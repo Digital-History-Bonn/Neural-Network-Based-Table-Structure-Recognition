@@ -1,0 +1,17 @@
+#!/bin/bash
+#SBATCH --partition=A40devel
+#SBATCH --nodes=1
+#SBATCH --tasks-per-node=1
+#SBATCH --job-name=test
+#SBATCH --output=outputs/test-%j.out
+#SBATCH --error=outputs/test-%j.err
+#SBATCH --gres gpu:1
+#SBATCH --cpus-per-task=1
+#SBATCH --time=1:00:00
+#SBATCH --mem=10gb
+source /home/s6anthel/.bashrc
+module load CUDA/11.8.0
+conda activate kosmos2
+cd unilm || exit
+cd kosmos-2_5 || exit
+python -m inference --do_ocr --image ../../data/BonnData/Tabellen/preprocessed/IMG_20190819_115757/IMG_20190819_115757_table_0.jpg --ckpt ../../checkpoints/kosmos2.5/ckpt.pt --out_dir ../../results/kosmos25/
