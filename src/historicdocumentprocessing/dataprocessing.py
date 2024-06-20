@@ -13,6 +13,37 @@ import warnings
 from torchvision.ops import box_iou
 
 
+def processdata_engnews_donut(targetloc: str = f"{Path(__file__).parent.absolute()}/../../data/EngNewspaper/raw",
+                              saveloc: str = f"{Path(__file__).parent.absolute()}/../../data/EngNewspaper/donut"):
+    """
+
+    Args:
+        targetloc:
+        saveloc:
+
+    Returns:
+
+    """
+    data = glob.glob(f"{targetloc}/*.json")
+    os.makedirs(saveloc, exist_ok=True)
+    dicts = []
+    for datapath in tqdm(data):
+        with open(datapath) as d:
+            string = json.load(d)
+            #print({"gt_parse": {"newspaper": [{str(k['class']): str(k['raw_text'])} for k in string['bboxes']]}})
+            #dict = {"file_name": {datapath.split('/')[-1].split('.')[-2]}, "ground_truth": {"gt_parse": {[{k['class']: k['raw_text']} for k in string['bboxes']]}}}
+            dicts.append({"file_name": str(datapath.split('/')[-1].split('.')[-2]), "ground_truth": {
+                "gt_parse": {"newspaper": [{str(k['class']): str(k['raw_text'])} for k in string['bboxes'] if
+                                           k['raw_text'] != ""]}}})
+    with open(f"{saveloc}/groundtruth.jsonl", "w") as file:
+        for dict in tqdm(dicts):
+            #print(dict, type(dict))
+            #cdict = json.dumps(dict)
+            #print([[type(key), key, type(value), value] for key, value in dict.items()])
+            #print(json.dumps({str(key): str(value) for key, value in dict.items()}))
+            file.write(f"{json.dumps(dict, indent=None)}\n")
+
+
 def processdata_engnews_kosmos(targetloc: str = f"{Path(__file__).parent.absolute()}/../../data/EngNewspaper/raw",
                                saveloc: str = f"{Path(__file__).parent.absolute()}/../../data/EngNewspaper/Kosmos"):
     """
@@ -344,8 +375,10 @@ def calcmetrics_tables(targetloc: str = f"{Path(__file__).parent.absolute()}/../
     #print(fullimagedf)
     #print(tabledf)
     #totalprec, totalrec, totalf1, totalwf1 = calcmetric(tpsum, fpsum, fnsum)
-    totalfullmetrics = get_dataframe(fullfnsum, fullfpsum, fulltpsum, nopredcount=fullimagedf.shape[0]-predcount, imnum=fullimagedf.shape[0], iou_thresholds=iou_thresholds)
-    partialfullmetrics = get_dataframe(fullfnsum_predonly, fullfpsum_predonly, fulltpsum_predonly, iou_thresholds=iou_thresholds)
+    totalfullmetrics = get_dataframe(fullfnsum, fullfpsum, fulltpsum, nopredcount=fullimagedf.shape[0] - predcount,
+                                     imnum=fullimagedf.shape[0], iou_thresholds=iou_thresholds)
+    partialfullmetrics = get_dataframe(fullfnsum_predonly, fullfpsum_predonly, fulltpsum_predonly,
+                                       iou_thresholds=iou_thresholds)
     totalmetrics = get_dataframe(fnsum, fpsum, tpsum, iou_thresholds=iou_thresholds)
     #print(totalfullmetrics)
     conclusiondf = pandas.DataFrame(columns=["wf1"])
@@ -371,11 +404,12 @@ def calcmetrics_tables(targetloc: str = f"{Path(__file__).parent.absolute()}/../
     return fullioulist, fullf1list, fullwf1list
 
 
-def get_dataframe(fnsum, fpsum, tpsum, nopredcount:int= None, imnum:int = None, iou_thresholds: List[float] = [0.5, 0.6, 0.7, 0.8, 0.9]):
+def get_dataframe(fnsum, fpsum, tpsum, nopredcount: int = None, imnum: int = None,
+                  iou_thresholds: List[float] = [0.5, 0.6, 0.7, 0.8, 0.9]):
     totalfullprec, totalfullrec, totalfullf1, totalfullwf1 = calcmetric(tpsum, fpsum, fnsum)
     totalfullmetrics = {"wf1": totalfullwf1.item()}
     totalfullmetrics.update({f"Number of evaluated files": imnum})
-    totalfullmetrics.update({f"Evaluated files without predictions:":nopredcount})
+    totalfullmetrics.update({f"Evaluated files without predictions:": nopredcount})
     totalfullmetrics.update({f"f1_{iou_thresholds[i]}": totalfullf1[i].item() for i in range(len(iou_thresholds))})
     totalfullmetrics.update({f"prec_{iou_thresholds[i]}": totalfullprec[i].item() for i in range(len(iou_thresholds))})
     totalfullmetrics.update({f"recall_{iou_thresholds[i]}": totalfullrec[i].item() for i in range(len(iou_thresholds))})
@@ -396,7 +430,8 @@ def main():
 
 if __name__ == '__main__':
     #processdata_engnews_kosmos()
+    processdata_engnews_donut()
     #print(calcmetrics_jsoninput())
-    calcmetrics_tables(
-        saveloc=f"{Path(__file__).parent.absolute()}/../../results/kosmos25/BonnData/Tabellen/testeval/trial4")
+    #calcmetrics_tables(
+    #    saveloc=f"{Path(__file__).parent.absolute()}/../../results/kosmos25/BonnData/Tabellen/testeval/trial4")
     #print(reversetablerelativebboxes_outer(f"{Path(__file__).parent.absolute()}/../../data/BonnData/Tabellen/preprocessed/I_HA_Rep_89_Nr_16160_0090"))
