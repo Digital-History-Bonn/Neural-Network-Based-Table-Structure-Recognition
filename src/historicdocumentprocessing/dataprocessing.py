@@ -12,6 +12,26 @@ import warnings
 
 from torchvision.ops import box_iou
 
+def getlabelname(label:str):
+    """
+    Ensure Labels are consistent between Melissa Dell and Chronicling Germany Newspaper Datasets
+    Args:
+        label: the label found in ground truth
+
+    Returns: final label used (str)
+
+    """
+    if label.casefold() in ["article", "header", "table", "caption", "heading", "advertisement"] :
+        return label.casefold()
+    elif label.casefold()=="headline":
+        return "heading"
+    elif label.casefold()=="cartoon/ad":
+        return "advertisement"
+    elif label.casefold()=="author":
+        return "author"
+    else :
+        return f"unknown label: {label}"
+
 
 def processdata_engnews_donut(targetloc: str = f"{Path(__file__).parent.absolute()}/../../data/EngNewspaper/raw",
                               saveloc: str = f"{Path(__file__).parent.absolute()}/../../data/EngNewspaper/donut"):
@@ -32,8 +52,11 @@ def processdata_engnews_donut(targetloc: str = f"{Path(__file__).parent.absolute
             string = json.load(d)
             #print({"gt_parse": {"newspaper": [{str(k['class']): str(k['raw_text'])} for k in string['bboxes']]}})
             #dict = {"file_name": {datapath.split('/')[-1].split('.')[-2]}, "ground_truth": {"gt_parse": {[{k['class']: k['raw_text']} for k in string['bboxes']]}}}
+            #dicts.append({"file_name": str(datapath.split('/')[-1].split('.')[-2]), "ground_truth": {
+            #    "gt_parse": {"newspaper": [{str(k['class']): str(k['raw_text'])} for k in string['bboxes'] if
+            #                               k['raw_text'] != ""]}}})
             dicts.append({"file_name": str(datapath.split('/')[-1].split('.')[-2]), "ground_truth": {
-                "gt_parse": {"newspaper": [{str(k['class']): str(k['raw_text'])} for k in string['bboxes'] if
+                "gt_parse": {"newspaper": [{getlabelname(str(k['class'])): str(k['raw_text'])} for k in string['bboxes'] if
                                            k['raw_text'] != ""]}}})
     with open(f"{saveloc}/groundtruth.jsonl", "w") as file:
         for dict in tqdm(dicts):
@@ -224,6 +247,7 @@ def calcmetrics_engnewspaper(targetloc: str = f"{Path(__file__).parent.absolute(
     List[torch.Tensor], List[torch.Tensor], List[torch.Tensor], torch.Tensor, torch.Tensor, torch.Tensor, torch.Tensor]:
     """
     Calculates metrics for all predictions and corresponding targets in a given location (Bboxes given as json files)
+    !incomplete since it wasnt needed so far!
     Args:
         targetloc: target location
         predloc: prediction location
@@ -421,11 +445,8 @@ def get_dataframe(fnsum, fpsum, tpsum, nopredcount: int = None, imnum: int = Non
 
 def savetotalmetrics(ioulist: List[torch.Tensor], f1list: List[torch.Tensor], wf1list: List[torch.Tensor],
                      totalprec: torch.Tensor, totalrec: torch.Tensor, totalf1: torch.Tensor, totalwf1: torch.Tensor):
-    return
-
-
-def main():
     pass
+
 
 
 if __name__ == '__main__':
