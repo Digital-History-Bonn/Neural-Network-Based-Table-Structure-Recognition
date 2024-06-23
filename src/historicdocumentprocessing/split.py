@@ -83,11 +83,11 @@ def newsplit(datapath: str = f"{Path(__file__).parent.absolute()}/../../data/Eng
     valid = imnames[round(imnum * (dataratio[1] + dataratio[0])):]
     #print(len(train), len(test), len(valid), imnum)
     assert len(train) + len(test) + len(valid) == imnum
-    dict = {"training": [t.split("/")[-1] for t in train], "test": [t.split("/")[-1] for t in test], "validation": [v.split("/")[-1] for v in valid]}
+    dict = {"train": [t.split("/")[-1] for t in train], "test": [t.split("/")[-1] for t in test], "validation": [v.split("/")[-1] for v in valid]}
     os.makedirs(savepath, exist_ok=True)
     with open(f"{savepath}/split.json", "w") as file:
         json.dump(dict, file, indent=2)
-    for cats, names in ((train, "training"), (test, "test"), (valid, "validation")):
+    for cats, names in ((train, "train"), (test, "test"), (valid, "validation")):
         saveloc = f"{savepath}/{names}"
         os.makedirs(saveloc, exist_ok=True)
         for im in cats:

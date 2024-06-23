@@ -6,13 +6,17 @@ from typing import Tuple, List
 
 import pandas
 import torch
+from bs4 import BeautifulSoup
 from torch import Tensor
 from tqdm import tqdm
 import warnings
 
+import re
+
 from torchvision.ops import box_iou
 
-def getlabelname(label:str):
+
+def getlabelname(label: str):
     """
     Ensure Labels are consistent between Melissa Dell and Chronicling Germany Newspaper Datasets
     Args:
@@ -21,17 +25,80 @@ def getlabelname(label:str):
     Returns: final label used (str)
 
     """
-    if label.casefold() in ["article", "header", "table", "caption", "heading", "advertisement"] :
+    if label.casefold() in ["paragraph", "header", "table", "caption", "heading", "advertisement", "image", "inverted_text"]:
+        #if label.casefold()=="advertisment":
+        #    print(label)
         return label.casefold()
-    elif label.casefold()=="headline":
+    elif label.casefold() == "headline":
         return "heading"
-    elif label.casefold()=="cartoon/ad":
+    elif label.casefold() == "cartoon/ad":
         return "advertisement"
-    elif label.casefold()=="author":
+    elif label.casefold() == "author":
         return "author"
-    else :
+    elif label.casefold()=="article":
+        return "paragraph"
+    elif re.compile("^separator_.+").match(label.casefold()):
+        #print(label)
+        return label.casefold()
+    else:
+        warnings.warn(f"Unknown label found!")
+        print(label)
         return f"unknown label: {label}"
 
+
+def processdata_gernews_donut(targetloc: str = f"{Path(__file__).parent.absolute()}/../../data/BonnData/Zeitungen/annotations/Test",
+                              saveloc: str = f"{Path(__file__).parent.absolute()}/../../data/BonnData/Zeitungen/donut/test"):
+    """
+    was tun bei annoncenseiten?????
+    Args:
+        targetloc:
+        saveloc:
+
+    Returns:
+
+    """
+    data = glob.glob(f"{targetloc}/*xml")
+    os.makedirs(saveloc, exist_ok=True)
+    #print(data)
+    dicts = []
+    for d in tqdm(data):
+        with open(d) as file:
+            xml = file.read()
+        xmlsoup = BeautifulSoup(xml, "xml")
+        #print(xmlsoup.contents)
+        #return
+        #print(d)
+        #\S+Region
+        dict = {"file_name": str(d.split('/')[-1].split('.')[-2]), "ground_truth": {
+            "gt_parse": {
+                "newspaper": []}}}
+        for x in xmlsoup.find_all(re.compile("^\S+Region")):#["TextRegion", "SeparatorRegion"]):
+            #print(x)
+            if x.has_attr('type'):
+                #print(uni.get_text() for uni in x.find_all('Unicode'))
+                #for uni in x.find_all('Unicode'):
+                    #print(uni.get_text())
+                dict["ground_truth"]["gt_parse"]["newspaper"].append({getlabelname(str(x['type'])): str("\n".join([uni.get_text() for uni in x.find_all('Unicode')]))})
+            elif x.Unicode:
+                #for uni in x.find_all('Unicode'):
+                #    print(uni.get_text())
+                #print("\n".join([uni.get_text() for uni in x.find_all('Unicode')]))
+                #print(x.custom, x)
+                dict["ground_truth"]["gt_parse"]["newspaper"].append(
+                    {getlabelname(str(x["custom"].split("structure {type:")[-1].split(";}")[-2])): str("\n".join([uni.get_text() for uni in x.find_all('Unicode')]))})
+            else:
+                #print(x.Unicode)
+                dict["ground_truth"]["gt_parse"]["newspaper"].append(
+                    {getlabelname(str(x["custom"].split("structure {type:")[-1].split(";}")[-2])): "\n"})
+                #print(x["custom"].split("structure {type:")[-1].split(";}")[-2])
+        dicts.append(dict)
+    with open(f"{saveloc}/groundtruth.jsonl", "w") as file:
+        for dict in tqdm(dicts):
+            #print(dict, type(dict))
+            #cdict = json.dumps(dict)
+            #print([[type(key), key, type(value), value] for key, value in dict.items()])
+            #print(json.dumps({str(key): str(value) for key, value in dict.items()}))
+            file.write(f"{json.dumps(dict, indent=None)}\n")
 
 def processdata_engnews_donut(targetloc: str = f"{Path(__file__).parent.absolute()}/../../data/EngNewspaper/raw",
                               saveloc: str = f"{Path(__file__).parent.absolute()}/../../data/EngNewspaper/donut"):
@@ -56,8 +123,9 @@ def processdata_engnews_donut(targetloc: str = f"{Path(__file__).parent.absolute
             #    "gt_parse": {"newspaper": [{str(k['class']): str(k['raw_text'])} for k in string['bboxes'] if
             #                               k['raw_text'] != ""]}}})
             dicts.append({"file_name": str(datapath.split('/')[-1].split('.')[-2]), "ground_truth": {
-                "gt_parse": {"newspaper": [{getlabelname(str(k['class'])): str(k['raw_text'])} for k in string['bboxes'] if
-                                           k['raw_text'] != ""]}}})
+                "gt_parse": {
+                    "newspaper": [{getlabelname(str(k['class'])): str(k['raw_text'])} for k in string['bboxes'] if
+                                  k['raw_text'] != ""]}}})
     with open(f"{saveloc}/groundtruth.jsonl", "w") as file:
         for dict in tqdm(dicts):
             #print(dict, type(dict))
@@ -448,10 +516,10 @@ def savetotalmetrics(ioulist: List[torch.Tensor], f1list: List[torch.Tensor], wf
     pass
 
 
-
 if __name__ == '__main__':
     #processdata_engnews_kosmos()
-    processdata_engnews_donut()
+    #processdata_engnews_donut()
+    processdata_gernews_donut()
     #print(calcmetrics_jsoninput())
     #calcmetrics_tables(
     #    saveloc=f"{Path(__file__).parent.absolute()}/../../results/kosmos25/BonnData/Tabellen/testeval/trial4")
