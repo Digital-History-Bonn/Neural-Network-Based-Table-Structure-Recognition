@@ -24,11 +24,13 @@ def recreatetablesplit(datapath: str = f"{Path(__file__).parent.absolute()}/../.
     savelocs = "/".join(datapath.split("/")[:-1]) + "/test"
     os.makedirs(savelocs, exist_ok=True)
     #print(len(imnames))
+    #print(imnames)
     for i, imname in tqdm(enumerate(imnames)):
+        if isinstance(imname, float):
+            imname = int(imname)
         imfolder = glob.glob(f"{datapath}/{str(imname)}")
         saveloc = f"{savelocs}/{imname}"
         dest = shutil.copytree(src=imfolder[0], dst=saveloc, dirs_exist_ok=True)
-        #print(i)
 
 
 def recreatenewspapersplit(datapath: str = f"{Path(__file__).parent.absolute()}/../../data/BonnData/Zeitungen",
@@ -83,7 +85,8 @@ def newsplit(datapath: str = f"{Path(__file__).parent.absolute()}/../../data/Eng
     valid = imnames[round(imnum * (dataratio[1] + dataratio[0])):]
     #print(len(train), len(test), len(valid), imnum)
     assert len(train) + len(test) + len(valid) == imnum
-    dict = {"train": [t.split("/")[-1] for t in train], "test": [t.split("/")[-1] for t in test], "validation": [v.split("/")[-1] for v in valid]}
+    dict = {"train": [t.split("/")[-1] for t in train], "test": [t.split("/")[-1] for t in test],
+            "validation": [v.split("/")[-1] for v in valid]}
     os.makedirs(savepath, exist_ok=True)
     with open(f"{savepath}/split.json", "w") as file:
         json.dump(dict, file, indent=2)
@@ -95,6 +98,8 @@ def newsplit(datapath: str = f"{Path(__file__).parent.absolute()}/../../data/Eng
 
 
 if __name__ == '__main__':
+    recreatetablesplit(datapath=f"{Path(__file__).parent.absolute()}/../../data/GloSat/preprocessed",
+                       csvpath=f"{Path(__file__).parent.absolute()}/../../data/GloSat/run_GloSAT_cell_aug_e250_es.csv")
     #recreatetablesplit()
     #recreatenewspapersplit()
-    newsplit()
+    #newsplit()
