@@ -10,14 +10,14 @@ from matplotlib import pyplot as plt
 import numpy as np
 from tqdm import tqdm
 from PIL import Image
-from dataprocessing import extractboxes, reversetablerelativebboxes_outer
+from src.historicdocumentprocessing.kosmos_eval import reversetablerelativebboxes_outer, extractboxes
 
 
 def drawimg_varformat(impath: str = f"{Path(__file__).parent.absolute()}/../../data/BonnData/test/Konflikttabelle.jpg",
                       predpath: str = f"{Path(__file__).parent.absolute()}/../../results/kosmos25/Konflikttabelle.jpg.json",
                       groundpath: str = None,
                       savepath: str = None,
-                      tableonly:bool = True):
+                      tableonly: bool = True):
     #img = plt.imread(impath)
     #img.setflags(write=1)
     #img = img.copy()
@@ -56,7 +56,21 @@ def drawimg_varformat(impath: str = f"{Path(__file__).parent.absolute()}/../../d
     #print(labels, colors, box)
     #print(gbox.shape, box.shape)
     #print(img.shape)
-    image = draw_bounding_boxes(image=img, boxes=box, labels=labels, colors=colors)
+    #print(predpath)
+    try:
+        image = draw_bounding_boxes(image=img, boxes=box, labels=labels, colors=colors)
+    except ValueError:
+        #print(predpath)
+        #print(box)
+        newbox = torch.empty((0, 4))
+        for b in box:
+            if b[0] < b[2] and b[1] < b[3]:
+                newbox= torch.vstack((newbox, b.clone()))
+            else:
+                print(f"Invalid bounfing box in image {impath.split('/')[-1]}",b)
+        #print(newbox)
+        labels = ["Pred" for i in range(newbox.shape[0])]
+        image = draw_bounding_boxes(image=img, boxes=torch.tensor(newbox), labels=labels, colors=colors)
     #plt.imshow(image.permute(1, 2, 0))
     if savepath:
         os.makedirs(savepath, exist_ok=True)
@@ -104,7 +118,7 @@ def drawimages(impath: str = f"{Path(__file__).parent.absolute()}/../../data/Bon
 
 def drawimages_var(impath: str = f"{Path(__file__).parent.absolute()}/../../data/BonnData/test",
                    jsonpath: str = f"{Path(__file__).parent.absolute()}/../../results/kosmos25/BonnData/test",
-                   savepath: str = None, groundpath: str = None, tableonly:bool=True):
+                   savepath: str = None, groundpath: str = None, tableonly: bool = True):
     jsons = glob.glob(f"{jsonpath}/*.json")
     if len(jsons) == 0:
         jsons = glob.glob(f"{jsonpath}/*")
@@ -124,7 +138,10 @@ def drawimages_var(impath: str = f"{Path(__file__).parent.absolute()}/../../data
         #print(signifier, imgpred)
         img = glob.glob(f"{impath}/{signifier}/{signifier}.jpg")
         #print(glob.glob(f"{impath}/{signifier}/*"))
-        drawimg_varformat(impath=img[0], predpath=imgpred, savepath=savepath, groundpath=groundpath if not groundpath else glob.glob(f"{groundpath}/{signifier}")[0], tableonly=tableonly)
+        #print(signifier, img)
+        drawimg_varformat(impath=img[0], predpath=imgpred, savepath=savepath,
+                          groundpath=groundpath if not groundpath else glob.glob(f"{groundpath}/{signifier}")[0],
+                          tableonly=tableonly)
         #if groundpath:
         #    groundpathfiner = glob.glob(f"{groundpath}/{signifier}")[0]
         #    #print(glob.glob(groundpathfiner), groundpathfiner)
@@ -141,10 +158,14 @@ def main():
 if __name__ == '__main__':
     #drawimages(savepath=f"{Path(__file__).parent.absolute()}/../../images/Kosmos")
     #drawimages_var()
-    drawimages_var(impath=f"{Path(__file__).parent.absolute()}/../../data/BonnData/Tabellen/test",
-                   groundpath=f"{Path(__file__).parent.absolute()}/../../data/BonnData/Tabellen/test",
-                   jsonpath=f"{Path(__file__).parent.absolute()}/../../results/kosmos25/BonnData/Tabellen/test",
-                   savepath=f"{Path(__file__).parent.absolute()}/../../images/Kosmos/tables/tableonly")
+    #drawimages_var(impath=f"{Path(__file__).parent.absolute()}/../../data/BonnData/Tabellen/test",
+    #               groundpath=f"{Path(__file__).parent.absolute()}/../../data/BonnData/Tabellen/test",
+    #               jsonpath=f"{Path(__file__).parent.absolute()}/../../results/kosmos25/BonnData/Tabellen/test",
+    #               savepath=f"{Path(__file__).parent.absolute()}/../../images/Kosmos/tables/tableonly")
+    drawimages_var(impath=f"{Path(__file__).parent.absolute()}/../../data/GloSat/test",
+                   groundpath=f"{Path(__file__).parent.absolute()}/../../data/GloSat/test",
+                   jsonpath=f"{Path(__file__).parent.absolute()}/../../results/kosmos25/GloSat/test1",
+                   savepath=f"{Path(__file__).parent.absolute()}/../../images/Kosmos/GloSat")
     #print(torch.load(f"{Path(__file__).parent.absolute()}/../../data/BonnData/Tabellen/preprocessed/I_HA_Rep_89_Nr_16160_0241/I_HA_Rep_89_Nr_16160_0241_tables.pt"))
     #drawimg(impath= f"{Path(__file__).parent.absolute()}/../../data/BonnData/Tabellen/preprocessed/I_HA_Rep_89_Nr_16160_0089/I_HA_Rep_89_Nr_16160_0089.jpg", jsonpath=f"{Path(__file__).parent.absolute()}/../../results/kosmos25/I_HA_Rep_89_Nr_16160_0089.jpg.json", savepath=f"{Path(__file__).parent.absolute()}/../../images/Kosmos")
     #drawimg(impath= f"{Path(__file__).parent.absolute()}/../../data/BonnData/Tabellen/preprocessed/I_HA_Rep_89_Nr_16160_0089/I_HA_Rep_89_Nr_16160_0089_table_0.jpg",jsonpath=f"{Path(__file__).parent.absolute()}/../../results/kosmos25/I_HA_Rep_89_Nr_16160_0089_table_0.jpg.json",savepath=f"{Path(__file__).parent.absolute()}/../../images/Kosmos")
