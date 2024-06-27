@@ -106,10 +106,16 @@ def calcstats_overlap(predbox: torch.tensor, targetbox: torch.tensor, imname: st
 
 
     """
-    overlapmat = torch.zeros((predbox.shape[0], targetbox.shape[1]))
+    #print(predbox.shape, targetbox.shape)
+    if not predbox.numel():
+        #print(predbox.shape)
+        warnings.warn(f"A Prediction Bounding Box Tensor in {imname} is empty. (no predicitons)")
+        return torch.zeros(1), torch.zeros(1), torch.full([1], fill_value=targetbox.shape[0])
+    overlapmat = torch.zeros((predbox.shape[0], targetbox.shape[0]))
     for i, pred in enumerate(predbox):
         for j, target in enumerate(targetbox):
-            if boxoverlap(bbox=pred, tablebox=target):
+            if boxoverlap(bbox=pred, tablebox=target, fuzzy=fuzzy):
+                #print(imname, pred,target)
                 overlapmat[i, j] = 1
     predious = overlapmat.amax(dim=1)
     targetious = overlapmat.amax(dim=0)
@@ -117,8 +123,10 @@ def calcstats_overlap(predbox: torch.tensor, targetbox: torch.tensor, imname: st
     # print(tp, predious.unsqueeze(-1).expand(-1, len(threshold_tensor)))
     fp = overlapmat.shape[0] - tp
     fn = torch.sum(targetious.unsqueeze(-1), dim=0)
-    print(overlapmat)
-    print(tp, fp, fn)
+    #print(overlapmat.shape, predbox.shape, targetbox.shape)
+    #print(tp, fp, fn)
+    #print(type(tp))
+    #print(tp.shape)
     return tp, fp, fn
 
 
@@ -134,6 +142,7 @@ def calcmetric_overlap(tp: torch.Tensor, fp: torch.Tensor, fn: torch.Tensor) -> 
     precision = torch.nan_to_num(tp / (tp + fp))
     recall = torch.nan_to_num(tp / (tp + fn))
     f1 = torch.nan_to_num(2 * (precision * recall) / (precision + recall))
+    #print(precision, recall, f1)
     return precision, recall, f1
 
 
@@ -274,6 +283,12 @@ def calcmetrics_tables(targetloc: str = f"{Path(__file__).parent.absolute()}/../
     fulltpsum_predonly = torch.zeros(len(iou_thresholds))
     fullfpsum_predonly = torch.zeros(len(iou_thresholds))
     fullfnsum_predonly = torch.zeros(len(iou_thresholds))
+    tpsum_overlap = torch.zeros(1)
+    fpsum_overlap = torch.zeros(1)
+    fnsum_overlap = torch.zeros(1)
+    tpsum_overlap_predonly = torch.zeros(1)
+    fpsum_overlap_predonly = torch.zeros(1)
+    fnsum_overlap_predonly = torch.zeros(1)
     #tablevars
     ioulist = []
     f1list = []
@@ -327,19 +342,26 @@ def calcmetrics_tables(targetloc: str = f"{Path(__file__).parent.absolute()}/../
         # fullimagemetrics with alternate metric
         # ........................................
         fulltp_overlap, fullfp_overlap, fullfn_overlap = calcstats_overlap(fullimagepredbox, fullimagegroundbox,
-                                                   imname=preds.split('/')[-1])
+                                                                           imname=preds.split('/')[-1])
 
-        fullprec_overlap, fullrec_overlap, fullf1_overlap = calcmetric_overlap(fulltp, fullfp, fullfn)
+        fullprec_overlap, fullrec_overlap, fullf1_overlap = calcmetric_overlap(tp=fulltp_overlap, fp=fullfp_overlap,
+                                                                               fn=fullfn_overlap)
         tpsum_overlap += fulltp_overlap
         fpsum_overlap += fullfp_overlap
         fnsum_overlap += fullfn_overlap
-        overlapmetric = {"img": imname, "prednum": fullimagepredbox.shape[0], f"prec" : fullprec_overlap.item(), f"recall": fullrec_overlap.item, f"f1" : fullf1_overlap.item()}
+        overlapmetric = {"img": imname, "prednum": fullimagepredbox.shape[0], f"prec": fullprec_overlap.item(),
+                         f"recall": fullrec_overlap.item(), f"f1": fullf1_overlap.item(),
+                         "tp": fulltp_overlap, "fp": fullfp_overlap, "fn": fullfn_overlap}
+
         overlapdf = pandas.concat([overlapdf, pandas.DataFrame(overlapmetric, index=[n])])
 
         if fullimagepredbox.shape[0] != 0:
             fulltpsum_predonly += fulltp
             fullfpsum_predonly += fullfp
             fullfnsum_predonly += fullfn
+            tpsum_overlap_predonly += fulltp_overlap
+            fpsum_overlap_predonly += fullfp_overlap
+            fnsum_overlap_predonly += fullfn_overlap
             predcount += 1
 
             #print("here",fullimagepredbox)
@@ -390,6 +412,15 @@ def calcmetrics_tables(targetloc: str = f"{Path(__file__).parent.absolute()}/../
                                        iou_thresholds=iou_thresholds)
     totalmetrics = get_dataframe(fnsum, fpsum, tpsum, iou_thresholds=iou_thresholds)
     #print(totalfullmetrics)
+    overlapprec, overlaprec, overlapf1 = calcmetric_overlap(tp=tpsum_overlap, fp=fpsum_overlap, fn=fnsum_overlap)
+    totaloverlapdf = pandas.DataFrame({"f1": overlapf1, "prec": overlaprec, "recall": overlaprec}, index=["overlap"])
+    overlapprec_predonly, overlaprec_predonly, overlapf1_predonly = calcmetric_overlap(tp=tpsum_overlap_predonly,
+                                                                                       fp=fpsum_overlap_predonly,
+                                                                                       fn=fnsum_overlap_predonly)
+    predonlyoverlapdf = pandas.DataFrame({f"Number of evaluated files": overlapdf.shape[0],
+                                          f"Evaluated files without predictions:": overlapdf.shape[0] - predcount,
+                                          "f1": overlapf1_predonly, "prec": overlaprec_predonly,
+                                          "recall": overlaprec_predonly}, index=["overlap with valid preds"])
     conclusiondf = pandas.DataFrame(columns=["wf1"])
     #totalmetrics = {"wf1": totalwf1.item()}
     #totalmetrics.update({f"f1_{iou_thresholds[i]}": totalf1[i].item() for i in range(len(iou_thresholds))})
@@ -401,7 +432,8 @@ def calcmetrics_tables(targetloc: str = f"{Path(__file__).parent.absolute()}/../
 
     conclusiondf = pandas.concat([conclusiondf, pandas.DataFrame(totalfullmetrics, index=["full image metrics"]),
                                   pandas.DataFrame(partialfullmetrics, index=["full image with valid preds"]),
-                                  pandas.DataFrame(totalmetrics, index=["table metrics"])])
+                                  pandas.DataFrame(totalmetrics, index=["table metrics"]), totaloverlapdf,
+                                  predonlyoverlapdf])
 
     #print(conclusiondf)
     #save results
@@ -432,6 +464,10 @@ def get_dataframe(fnsum, fpsum, tpsum, nopredcount: int = None, imnum: int = Non
 if __name__ == '__main__':
     #print(calcmetrics_jsoninput())
     #calcmetrics_tables(
-    #saveloc=f"{Path(__file__).parent.absolute()}/../../results/kosmos25/BonnData/Tabellen/testeval/trial4")
+    #    saveloc=f"{Path(__file__).parent.absolute()}/../../results/kosmos25/BonnData/Tabellen/testeval/trial5")
+    calcmetrics_tables(targetloc=f"{Path(__file__).parent.absolute()}/../../data/GloSat/test",
+                       predloc=f"{Path(__file__).parent.absolute()}/../../results/kosmos25/GloSat/test1",
+                       iou_thresholds=[0.5, 0.6, 0.7, 0.8, 0.9],
+                       saveloc=f"{Path(__file__).parent.absolute()}/../../results/kosmos25/GloSat/testeval/test1")
     #print(reversetablerelativebboxes_outer(f"{Path(__file__).parent.absolute()}/../../data/BonnData/Tabellen/preprocessed/I_HA_Rep_89_Nr_16160_0090"))
     pass
