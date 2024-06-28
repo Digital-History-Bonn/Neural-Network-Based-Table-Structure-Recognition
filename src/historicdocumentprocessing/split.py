@@ -7,8 +7,33 @@ from pathlib import Path
 from typing import List, Dict
 
 import pandas as pd
+import torch
 from tqdm import tqdm
+from dataprocessing import processdata_wildtable_kosmos
 
+def subclasssplitwildtables(impath: str = f"{Path(__file__).parent.absolute()}/../../data/Tablesinthewild/test/images", xmlpath: str =  f"{Path(__file__).parent.absolute()}/../../data/Tablesinthewild/test/test-xml-revise/test-xml-revise", txtfolder:str = f"{Path(__file__).parent.absolute()}/../../data/Tablesinthewild/test/sub_classes"):
+    """split wildtables into subclasses (TO ADD: Preprocessing for xml files)"""
+    txts = glob.glob(f"{txtfolder}/*txt")
+    for txt in txts:
+        with open(txt) as f:
+            foldername = txt.split("/")[-1].split(".")[-2]
+            #print(foldername)
+            destfolder = f"{'/'.join(impath.split('/')[:-2])}/preprocessed/{foldername}"
+            #print(destfolder)
+            for line in tqdm(f):
+                #print(line)
+                #print(f"{impath}/{line}")
+
+                im = glob.glob(f"{impath}/{line.rstrip()}")[0]
+                xml = glob.glob(f"{xmlpath}/{line.split('.')[-2]}.xml")[0]
+                processedpt = processdata_wildtable_kosmos(xml)
+                #print(processedpt)
+                imfolder = f"{destfolder}/{line.split('.')[-2]}"
+                os.makedirs(imfolder, exist_ok=True)
+                #print(f"{imfolder}/{line.split('.')[-2]}.xml",  f"{imfolder}/{line.rstrip()}")
+                shutil.copy(im, f"{imfolder}/{line.rstrip()}")
+                torch.save(processedpt, f"{imfolder}/{line.split('.')[-2]}.pt")
+                pass
 
 def recreatetablesplit(datapath: str = f"{Path(__file__).parent.absolute()}/../../data/BonnData/Tabellen/preprocessed",
                        csvpath: str = f"{Path(__file__).parent.absolute()}/../../data/BonnData/Tabellen/run3_BonnData_cell_aug_loadrun_GloSAT_cell_aug_e250_es_e250_es.csv"):
@@ -98,8 +123,9 @@ def newsplit(datapath: str = f"{Path(__file__).parent.absolute()}/../../data/Eng
 
 
 if __name__ == '__main__':
-    recreatetablesplit(datapath=f"{Path(__file__).parent.absolute()}/../../data/GloSat/preprocessed",
-                       csvpath=f"{Path(__file__).parent.absolute()}/../../data/GloSat/run_GloSAT_cell_aug_e250_es.csv")
+    #recreatetablesplit(datapath=f"{Path(__file__).parent.absolute()}/../../data/GloSat/preprocessed",
+    #                   csvpath=f"{Path(__file__).parent.absolute()}/../../data/GloSat/run_GloSAT_cell_aug_e250_es.csv")
     #recreatetablesplit()
     #recreatenewspapersplit()
     #newsplit()
+    subclasssplitwildtables()

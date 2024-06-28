@@ -3,6 +3,7 @@ from pathlib import Path
 import glob
 import json
 
+import torch
 from bs4 import BeautifulSoup
 from tqdm import tqdm
 import warnings
@@ -19,7 +20,8 @@ def getlabelname(label: str):
     Returns: final label used (str)
 
     """
-    if label.casefold() in ["paragraph", "header", "table", "caption", "heading", "advertisement", "image", "inverted_text"]:
+    if label.casefold() in ["paragraph", "header", "table", "caption", "heading", "advertisement", "image",
+                            "inverted_text"]:
         #if label.casefold()=="advertisment":
         #    print(label)
         return label.casefold()
@@ -29,7 +31,7 @@ def getlabelname(label: str):
         return "advertisement"
     elif label.casefold() == "author":
         return "author"
-    elif label.casefold()=="article":
+    elif label.casefold() == "article":
         return "paragraph"
     elif re.compile("^separator_.+").match(label.casefold()):
         #print(label)
@@ -40,8 +42,9 @@ def getlabelname(label: str):
         return f"unknown label: {label}"
 
 
-def processdata_gernews_donut(targetloc: str = f"{Path(__file__).parent.absolute()}/../../data/BonnData/Zeitungen/annotations/Test",
-                              saveloc: str = f"{Path(__file__).parent.absolute()}/../../data/BonnData/Zeitungen/donut/test"):
+def processdata_gernews_donut(
+        targetloc: str = f"{Path(__file__).parent.absolute()}/../../data/BonnData/Zeitungen/annotations/Test",
+        saveloc: str = f"{Path(__file__).parent.absolute()}/../../data/BonnData/Zeitungen/donut/test"):
     """
     was tun bei annoncenseiten?????
     Args:
@@ -66,20 +69,22 @@ def processdata_gernews_donut(targetloc: str = f"{Path(__file__).parent.absolute
         dict = {"file_name": str(d.split('/')[-1].split('.')[-2]), "ground_truth": {
             "gt_parse": {
                 "newspaper": []}}}
-        for x in xmlsoup.find_all(re.compile("^\S+Region")):#["TextRegion", "SeparatorRegion"]):
+        for x in xmlsoup.find_all(re.compile("^\S+Region")):  #["TextRegion", "SeparatorRegion"]):
             #print(x)
             if x.has_attr('type'):
                 #print(uni.get_text() for uni in x.find_all('Unicode'))
                 #for uni in x.find_all('Unicode'):
-                    #print(uni.get_text())
-                dict["ground_truth"]["gt_parse"]["newspaper"].append({getlabelname(str(x['type'])): str("\n".join([uni.get_text() for uni in x.find_all('Unicode')]))})
+                #print(uni.get_text())
+                dict["ground_truth"]["gt_parse"]["newspaper"].append(
+                    {getlabelname(str(x['type'])): str("\n".join([uni.get_text() for uni in x.find_all('Unicode')]))})
             elif x.Unicode:
                 #for uni in x.find_all('Unicode'):
                 #    print(uni.get_text())
                 #print("\n".join([uni.get_text() for uni in x.find_all('Unicode')]))
                 #print(x.custom, x)
                 dict["ground_truth"]["gt_parse"]["newspaper"].append(
-                    {getlabelname(str(x["custom"].split("structure {type:")[-1].split(";}")[-2])): str("\n".join([uni.get_text() for uni in x.find_all('Unicode')]))})
+                    {getlabelname(str(x["custom"].split("structure {type:")[-1].split(";}")[-2])): str(
+                        "\n".join([uni.get_text() for uni in x.find_all('Unicode')]))})
             else:
                 #print(x.Unicode)
                 dict["ground_truth"]["gt_parse"]["newspaper"].append(
@@ -93,6 +98,7 @@ def processdata_gernews_donut(targetloc: str = f"{Path(__file__).parent.absolute
             #print([[type(key), key, type(value), value] for key, value in dict.items()])
             #print(json.dumps({str(key): str(value) for key, value in dict.items()}))
             file.write(f"{json.dumps(dict, indent=None)}\n")
+
 
 def processdata_engnews_donut(targetloc: str = f"{Path(__file__).parent.absolute()}/../../data/EngNewspaper/raw",
                               saveloc: str = f"{Path(__file__).parent.absolute()}/../../data/EngNewspaper/donut"):
@@ -157,8 +163,21 @@ def processdata_engnews_kosmos(targetloc: str = f"{Path(__file__).parent.absolut
                     out.write(currentjson)
 
 
+def processdata_wildtable_kosmos(datapath):
+    """process data to pt bbox file used in project group"""
+    with open(datapath) as d:
+        xml = BeautifulSoup(d, "xml")
+    #print(xml)
+    bboxes = torch.empty(4, dtype=torch.uint8)
+    for box in xml.find_all("bndbox"):
+        new = torch.tensor([int(float(box.xmin.get_text())), int(float(box.ymin.get_text())), int(float(box.xmax.get_text())),
+                            int(float(box.ymax.get_text()))], dtype=torch.uint8)
+        bboxes = torch.vstack([bboxes, new])
+    return bboxes
+
+
 if __name__ == '__main__':
+    pass
     #processdata_engnews_kosmos()
     #processdata_engnews_donut()
-    processdata_gernews_donut()
-
+    #processdata_gernews_donut()
