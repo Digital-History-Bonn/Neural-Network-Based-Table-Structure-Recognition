@@ -261,7 +261,7 @@ def calcmetrics_tables(targetloc: str = f"{Path(__file__).parent.absolute()}/../
                        predloc: str = f"{Path(__file__).parent.absolute()}/../../results/kosmos25/BonnData"
                                       f"/Tabellen/test",
                        iou_thresholds: List[float] = [0.5, 0.6, 0.7, 0.8, 0.9],
-                       saveloc: str = f"{Path(__file__).parent.absolute()}/../../results/kosmos25/BonnData/Tabellen/testeval") -> \
+                       saveloc: str = f"{Path(__file__).parent.absolute()}/../../results/kosmos25/BonnData/Tabellen/testeval", tableavail:bool=True) -> \
         Tuple[
             List[torch.Tensor], List[torch.Tensor], List[
                 torch.Tensor]]:
@@ -308,9 +308,13 @@ def calcmetrics_tables(targetloc: str = f"{Path(__file__).parent.absolute()}/../
         fullimagepred = [file for file in glob.glob(f"{preds}/*") if "_table_" not in file][0]
         #print(fullimagepred)
         with open(fullimagepred) as p:
-            fullimagepredbox = extractboxes(json.load(p), fpath=targets[0])
+            fullimagepredbox = extractboxes(json.load(p), fpath=targets[0] if tableavail else None)
             #print(targets[0])
-        fullimagegroundbox = reversetablerelativebboxes_outer(targets[0])
+
+        if tableavail:
+            fullimagegroundbox = reversetablerelativebboxes_outer(targets[0])
+        else:
+            fullimagegroundbox = torch.load(glob.glob(f"{targetloc}/{preds.split('/')[-1]}/*pt")[0])
 
         # .................................
         # fullimagemetrics with iou
@@ -465,9 +469,18 @@ if __name__ == '__main__':
     #print(calcmetrics_jsoninput())
     #calcmetrics_tables(
     #    saveloc=f"{Path(__file__).parent.absolute()}/../../results/kosmos25/BonnData/Tabellen/testeval/trial5")
-    calcmetrics_tables(targetloc=f"{Path(__file__).parent.absolute()}/../../data/GloSat/test",
-                       predloc=f"{Path(__file__).parent.absolute()}/../../results/kosmos25/GloSat/test1",
+    #calcmetrics_tables(targetloc=f"{Path(__file__).parent.absolute()}/../../data/GloSat/test",
+    #                   predloc=f"{Path(__file__).parent.absolute()}/../../results/kosmos25/GloSat/test1",
+    #                   iou_thresholds=[0.5, 0.6, 0.7, 0.8, 0.9],
+    #                   saveloc=f"{Path(__file__).parent.absolute()}/../../results/kosmos25/GloSat/testeval/test1")
+    #calcmetrics_tables(targetloc=f"{Path(__file__).parent.absolute()}/../../data/Tablesinthewild/preprocessed/simple",
+    #                   predloc=f"{Path(__file__).parent.absolute()}/../../results/kosmos25/Tablesinthewild/simple",
+    #                   iou_thresholds=[0.5, 0.6, 0.7, 0.8, 0.9],
+    #                   saveloc=f"{Path(__file__).parent.absolute()}/../../results/kosmos25/Tablesinthewild/testeval/simple", tableavail=False)
+    calcmetrics_tables(targetloc=f"{Path(__file__).parent.absolute()}/../../data/Tablesinthewild/preprocessed/curved",
+                       predloc=f"{Path(__file__).parent.absolute()}/../../results/kosmos25/Tablesinthewild/curved",
                        iou_thresholds=[0.5, 0.6, 0.7, 0.8, 0.9],
-                       saveloc=f"{Path(__file__).parent.absolute()}/../../results/kosmos25/GloSat/testeval/test1")
+                       saveloc=f"{Path(__file__).parent.absolute()}/../../results/kosmos25/Tablesinthewild/testeval/curved",
+                       tableavail=False)
     #print(reversetablerelativebboxes_outer(f"{Path(__file__).parent.absolute()}/../../data/BonnData/Tabellen/preprocessed/I_HA_Rep_89_Nr_16160_0090"))
     pass

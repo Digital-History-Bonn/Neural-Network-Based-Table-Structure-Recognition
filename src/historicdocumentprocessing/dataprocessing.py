@@ -168,15 +168,19 @@ def processdata_wildtable_kosmos(datapath):
     with open(datapath) as d:
         xml = BeautifulSoup(d, "xml")
     #print(xml)
-    bboxes = torch.empty(4, dtype=torch.uint8)
+    bboxes = torch.empty(4)
     for box in xml.find_all("bndbox"):
+        #print(box)
         new = torch.tensor([int(float(box.xmin.get_text())), int(float(box.ymin.get_text())), int(float(box.xmax.get_text())),
-                            int(float(box.ymax.get_text()))], dtype=torch.uint8)
+                            int(float(box.ymax.get_text()))], dtype=torch.float)
+        #print(new)
         bboxes = torch.vstack([bboxes, new])
+    #print(bboxes)
     return bboxes
 
 
 if __name__ == '__main__':
+    processdata_wildtable_kosmos(f"{Path(__file__).parent.absolute()}/../../data/Tablesinthewild/test/test-xml-revise/test-xml-revise/0hZg6EpcTdKXk6j44umj3gAAACMAAQED.xml")
     pass
     #processdata_engnews_kosmos()
     #processdata_engnews_donut()
