@@ -392,9 +392,9 @@ def calcmetrics_tables(targetloc: str = f"{Path(__file__).parent.absolute()}/../
                                                                     targetbox=fullimagegroundbox,
                                                                     imname=preds.split('/')[-1],
                                                                     iou_thresholds=iou_thresholds)
-        print(IoDT_tp, IoDT_fp, IoDT_fn)
+        #print(IoDT_tp, IoDT_fp, IoDT_fn)
         IoDT_prec, IoDT_rec, IoDT_f1, IoDT_wf1 = calcmetric(IoDT_tp, IoDT_fp, IoDT_fn, iou_thresholds=iou_thresholds)
-        print(IoDT_prec, IoDT_rec, IoDT_f1, IoDT_wf1)
+        #print(IoDT_prec, IoDT_rec, IoDT_f1, IoDT_wf1)
         tpsum_IoDT += IoDT_tp
         fpsum_IoDT += IoDT_fp
         fnsum_IoDT += IoDT_fn
@@ -548,8 +548,9 @@ def calcmetrics_tables(targetloc: str = f"{Path(__file__).parent.absolute()}/../
     os.makedirs(saveloc, exist_ok=True)
     #print(fullimagedf.loc[50])
     overlapdf.to_csv(f"{saveloc}/fullimageoverlapeval.csv")
-    fullimagedf.to_csv(f"{saveloc}/fullimageeval.csv")
-    tabledf.to_csv(f"{saveloc}/tableeval.csv")
+    fullimagedf.to_csv(f"{saveloc}/fullimageiou.csv")
+    tabledf.to_csv(f"{saveloc}/tableiou.csv")
+    iodtdf.to_csv(f"{saveloc}/fullimageiodt.csv")
     conclusiondf.to_csv(f"{saveloc}/overview.csv")
     return fullioulist, fullf1list, fullwf1list
 
@@ -573,19 +574,21 @@ if __name__ == '__main__':
     #print(calcmetrics_jsoninput())
     calcmetrics_tables(
         saveloc=f"{Path(__file__).parent.absolute()}/../../results/kosmos25/BonnData/Tabellen/testeval/withIoDT")
-    #calcmetrics_tables(targetloc=f"{Path(__file__).parent.absolute()}/../../data/GloSat/test",
-    #                   predloc=f"{Path(__file__).parent.absolute()}/../../results/kosmos25/GloSat/test1",
-    #                   iou_thresholds=[0.5, 0.6, 0.7, 0.8, 0.9],
-    #                   saveloc=f"{Path(__file__).parent.absolute()}/../../results/kosmos25/GloSat/testeval/test1")
+    calcmetrics_tables(targetloc=f"{Path(__file__).parent.absolute()}/../../data/GloSat/test",
+                       predloc=f"{Path(__file__).parent.absolute()}/../../results/kosmos25/GloSat/test1",
+                       iou_thresholds=[0.5, 0.6, 0.7, 0.8, 0.9],
+                       saveloc=f"{Path(__file__).parent.absolute()}/../../results/kosmos25/GloSat/testeval/withIoDT")
     calcmetrics_tables(targetloc=f"{Path(__file__).parent.absolute()}/../../data/Tablesinthewild/preprocessed/simple",
                        predloc=f"{Path(__file__).parent.absolute()}/../../results/kosmos25/Tablesinthewild/simple",
                        iou_thresholds=[0.5, 0.6, 0.7, 0.8, 0.9],
-                       saveloc=f"{Path(__file__).parent.absolute()}/../../results/kosmos25/Tablesinthewild/testeval/simple/withIoDT",
+                       saveloc=f"{Path(__file__).parent.absolute()}/../../results/kosmos25/Tablesinthewild/testeval"
+                               f"/simple/withIoDT",
                        tableavail=False)
-    #calcmetrics_tables(targetloc=f"{Path(__file__).parent.absolute()}/../../data/Tablesinthewild/preprocessed/curved",
-    #                   predloc=f"{Path(__file__).parent.absolute()}/../../results/kosmos25/Tablesinthewild/curved",
-    #                   iou_thresholds=[0.5, 0.6, 0.7, 0.8, 0.9],
-    #                   saveloc=f"{Path(__file__).parent.absolute()}/../../results/kosmos25/Tablesinthewild/testeval/curved",
-    #                   tableavail=False)
+    calcmetrics_tables(targetloc=f"{Path(__file__).parent.absolute()}/../../data/Tablesinthewild/preprocessed/curved",
+                       predloc=f"{Path(__file__).parent.absolute()}/../../results/kosmos25/Tablesinthewild/curved",
+                       iou_thresholds=[0.5, 0.6, 0.7, 0.8, 0.9],
+                       saveloc=f"{Path(__file__).parent.absolute()}/../../results/kosmos25/Tablesinthewild/testeval"
+                               f"/curved/withIoDT",
+                       tableavail=False)
     #print(reversetablerelativebboxes_outer(f"{Path(__file__).parent.absolute()}/../../data/BonnData/Tabellen/preprocessed/I_HA_Rep_89_Nr_16160_0090"))
     pass
