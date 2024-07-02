@@ -106,6 +106,12 @@ def calcstats_IoDT(predbox: torch.tensor, targetbox: torch.tensor, imname: str =
 
     """
     threshold_tensor = torch.tensor(iou_thresholds)
+    if not predbox.numel():
+        #print(predbox.shape)
+        warnings.warn(f"A Prediction Bounding Box Tensor in {imname} is empty. (no predicitons)")
+        return torch.zeros(predbox.shape[0]), torch.zeros(targetbox.shape[0]), torch.zeros(
+            threshold_tensor.shape), torch.zeros(threshold_tensor.shape), torch.full(threshold_tensor.shape,
+                                                                                     fill_value=targetbox.shape[0])
     IoDT = Intersection_over_Detection(predbox, targetbox)
     #print(IoDT, IoDT.shape)
     prediodt = IoDT.amax(dim=1)
@@ -343,6 +349,12 @@ def calcmetrics_tables(targetloc: str = f"{Path(__file__).parent.absolute()}/../
     tpsum_overlap_predonly = torch.zeros(1)
     fpsum_overlap_predonly = torch.zeros(1)
     fnsum_overlap_predonly = torch.zeros(1)
+    tpsum_IoDT = torch.zeros(len(iou_thresholds))
+    fpsum_IoDT = torch.zeros(len(iou_thresholds))
+    fnsum_IoDT = torch.zeros(len(iou_thresholds))
+    tpsum_IoDT_predonly = torch.zeros(len(iou_thresholds))
+    fpsum_IoDT_predonly = torch.zeros(len(iou_thresholds))
+    fnsum_IoDT_predonly = torch.zeros(len(iou_thresholds))
     #tablevars
     ioulist = []
     f1list = []
@@ -352,8 +364,9 @@ def calcmetrics_tables(targetloc: str = f"{Path(__file__).parent.absolute()}/../
     fpsum = torch.zeros(len(iou_thresholds))
     fnsum = torch.zeros(len(iou_thresholds))
     overlapdf = pandas.DataFrame(columns=["img", "prednum"])
-    fullimagedf = pandas.DataFrame(columns=["img", "mean_pred_iou", "mean_tar_iou", "wf1", "prednum"])
-    tabledf = pandas.DataFrame(columns=["img", "mean_pred_iou", "mean_tar_iou", "wf1", "prednum"])
+    fullimagedf = pandas.DataFrame(columns=["img", "mean pred iou", "mean tar iou", "wf1", "prednum"])
+    iodtdf = pandas.DataFrame(columns=["img", "mean pred iod", "mean tar iod", "wf1", "prednum"])
+    tabledf = pandas.DataFrame(columns=["img", "mean pred iou", "mean tar iou", "wf1", "prednum"])
     for n, preds in enumerate(predfolder):
         targets = glob.glob(f"{targetloc}/{preds.split('/')[-1]}")
         #imagepred = [file for file in glob.glob(f"{preds}/*.json") if "_table_" not in file][0]
@@ -370,10 +383,32 @@ def calcmetrics_tables(targetloc: str = f"{Path(__file__).parent.absolute()}/../
         else:
             fullimagegroundbox = torch.load(glob.glob(f"{targetloc}/{preds.split('/')[-1]}/*pt")[0])
 
-        _, _, IoDT_tp, IoDT_fp, IoDT_fn = calcstats_IoDT(predbox=fullimagepredbox, targetbox=fullimagegroundbox,
-                                                         imname=preds.split('/')[-1])
+        imname = fullimagepred.split("/")[-1].split(".")[-3]
+
+        #.......................................
+        #fullimagemetrics with IoDT
+        #.......................................
+        prediod, tariod, IoDT_tp, IoDT_fp, IoDT_fn = calcstats_IoDT(predbox=fullimagepredbox,
+                                                                    targetbox=fullimagegroundbox,
+                                                                    imname=preds.split('/')[-1],
+                                                                    iou_thresholds=iou_thresholds)
         print(IoDT_tp, IoDT_fp, IoDT_fn)
-        pass
+        IoDT_prec, IoDT_rec, IoDT_f1, IoDT_wf1 = calcmetric(IoDT_tp, IoDT_fp, IoDT_fn, iou_thresholds=iou_thresholds)
+        print(IoDT_prec, IoDT_rec, IoDT_f1, IoDT_wf1)
+        tpsum_IoDT += IoDT_tp
+        fpsum_IoDT += IoDT_fp
+        fnsum_IoDT += IoDT_fn
+        IoDTmetrics = {"img": imname, "mean pred iod": torch.mean(prediod).item(),
+                       "mean tar iod": torch.mean(tariod).item(), "wf1": IoDT_wf1.item(),
+                       "prednum": fullimagepredbox.shape[0]}
+        IoDTmetrics.update({f"prec@{iou_thresholds[i]}": IoDT_prec[i].item() for i in range(len(iou_thresholds))})
+        IoDTmetrics.update({f"recall@{iou_thresholds[i]}": IoDT_rec[i].item() for i in range(len(iou_thresholds))})
+        IoDTmetrics.update({f"f1@{iou_thresholds[i]}": IoDT_f1[i].item() for i in range(len(iou_thresholds))})
+        IoDTmetrics.update({f"tp@{iou_thresholds[i]}": IoDT_tp[i].item() for i in range(len(iou_thresholds))})
+        IoDTmetrics.update({f"fp@{iou_thresholds[i]}": IoDT_fp[i].item() for i in range(len(iou_thresholds))})
+        IoDTmetrics.update({f"fn@{iou_thresholds[i]}": IoDT_fn[i].item() for i in range(len(iou_thresholds))})
+
+        iodtdf = pandas.concat([iodtdf, pandas.DataFrame(IoDTmetrics, index=[n])])
 
         # .................................
         # fullimagemetrics with iou
@@ -390,16 +425,16 @@ def calcmetrics_tables(targetloc: str = f"{Path(__file__).parent.absolute()}/../
         fullioulist.append(fullprediou)
         fullf1list.append(fullf1)
         fullwf1list.append(fullwf1)
-        imname = fullimagepred.split("/")[-1].split(".")[-3]
-        fullimagemetrics = {"img": imname, "mean_pred_iou": torch.mean(fullprediou).item(),
-                            "mean_tar_iou": torch.mean(fulltargetiou).item(), "wf1": fullwf1.item(),
+
+        fullimagemetrics = {"img": imname, "mean pred iou": torch.mean(fullprediou).item(),
+                            "mean tar iou": torch.mean(fulltargetiou).item(), "wf1": fullwf1.item(),
                             "prednum": fullimagepredbox.shape[0]}
-        fullimagemetrics.update({f"prec_{iou_thresholds[i]}": fullprec[i].item() for i in range(len(iou_thresholds))})
-        fullimagemetrics.update({f"recall_{iou_thresholds[i]}": fullrec[i].item() for i in range(len(iou_thresholds))})
-        fullimagemetrics.update({f"f1_{iou_thresholds[i]}": fullf1[i].item() for i in range(len(iou_thresholds))})
-        fullimagemetrics.update({f"tp_{iou_thresholds[i]}": fulltp[i].item() for i in range(len(iou_thresholds))})
-        fullimagemetrics.update({f"fp_{iou_thresholds[i]}": fullfp[i].item() for i in range(len(iou_thresholds))})
-        fullimagemetrics.update({f"fn_{iou_thresholds[i]}": fullfn[i].item() for i in range(len(iou_thresholds))})
+        fullimagemetrics.update({f"prec@{iou_thresholds[i]}": fullprec[i].item() for i in range(len(iou_thresholds))})
+        fullimagemetrics.update({f"recall@{iou_thresholds[i]}": fullrec[i].item() for i in range(len(iou_thresholds))})
+        fullimagemetrics.update({f"f1@{iou_thresholds[i]}": fullf1[i].item() for i in range(len(iou_thresholds))})
+        fullimagemetrics.update({f"tp@{iou_thresholds[i]}": fulltp[i].item() for i in range(len(iou_thresholds))})
+        fullimagemetrics.update({f"fp@{iou_thresholds[i]}": fullfp[i].item() for i in range(len(iou_thresholds))})
+        fullimagemetrics.update({f"fn@{iou_thresholds[i]}": fullfn[i].item() for i in range(len(iou_thresholds))})
 
         # ........................................
         # fullimagemetrics with alternate metric
@@ -425,6 +460,9 @@ def calcmetrics_tables(targetloc: str = f"{Path(__file__).parent.absolute()}/../
             tpsum_overlap_predonly += fulltp_overlap
             fpsum_overlap_predonly += fullfp_overlap
             fnsum_overlap_predonly += fullfn_overlap
+            tpsum_IoDT_predonly += tpsum_IoDT
+            fpsum_IoDT_predonly += fpsum_IoDT
+            fnsum_IoDT_predonly += fnsum_IoDT
             predcount += 1
 
             #print("here",fullimagepredbox)
@@ -452,17 +490,17 @@ def calcmetrics_tables(targetloc: str = f"{Path(__file__).parent.absolute()}/../
             ioulist.append(prediou)
             f1list.append(f1)
             wf1list.append(wf1)
-            tablemetrics = {"img": imname, "mean_pred_iou": torch.mean(prediou).item(),
-                            "mean_tar_iou": torch.mean(targetiou).item(), "wf1": wf1.item(),
+            tablemetrics = {"img": imname, "mean pred iou": torch.mean(prediou).item(),
+                            "mean tar iou": torch.mean(targetiou).item(), "wf1": wf1.item(),
                             "prednum": tablebox.shape[0]}
             tablemetrics.update(
-                {f"prec_{iou_thresholds[i]}": prec[i].item() for i in range(len(iou_thresholds))})
+                {f"prec@{iou_thresholds[i]}": prec[i].item() for i in range(len(iou_thresholds))})
             tablemetrics.update(
-                {f"recall_{iou_thresholds[i]}": rec[i].item() for i in range(len(iou_thresholds))})
-            tablemetrics.update({f"f1_{iou_thresholds[i]}": f1[i].item() for i in range(len(iou_thresholds))})
-            tablemetrics.update({f"tp_{iou_thresholds[i]}": tp[i].item() for i in range(len(iou_thresholds))})
-            tablemetrics.update({f"fp_{iou_thresholds[i]}": fp[i].item() for i in range(len(iou_thresholds))})
-            tablemetrics.update({f"fn_{iou_thresholds[i]}": fn[i].item() for i in range(len(iou_thresholds))})
+                {f"recall@{iou_thresholds[i]}": rec[i].item() for i in range(len(iou_thresholds))})
+            tablemetrics.update({f"f1@{iou_thresholds[i]}": f1[i].item() for i in range(len(iou_thresholds))})
+            tablemetrics.update({f"tp@{iou_thresholds[i]}": tp[i].item() for i in range(len(iou_thresholds))})
+            tablemetrics.update({f"fp@{iou_thresholds[i]}": fp[i].item() for i in range(len(iou_thresholds))})
+            tablemetrics.update({f"fn@{iou_thresholds[i]}": fn[i].item() for i in range(len(iou_thresholds))})
             tabledf = pandas.concat([tabledf, pandas.DataFrame(tablemetrics, index=[f"{n}.{num}"])])
             #print(tablebox.shape, tablemetrics)
             #print(tablemetrics)
@@ -484,6 +522,12 @@ def calcmetrics_tables(targetloc: str = f"{Path(__file__).parent.absolute()}/../
                                           f"Evaluated files without predictions:": overlapdf.shape[0] - predcount,
                                           "f1": overlapf1_predonly, "prec": overlaprec_predonly,
                                           "recall": overlaprec_predonly}, index=["overlap with valid preds"])
+    totaliodt = get_dataframe(fnsum=fnsum_IoDT, fpsum=fpsum_IoDT, tpsum=tpsum_IoDT,
+                              nopredcount=iodtdf.shape[0] - predcount, imnum=iodtdf.shape[0],
+                              iou_thresholds=iou_thresholds)
+    predonlyiodt = get_dataframe(fnsum=fnsum_IoDT_predonly, fpsum=fpsum_IoDT_predonly, tpsum=tpsum_IoDT_predonly,
+                                 iou_thresholds=iou_thresholds)
+
     conclusiondf = pandas.DataFrame(columns=["wf1"])
     #totalmetrics = {"wf1": totalwf1.item()}
     #totalmetrics.update({f"f1_{iou_thresholds[i]}": totalf1[i].item() for i in range(len(iou_thresholds))})
@@ -493,10 +537,11 @@ def calcmetrics_tables(targetloc: str = f"{Path(__file__).parent.absolute()}/../
     #totalmetrics.update({f"fp_{iou_thresholds[i]}": fpsum[i].item() for i in range(len(iou_thresholds))})
     #totalmetrics.update({f"fn_{iou_thresholds[i]}": fnsum[i].item() for i in range(len(iou_thresholds))})
 
-    conclusiondf = pandas.concat([conclusiondf, pandas.DataFrame(totalfullmetrics, index=["full image metrics"]),
-                                  pandas.DataFrame(partialfullmetrics, index=["full image with valid preds"]),
-                                  pandas.DataFrame(totalmetrics, index=["table metrics"]), totaloverlapdf,
-                                  predonlyoverlapdf])
+    conclusiondf = pandas.concat([conclusiondf, pandas.DataFrame(totalfullmetrics, index=["full image IoU"]),
+                                  pandas.DataFrame(partialfullmetrics, index=["full image IoU with valid preds"]),
+                                  pandas.DataFrame(totalmetrics, index=["table IoU"]), totaloverlapdf,
+                                  predonlyoverlapdf, pandas.DataFrame(totaliodt, index=["full image IoDt"]),
+                                  pandas.DataFrame(predonlyiodt, index=[" full image IoDt with valid preds"])])
 
     #print(conclusiondf)
     #save results
@@ -515,19 +560,19 @@ def get_dataframe(fnsum, fpsum, tpsum, nopredcount: int = None, imnum: int = Non
     totalfullmetrics = {"wf1": totalfullwf1.item()}
     totalfullmetrics.update({f"Number of evaluated files": imnum})
     totalfullmetrics.update({f"Evaluated files without predictions:": nopredcount})
-    totalfullmetrics.update({f"f1_{iou_thresholds[i]}": totalfullf1[i].item() for i in range(len(iou_thresholds))})
-    totalfullmetrics.update({f"prec_{iou_thresholds[i]}": totalfullprec[i].item() for i in range(len(iou_thresholds))})
-    totalfullmetrics.update({f"recall_{iou_thresholds[i]}": totalfullrec[i].item() for i in range(len(iou_thresholds))})
-    totalfullmetrics.update({f"tp_{iou_thresholds[i]}": tpsum[i].item() for i in range(len(iou_thresholds))})
-    totalfullmetrics.update({f"fp_{iou_thresholds[i]}": fpsum[i].item() for i in range(len(iou_thresholds))})
-    totalfullmetrics.update({f"fn_{iou_thresholds[i]}": fnsum[i].item() for i in range(len(iou_thresholds))})
+    totalfullmetrics.update({f"f1@{iou_thresholds[i]}": totalfullf1[i].item() for i in range(len(iou_thresholds))})
+    totalfullmetrics.update({f"prec@{iou_thresholds[i]}": totalfullprec[i].item() for i in range(len(iou_thresholds))})
+    totalfullmetrics.update({f"recall@{iou_thresholds[i]}": totalfullrec[i].item() for i in range(len(iou_thresholds))})
+    totalfullmetrics.update({f"tp@{iou_thresholds[i]}": tpsum[i].item() for i in range(len(iou_thresholds))})
+    totalfullmetrics.update({f"fp@{iou_thresholds[i]}": fpsum[i].item() for i in range(len(iou_thresholds))})
+    totalfullmetrics.update({f"fn@{iou_thresholds[i]}": fnsum[i].item() for i in range(len(iou_thresholds))})
     return totalfullmetrics
 
 
 if __name__ == '__main__':
     #print(calcmetrics_jsoninput())
-    #calcmetrics_tables(
-    #    saveloc=f"{Path(__file__).parent.absolute()}/../../results/kosmos25/BonnData/Tabellen/testeval/trial5")
+    calcmetrics_tables(
+        saveloc=f"{Path(__file__).parent.absolute()}/../../results/kosmos25/BonnData/Tabellen/testeval/withIoDT")
     #calcmetrics_tables(targetloc=f"{Path(__file__).parent.absolute()}/../../data/GloSat/test",
     #                   predloc=f"{Path(__file__).parent.absolute()}/../../results/kosmos25/GloSat/test1",
     #                   iou_thresholds=[0.5, 0.6, 0.7, 0.8, 0.9],
