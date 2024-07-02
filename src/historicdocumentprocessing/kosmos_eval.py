@@ -8,6 +8,8 @@ from typing import Tuple, List
 import pandas
 import torch
 from torchvision.ops import box_iou
+from torchvision.ops.boxes import _box_inter_union
+from torchvision.ops import box_area
 
 
 def reversetablerelativebboxes_inner(tablebbox: torch.Tensor, cellbboxes: torch.Tensor) -> torch.Tensor:
@@ -87,6 +89,56 @@ def extractboxes(boxdict: dict, fpath: str = None) -> torch.tensor:
             boxlist.append(bbox)
     #print(boxlist)
     return torch.tensor(boxlist) if boxlist else torch.empty(0, 4)
+
+
+def calcstats_IoDT(predbox: torch.tensor, targetbox: torch.tensor, imname: str = None,
+                   iou_thresholds: List[float] = [0.5, 0.6, 0.7, 0.8, 0.9]) -> Tuple[
+    torch.Tensor, torch.Tensor, torch.Tensor, torch.Tensor, torch.Tensor]:
+    """
+    Calculate tp, tp, fn based on IoDT (Intersection over Detection) at given IoU Thresholds
+    Args:
+        predbox:
+        targetbox:
+        imname:
+        iou_thresholds:
+
+    Returns:
+
+    """
+    threshold_tensor = torch.tensor(iou_thresholds)
+    IoDT = Intersection_over_Detection(predbox, targetbox)
+    #print(IoDT, IoDT.shape)
+    prediodt = IoDT.amax(dim=1)
+    targetiodt = IoDT.amax(dim=0)
+    #print(predbox.shape, prediodt.shape, prediodt)
+    #print(targetbox.shape, targetiodt.shape, targetiodt)
+    #print(imname)
+    tp = torch.sum(prediodt.unsqueeze(-1).expand(-1, len(threshold_tensor)) >= threshold_tensor, dim=0)
+    # print(tp, prediodt.unsqueeze(-1).expand(-1, len(threshold_tensor)))
+    fp = IoDT.shape[0] - tp
+    fn = torch.sum(targetiodt.unsqueeze(-1).expand(-1, len(threshold_tensor)) < threshold_tensor, dim=0)
+    #print(tp, fp, fn)
+    return prediodt, targetiodt, tp, fp, fn
+
+
+def Intersection_over_Detection(predbox, targetbox):
+    """
+    Calculate the IoDT (Intersection over Detection Metric): Intersection of prediction and target over the total prediction area
+    Args:
+        predbox:
+        targetbox:
+
+    Returns:
+
+    """
+    inter, union = _box_inter_union(targetbox, predbox)
+    predarea = box_area(predbox)
+    # print(inter, inter.shape)
+    # print(predarea, predarea.shape)
+    IoDT = torch.div(inter, predarea)
+    # print(IoDT, IoDT.shape)
+    IoDT = IoDT.T
+    return IoDT
 
 
 def calcstats_overlap(predbox: torch.tensor, targetbox: torch.tensor, imname: str = None, fuzzy: int = 25) -> Tuple[
@@ -261,7 +313,9 @@ def calcmetrics_tables(targetloc: str = f"{Path(__file__).parent.absolute()}/../
                        predloc: str = f"{Path(__file__).parent.absolute()}/../../results/kosmos25/BonnData"
                                       f"/Tabellen/test",
                        iou_thresholds: List[float] = [0.5, 0.6, 0.7, 0.8, 0.9],
-                       saveloc: str = f"{Path(__file__).parent.absolute()}/../../results/kosmos25/BonnData/Tabellen/testeval", tableavail:bool=True) -> \
+                       saveloc: str = f"{Path(__file__).parent.absolute()}/../../results/kosmos25/BonnData/Tabellen"
+                                      f"/testeval",
+                       tableavail: bool = True) -> \
         Tuple[
             List[torch.Tensor], List[torch.Tensor], List[
                 torch.Tensor]]:
@@ -315,6 +369,11 @@ def calcmetrics_tables(targetloc: str = f"{Path(__file__).parent.absolute()}/../
             fullimagegroundbox = reversetablerelativebboxes_outer(targets[0])
         else:
             fullimagegroundbox = torch.load(glob.glob(f"{targetloc}/{preds.split('/')[-1]}/*pt")[0])
+
+        _, _, IoDT_tp, IoDT_fp, IoDT_fn = calcstats_IoDT(predbox=fullimagepredbox, targetbox=fullimagegroundbox,
+                                                         imname=preds.split('/')[-1])
+        print(IoDT_tp, IoDT_fp, IoDT_fn)
+        pass
 
         # .................................
         # fullimagemetrics with iou
@@ -473,14 +532,15 @@ if __name__ == '__main__':
     #                   predloc=f"{Path(__file__).parent.absolute()}/../../results/kosmos25/GloSat/test1",
     #                   iou_thresholds=[0.5, 0.6, 0.7, 0.8, 0.9],
     #                   saveloc=f"{Path(__file__).parent.absolute()}/../../results/kosmos25/GloSat/testeval/test1")
-    #calcmetrics_tables(targetloc=f"{Path(__file__).parent.absolute()}/../../data/Tablesinthewild/preprocessed/simple",
-    #                   predloc=f"{Path(__file__).parent.absolute()}/../../results/kosmos25/Tablesinthewild/simple",
-    #                   iou_thresholds=[0.5, 0.6, 0.7, 0.8, 0.9],
-    #                   saveloc=f"{Path(__file__).parent.absolute()}/../../results/kosmos25/Tablesinthewild/testeval/simple", tableavail=False)
-    calcmetrics_tables(targetloc=f"{Path(__file__).parent.absolute()}/../../data/Tablesinthewild/preprocessed/curved",
-                       predloc=f"{Path(__file__).parent.absolute()}/../../results/kosmos25/Tablesinthewild/curved",
+    calcmetrics_tables(targetloc=f"{Path(__file__).parent.absolute()}/../../data/Tablesinthewild/preprocessed/simple",
+                       predloc=f"{Path(__file__).parent.absolute()}/../../results/kosmos25/Tablesinthewild/simple",
                        iou_thresholds=[0.5, 0.6, 0.7, 0.8, 0.9],
-                       saveloc=f"{Path(__file__).parent.absolute()}/../../results/kosmos25/Tablesinthewild/testeval/curved",
+                       saveloc=f"{Path(__file__).parent.absolute()}/../../results/kosmos25/Tablesinthewild/testeval/simple/withIoDT",
                        tableavail=False)
+    #calcmetrics_tables(targetloc=f"{Path(__file__).parent.absolute()}/../../data/Tablesinthewild/preprocessed/curved",
+    #                   predloc=f"{Path(__file__).parent.absolute()}/../../results/kosmos25/Tablesinthewild/curved",
+    #                   iou_thresholds=[0.5, 0.6, 0.7, 0.8, 0.9],
+    #                   saveloc=f"{Path(__file__).parent.absolute()}/../../results/kosmos25/Tablesinthewild/testeval/curved",
+    #                   tableavail=False)
     #print(reversetablerelativebboxes_outer(f"{Path(__file__).parent.absolute()}/../../data/BonnData/Tabellen/preprocessed/I_HA_Rep_89_Nr_16160_0090"))
     pass
