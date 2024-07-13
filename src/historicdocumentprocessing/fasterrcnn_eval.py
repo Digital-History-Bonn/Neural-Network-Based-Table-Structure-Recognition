@@ -10,14 +10,15 @@ from torchvision.models.detection import fasterrcnn_resnet50_fpn, FasterRCNN_Res
 from PIL import Image
 
 from kosmos_eval import calcstats, calcmetric
-from src.historicdocumentprocessing.kosmos_eval import calcstats_IoDT, get_dataframe
+from kosmos_eval import calcstats_IoDT, get_dataframe
 
+from tqdm import tqdm
 
 def inference(datapath: str = f"{Path(__file__).parent.absolute()}/../../data/BonnData/Tabellen/test",
               modelpath: str = f"{Path(__file__).parent.absolute()}/../../checkpoints/fasterrcnn"
                                f"/run3_BonnData_cell_aug_loadrun_GloSAT_cell_aug_e250_es_e250_es.pt",
               datasetname: str = "BonnData",
-              iou_thresholds: List[float] = [0.5, 0.6, 0.7, 0.8, 0.9]):
+              iou_thresholds: List[float] = [0.5, 0.6, 0.7, 0.8, 0.9], filtering = False, saveboxes=False):
     #print("here")
     model = fasterrcnn_resnet50_fpn(
         weights=FasterRCNN_ResNet50_FPN_Weights.DEFAULT, **{"box_detections_per_img": 200}
@@ -36,7 +37,13 @@ def inference(datapath: str = f"{Path(__file__).parent.absolute()}/../../data/Bo
         return
     model.eval()
     saveloc = f"{Path(__file__).parent.absolute()}/../../results/fasterrcnn/testeval/{datasetname}"
-    #os.makedirs(saveloc, exist_ok=True)
+    boxsaveloc = f"{Path(__file__).parent.absolute()}/../../results/fasterrcnn/{datasetname}"
+    if filtering:
+        saveloc = f"{Path(__file__).parent.absolute()}/../../results/fasterrcnn/testeval/{datasetname}_filtering"
+    os.makedirs(saveloc, exist_ok=True)
+    if saveboxes:
+        os.makedirs(boxsaveloc, exist_ok=True)
+
     ioulist = []
     f1list = []
     wf1list = []
@@ -64,7 +71,15 @@ def inference(datapath: str = f"{Path(__file__).parent.absolute()}/../../data/Bo
             #print(target)
             output = model([img])
             output = {k: v.detach().cpu() for k, v in output[0].items()}
-            #print(output)
+            #print(output['boxes'], output['boxes'][output['scores']>0.8])
+            if filtering:
+                output['boxes'] = output['boxes'][output['scores']>0.8]
+
+            if saveboxes:
+                os.makedirs(f"{boxsaveloc}/{folder.split('/')[-1]}", exist_ok=True)
+                torch.save(output['boxes'], f"{boxsaveloc}/{folder.split('/')[-1]}/{folder.split('/')[-1]}_{num}.pt")
+                #print(f"{boxsaveloc}/{folder.split('/')[-1]}")
+
             #..................IoU
             prediou, targetiou, tp, fp, fn = calcstats(predbox=output['boxes'], targetbox=target,
                                                        iou_thresholds=iou_thresholds,
@@ -89,7 +104,7 @@ def inference(datapath: str = f"{Path(__file__).parent.absolute()}/../../data/Bo
             ioumetrics.update({f"fp@{iou_thresholds[i]}": fp[i].item() for i in range(len(iou_thresholds))})
             ioumetrics.update({f"fn@{iou_thresholds[i]}": fn[i].item() for i in range(len(iou_thresholds))})
             ioudf = pandas.concat([ioudf, pandas.DataFrame(ioumetrics, index=[f"{n}.{num}"])])
-            #print(ioudf)
+            print(ioudf)
             #...........................
             #....................IoDt
             prediodt, targetiodt, tp_iodt, fp_iodt, fn_iodt = calcstats_IoDT(predbox=output['boxes'], targetbox=target,
@@ -104,18 +119,19 @@ def inference(datapath: str = f"{Path(__file__).parent.absolute()}/../../data/Bo
             iodtlist.append(prediodt)
             f1list_iodt.append(f1_iodt)
             wf1list_iodt.append(wf1_iodt)
-            iodtmetrics = {"img": folder.split('/')[-1], "mean pred iodt": torch.mean(prediou).item(),
-                           "mean tar iodt": torch.mean(targetiou).item(), "wf1": wf1.item(),
+            iodtmetrics = {"img": folder.split('/')[-1], "mean pred iodt": torch.mean(prediodt).item(),
+                           "mean tar iodt": torch.mean(targetiodt).item(), "wf1": wf1_iodt.item(),
                            "prednum": output['boxes'].shape[0]}
             iodtmetrics.update(
-                {f"prec@{iou_thresholds[i]}": prec[i].item() for i in range(len(iou_thresholds))})
+                {f"prec@{iou_thresholds[i]}": prec_iodt[i].item() for i in range(len(iou_thresholds))})
             iodtmetrics.update(
-                {f"recall@{iou_thresholds[i]}": rec[i].item() for i in range(len(iou_thresholds))})
-            iodtmetrics.update({f"f1@{iou_thresholds[i]}": f1[i].item() for i in range(len(iou_thresholds))})
-            iodtmetrics.update({f"tp@{iou_thresholds[i]}": tp[i].item() for i in range(len(iou_thresholds))})
-            iodtmetrics.update({f"fp@{iou_thresholds[i]}": fp[i].item() for i in range(len(iou_thresholds))})
-            iodtmetrics.update({f"fn@{iou_thresholds[i]}": fn[i].item() for i in range(len(iou_thresholds))})
+                {f"recall@{iou_thresholds[i]}": rec_iodt[i].item() for i in range(len(iou_thresholds))})
+            iodtmetrics.update({f"f1@{iou_thresholds[i]}": f1_iodt[i].item() for i in range(len(iou_thresholds))})
+            iodtmetrics.update({f"tp@{iou_thresholds[i]}": tp_iodt[i].item() for i in range(len(iou_thresholds))})
+            iodtmetrics.update({f"fp@{iou_thresholds[i]}": fp_iodt[i].item() for i in range(len(iou_thresholds))})
+            iodtmetrics.update({f"fn@{iou_thresholds[i]}": fn_iodt[i].item() for i in range(len(iou_thresholds))})
             iodtdf = pandas.concat([iodtdf, pandas.DataFrame(iodtmetrics, index=[f"{n}.{num}"])])
+
     conclusiondf = pandas.DataFrame(columns=["wf1"])
     fulliodtdf = get_dataframe(fnsum=fnsum_iodt, fpsum=fpsum_iodt, tpsum=tpsum_iodt, iou_thresholds=iou_thresholds)
     fullioudf = get_dataframe(fnsum=fnsum, fpsum=fpsum, tpsum=tpsum, iou_thresholds=iou_thresholds)
@@ -125,4 +141,8 @@ def inference(datapath: str = f"{Path(__file__).parent.absolute()}/../../data/Bo
     conclusiondf.to_csv(f"{saveloc}/overview.csv")
 
 if __name__ == '__main__':
-    inference()
+   inference(filtering=True, saveboxes=True)
+   #inference(datapath = f"{Path(__file__).parent.absolute()}/../../data/GloSat/test",
+   #           modelpath = f"{Path(__file__).parent.absolute()}/../../checkpoints/fasterrcnn"
+   #                            f"/run_GloSAT_cell_aug_e250_es.pt",
+   #           datasetname = "GloSat")
