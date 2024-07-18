@@ -183,7 +183,10 @@ def processdata_wildtable_inner(datapath) -> torch.Tensor:
             warnings.warn("invalid bbox found")
             print(datapath)
     #print(bboxes)
-    return torch.vstack(bboxes)
+    if not bboxes:
+        warnings.warn("no bboxes on img")
+        print(datapath)
+    return torch.vstack(bboxes) if bboxes else torch.empty(0, 4)
 
 
 def processdata_wildtable_outer(
@@ -196,11 +199,14 @@ def processdata_wildtable_outer(
         impath = glob.glob(f"{imfolder}/{xml.split('/')[-1].split('.')[-3]}*")[0]
         tarfolder = f"{target}/{xml.split('/')[-1].split('.')[-3]}"
         #print(xml)
-        os.makedirs(tarfolder, exist_ok=True)
         #print(f"{tarfolder}/{impath.split('/')[-1]}")
         #print(f"{tarfolder}/{xml.split('/')[-1].split('.')[-3]}.pt")
-        shutil.copy(impath, dst=f"{tarfolder}/{impath.split('/')[-1]}")
-        torch.save(bboxfile, f"{tarfolder}/{xml.split('/')[-1].split('.')[-3]}.pt")
+        if bboxfile.numel():
+            os.makedirs(tarfolder, exist_ok=True)
+            shutil.copy(impath, dst=f"{tarfolder}/{impath.split('/')[-1]}")
+            torch.save(bboxfile, f"{tarfolder}/{xml.split('/')[-1].split('.')[-3]}.pt")
+        else:
+            warnings.warn("empty bbox, image not added to preprocessed training data")
 
 
 if __name__ == '__main__':
