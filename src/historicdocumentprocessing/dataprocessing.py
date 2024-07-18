@@ -7,6 +7,7 @@ import json
 
 import torch
 from bs4 import BeautifulSoup
+from torchvision.io import read_image
 from tqdm import tqdm
 import warnings
 
@@ -196,15 +197,19 @@ def processdata_wildtable_outer(
     target = f"{datapath}/../../train"
     for xml in tqdm(glob.glob(f"{xmlfolder}/*xml")):
         bboxfile = processdata_wildtable_inner(xml)
-        impath = glob.glob(f"{imfolder}/{xml.split('/')[-1].split('.')[-3]}*")[0]
+        impath = glob.glob(f"{imfolder}/{xml.split('/')[-1].split('.')[-3]}.jpg")[0]
         tarfolder = f"{target}/{xml.split('/')[-1].split('.')[-3]}"
         #print(xml)
         #print(f"{tarfolder}/{impath.split('/')[-1]}")
         #print(f"{tarfolder}/{xml.split('/')[-1].split('.')[-3]}.pt")
         if bboxfile.numel():
-            os.makedirs(tarfolder, exist_ok=True)
-            shutil.copy(impath, dst=f"{tarfolder}/{impath.split('/')[-1]}")
-            torch.save(bboxfile, f"{tarfolder}/{xml.split('/')[-1].split('.')[-3]}.pt")
+            if (read_image(impath) / 255).shape[0] == 3:
+                os.makedirs(tarfolder, exist_ok=True)
+                shutil.copy(impath, dst=f"{tarfolder}/{impath.split('/')[-1]}")
+                torch.save(bboxfile, f"{tarfolder}/{xml.split('/')[-1].split('.')[-3]}.pt")
+            else:
+                warnings.warn("image in wrong format, not added to preprocessed training data")
+                print(impath)
         else:
             warnings.warn("empty bbox, image not added to preprocessed training data")
 

@@ -30,15 +30,18 @@ def subclasssplitwildtables(impath: str = f"{Path(__file__).parent.absolute()}/.
                 #print(f"{impath}/{line}")
 
                 im = glob.glob(f"{impath}/{line.rstrip()}")[0]
+                #print(f"{impath}/{line.rstrip()}")
                 xml = glob.glob(f"{xmlpath}/{line.split('.')[-2]}.xml")[0]
                 processedpt = processdata_wildtable_inner(xml)
                 imfolder = f"{destfolder}/{line.split('.')[-2]}"
-                os.makedirs(imfolder, exist_ok=True)
-                #print(f"{imfolder}/{line.split('.')[-2]}.pt",  f"{imfolder}/{line.rstrip()}")
-                shutil.copy(im, f"{imfolder}/{line.rstrip()}")
-                #print(f"{imfolder}/{line.split('.')[-2]}.pt")
-                torch.save(processedpt, f"{imfolder}/{line.split('.')[-2]}.pt")
-                pass
+                if processedpt.numel():
+                    os.makedirs(imfolder, exist_ok=True)
+                    #print(f"{imfolder}/{line.split('.')[-2]}.pt",  f"{imfolder}/{line.rstrip()}")
+                    shutil.copy(im, f"{imfolder}/{line.rstrip()}")
+                    #print(f"{imfolder}/{line.split('.')[-2]}.pt")
+                    torch.save(processedpt, f"{imfolder}/{line.split('.')[-2]}.pt")
+                else:
+                    print("f")
 
 def recreatetablesplit(datapath: str = f"{Path(__file__).parent.absolute()}/../../data/BonnData/Tabellen/preprocessed",
                        csvpath: str = f"{Path(__file__).parent.absolute()}/../../data/BonnData/Tabellen/run3_BonnData_cell_aug_loadrun_GloSAT_cell_aug_e250_es_e250_es.csv"):

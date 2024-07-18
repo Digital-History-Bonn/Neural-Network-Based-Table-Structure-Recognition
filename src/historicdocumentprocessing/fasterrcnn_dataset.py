@@ -50,14 +50,18 @@ class CustomDataset(Dataset):  # type: ignore
         # load image and targets depending on objective
         if self.objective == "fullimage":
             imgnum = self.data[index].split(os.sep)[-1]
-            img = read_image(f"{self.data[index]}/{imgnum}.jpg")
+            img = read_image(f"{self.data[index]}/{imgnum}.jpg")/255
             target = torch.load(f"{self.data[index]}/{imgnum}.pt")
+            #print(img.dtype)
         else:
             "not yet implemented since there is no need, left in so it can be added in future"
             pass
 
         if self.transforms:
             img = self.transforms(img)
+
+        if img.shape[0]!=3:
+            print(self.data[index])
 
         return (
             img,
@@ -115,19 +119,21 @@ if __name__ == "__main__":
     )
 
     img, target = dataset[dataset.getidx("mit_google_image_search-10918758-be4b5fa7bf3fea80823dabbe1e17e4136f0da811")]
-
-    #dataset = CustomDataset(
-    #    f"{Path(__file__).parent.absolute()}/../../data/Tablesinthewild/train",
-    #    "fullimage",
-    #    transforms=None,
-    #)
+    print(target['boxes'])
+    img,target = dataset[dataset.getidx('customs-declaration-12689')]
+    print(target['boxes'])
+    dataset = CustomDataset(
+       f"{Path(__file__).parent.absolute()}/../../data/Tablesinthewild/train",
+        "fullimage",
+        transforms=None,
+    )
 
     #img, target = dataset[dataset.getidx("mit_google_image_search-10918758-cdcd82db9ce0b61da60155c5c822b0be3884a2cf")]
 
-    result = draw_bounding_boxes(image=img, boxes=target['boxes'],
+    result = draw_bounding_boxes(image=(img*255).to(torch.uint8), boxes=target['boxes'],
                                  colors=["red" for i in range(target['boxes'].shape[0])],
                                  labels=["Ground" for i in range(target['boxes'].shape[0])])
     result = Image.fromarray(result.permute(1, 2, 0).numpy())
     result.save(
-        f"{Path(__file__).parent.absolute()}/../../images/rcnn/Tablesinthewild/example_test.jpg"
+        f"{Path(__file__).parent.absolute()}/../../images/rcnn/Tablesinthewild/example_test_2.jpg"
     )
