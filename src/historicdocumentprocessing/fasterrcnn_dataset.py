@@ -109,18 +109,25 @@ if __name__ == "__main__":
     )
 
     dataset = CustomDataset(
-        f"{Path(__file__).parent.absolute()}/../../data/Tablesinthewild/train/preprocessed",
+        f"{Path(__file__).parent.absolute()}/../../data/Tablesinthewild/test",
         "fullimage",
         transforms=None,
     )
 
-    img, target = dataset[dataset.getidx("mit_google_image_search-10918758-cdcd82db9ce0b61da60155c5c822b0be3884a2cf")]
+    img, target = dataset[dataset.getidx("mit_google_image_search-10918758-be4b5fa7bf3fea80823dabbe1e17e4136f0da811")]
 
-    #mit_google_image_search-10918758-cdcd82db9ce0b61da60155c5c822b0be3884a2cf.jpg
+    #dataset = CustomDataset(
+    #    f"{Path(__file__).parent.absolute()}/../../data/Tablesinthewild/train",
+    #    "fullimage",
+    #    transforms=None,
+    #)
+
+    #img, target = dataset[dataset.getidx("mit_google_image_search-10918758-cdcd82db9ce0b61da60155c5c822b0be3884a2cf")]
+
     result = draw_bounding_boxes(image=img, boxes=target['boxes'],
-                                 colors=["green" for i in range(target['boxes'].shape[0])],
-                                 labels=["Pred" for i in range(target['boxes'].shape[0])])
+                                 colors=["red" for i in range(target['boxes'].shape[0])],
+                                 labels=["Ground" for i in range(target['boxes'].shape[0])])
     result = Image.fromarray(result.permute(1, 2, 0).numpy())
     result.save(
-        f"{Path(__file__).parent.absolute()}/../../images/rcnn/Tablesinthewild/example.jpg"
+        f"{Path(__file__).parent.absolute()}/../../images/rcnn/Tablesinthewild/example_test.jpg"
     )

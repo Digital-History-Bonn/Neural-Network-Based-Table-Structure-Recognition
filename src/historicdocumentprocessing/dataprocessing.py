@@ -1,5 +1,6 @@
 import os
 import shutil
+from logging import warning
 from pathlib import Path
 import glob
 import json
@@ -164,25 +165,32 @@ def processdata_engnews_kosmos(targetloc: str = f"{Path(__file__).parent.absolut
                     out.write(currentjson)
 
 
-def processdata_wildtable_inner(datapath):
+def processdata_wildtable_inner(datapath) -> torch.Tensor:
     """process data to pt bbox file used in project group"""
     with open(datapath) as d:
         xml = BeautifulSoup(d, "xml")
     #print(xml)
-    bboxes = torch.empty(4)
+    bboxes = []
     for box in xml.find_all("bndbox"):
         #print(box)
-        new = torch.tensor([int(float(box.xmin.get_text())), int(float(box.ymin.get_text())), int(float(box.xmax.get_text())),
-                            int(float(box.ymax.get_text()))], dtype=torch.float)
+        new = torch.tensor(
+            [int(float(box.xmin.get_text())), int(float(box.ymin.get_text())), int(float(box.xmax.get_text())),
+             int(float(box.ymax.get_text()))], dtype=torch.float)
         #print(new)
-        bboxes = torch.vstack([bboxes, new])
+        if new[0] < new[2] and new[1] < new[3]:
+            bboxes.append(new)
+        else:
+            warnings.warn("invalid bbox found")
+            print(datapath)
     #print(bboxes)
-    return bboxes
+    return torch.vstack(bboxes)
 
-def processdata_wildtable_outer(datapath: str = f"{Path(__file__).parent.absolute()}/../../data/Tablesinthewild/train"):
+
+def processdata_wildtable_outer(
+        datapath: str = f"{Path(__file__).parent.absolute()}/../../data/Tablesinthewild/rawdata/train"):
     xmlfolder = f"{datapath}/xml"
     imfolder = f"{datapath}/images"
-    target = f"{datapath}/preprocessed"
+    target = f"{datapath}/../../train"
     for xml in tqdm(glob.glob(f"{xmlfolder}/*xml")):
         bboxfile = processdata_wildtable_inner(xml)
         impath = glob.glob(f"{imfolder}/{xml.split('/')[-1].split('.')[-3]}*")[0]
@@ -193,7 +201,6 @@ def processdata_wildtable_outer(datapath: str = f"{Path(__file__).parent.absolut
         #print(f"{tarfolder}/{xml.split('/')[-1].split('.')[-3]}.pt")
         shutil.copy(impath, dst=f"{tarfolder}/{impath.split('/')[-1]}")
         torch.save(bboxfile, f"{tarfolder}/{xml.split('/')[-1].split('.')[-3]}.pt")
-
 
 
 if __name__ == '__main__':

@@ -162,10 +162,15 @@ def main():
 
 
 if __name__ == '__main__':
-    drawimages_var(impath=f"{Path(__file__).parent.absolute()}/../../data/Tablesinthewild/preprocessed/overlaid",
-                      groundpath=f"{Path(__file__).parent.absolute()}/../../data/Tablesinthewild/preprocessed/overlaid",
-                      jsonpath=f"{Path(__file__).parent.absolute()}/../../results/kosmos25/Tablesinthewild/overlaid",
-                      savepath=f"{Path(__file__).parent.absolute()}/../../images/Kosmos/Tablesinthewild/overlaid", tableonly=False, range=50)
+    drawimg_varformat(savepath=f"{Path(__file__).parent.absolute()}/../../images/rcnn/BonnTables/test",
+                      impath=f"{Path(__file__).parent.absolute()}/../../data/BonnData/Tabellen/test/IMG_20190821_132903/IMG_20190821_132903_table_0.jpg",
+                      groundpath=f"{Path(__file__).parent.absolute()}/../../data/BonnData/Tabellen/test/IMG_20190821_132903/IMG_20190821_132903_cell_0.pt",
+                      predpath=f"{Path(__file__).parent.absolute()}/../../results/fasterrcnn/BonnData/IMG_20190821_132903/IMG_20190821_132903.pt")
+
+    #drawimages_var(impath=f"{Path(__file__).parent.absolute()}/../../data/Tablesinthewild/preprocessed/overlaid",
+    #                  groundpath=f"{Path(__file__).parent.absolute()}/../../data/Tablesinthewild/preprocessed/overlaid",
+    #                  jsonpath=f"{Path(__file__).parent.absolute()}/../../results/kosmos25/Tablesinthewild/overlaid",
+    #                  savepath=f"{Path(__file__).parent.absolute()}/../../images/Kosmos/Tablesinthewild/overlaid", tableonly=False, range=50)
     #drawimg_varformat(impath=f"{Path(__file__).parent.absolute()}/../../data/Tablesinthewild/preprocessed/simple/0hZg6EpcTdKXk6j44umj3gAAACMAAQED/0hZg6EpcTdKXk6j44umj3gAAACMAAQED.jpg",
     #                  groundpath=f"{Path(__file__).parent.absolute()}/../../data/Tablesinthewild/preprocessed/simple/0hZg6EpcTdKXk6j44umj3gAAACMAAQED/0hZg6EpcTdKXk6j44umj3gAAACMAAQED.pt",
     #                  predpath=f"{Path(__file__).parent.absolute()}/../../results/kosmos25/Tablesinthewild/simple/0hZg6EpcTdKXk6j44umj3gAAACMAAQED/0hZg6EpcTdKXk6j44umj3gAAACMAAQED.jpg.json",
@@ -197,4 +202,5 @@ if __name__ == '__main__':
 
     #drawimg(savepath=f"{Path(__file__).parent.absolute()}/../../images/Kosmos")
     #drawimg(impath= f"{Path(__file__).parent.absolute()}/../../data/BonnData/Tabellen/preprocessed/IMG_20190819_115757/IMG_20190819_115757_table_0.jpg", jsonpath=f"{Path(__file__).parent.absolute()}/../../results/kosmos25/IMG_20190819_115757_table_0.jpg.json", savepath=f"{Path(__file__).parent.absolute()}/../../images/Kosmos")
+
     pass

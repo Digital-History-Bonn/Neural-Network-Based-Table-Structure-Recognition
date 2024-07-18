@@ -11,14 +11,19 @@ import torch
 from tqdm import tqdm
 from dataprocessing import processdata_wildtable_inner
 
-def subclasssplitwildtables(impath: str = f"{Path(__file__).parent.absolute()}/../../data/Tablesinthewild/test/images", xmlpath: str =  f"{Path(__file__).parent.absolute()}/../../data/Tablesinthewild/test/test-xml-revise/test-xml-revise", txtfolder:str = f"{Path(__file__).parent.absolute()}/../../data/Tablesinthewild/test/sub_classes"):
-    """split wildtables into subclasses (TO ADD: Preprocessing for xml files)"""
+def subclassjoinwildtables(path: str = f"{Path(__file__).parent.absolute()}/../../data/Tablesinthewild/preprocessed", dst: str = f"{Path(__file__).parent.absolute()}/../../data/Tablesinthewild/test"):
+    for folder in glob.glob(f"{path}/*"):
+        #print(folder, dst)
+        shutil.copytree(src=folder, dst=dst, dirs_exist_ok=True)
+
+def subclasssplitwildtables(impath: str = f"{Path(__file__).parent.absolute()}/../../data/Tablesinthewild/rawdata/test/images", xmlpath: str =  f"{Path(__file__).parent.absolute()}/../../data/Tablesinthewild/rawdata/test/test-xml-revise/test-xml-revise", txtfolder:str = f"{Path(__file__).parent.absolute()}/../../data/Tablesinthewild/rawdata/test/sub_classes"):
+    """split wildtables test into subclasses"""
     txts = glob.glob(f"{txtfolder}/*txt")
     for txt in txts:
         with open(txt) as f:
             foldername = txt.split("/")[-1].split(".")[-2]
             #print(foldername)
-            destfolder = f"{'/'.join(impath.split('/')[:-2])}/preprocessed/{foldername}"
+            destfolder = f"{'/'.join(impath.split('/')[:-2])}/../preprocessed/{foldername}"
             #print(destfolder)
             for line in tqdm(f):
                 #print(line)
@@ -27,11 +32,11 @@ def subclasssplitwildtables(impath: str = f"{Path(__file__).parent.absolute()}/.
                 im = glob.glob(f"{impath}/{line.rstrip()}")[0]
                 xml = glob.glob(f"{xmlpath}/{line.split('.')[-2]}.xml")[0]
                 processedpt = processdata_wildtable_inner(xml)
-                #print(processedpt)
                 imfolder = f"{destfolder}/{line.split('.')[-2]}"
                 os.makedirs(imfolder, exist_ok=True)
-                #print(f"{imfolder}/{line.split('.')[-2]}.xml",  f"{imfolder}/{line.rstrip()}")
+                #print(f"{imfolder}/{line.split('.')[-2]}.pt",  f"{imfolder}/{line.rstrip()}")
                 shutil.copy(im, f"{imfolder}/{line.rstrip()}")
+                #print(f"{imfolder}/{line.split('.')[-2]}.pt")
                 torch.save(processedpt, f"{imfolder}/{line.split('.')[-2]}.pt")
                 pass
 
@@ -128,4 +133,5 @@ if __name__ == '__main__':
     #recreatetablesplit()
     #recreatenewspapersplit()
     #newsplit()
-    subclasssplitwildtables()
+    #subclasssplitwildtables()
+    subclassjoinwildtables()
