@@ -1,8 +1,10 @@
-"""Module to train models on table datasets. Code from
+"""Module to train models on table datasets. Code  modified from
 https://github.com/Digital-History-Bonn/HistorischeTabellenSemanticExtraction/blob/main/src/TableExtraction/trainer
 .py"""
 
 import os
+import sys
+import traceback
 from pathlib import Path
 import argparse
 from typing import Optional, Union
@@ -18,9 +20,10 @@ from torchvision.models.detection import (
     fasterrcnn_resnet50_fpn,
 )
 from tqdm import tqdm
+from triton.language import dtype
 
-from src.TableExtraction.customdataset import CustomDataset
-from src.TableExtraction.utils.utils import get_image
+from src.historicdocumentprocessing.fasterrcnn_dataset import CustomDataset
+from torchvision.utils import draw_bounding_boxes
 
 LR = 0.00001
 
@@ -74,8 +77,10 @@ class Trainer:
         print(f"{train_log_dir=}")
         self.writer = SummaryWriter(train_log_dir)  # type: ignore
 
-        self.example_image, self.example_target = testdataset[0]
-        self.train_example_image, self.train_example_target = traindataset[0]
+        self.example_image, self.example_target = testdataset[testdataset.getidx("mit_google_image_search-10918758-be4b5fa7bf3fea80823dabbe1e17e4136f0da811")]
+        self.train_example_image, self.train_example_target = traindataset[traindataset.getidx("mit_google_image_search-10918758-cdcd82db9ce0b61da60155c5c822b0be3884a2cf")]
+        self.example_image = (self.example_image*255).to(torch.uint8)
+        self.train_example_image = (self.train_example_image*255).to(torch.uint8)
 
     def save(self, name: str = "") -> None:
         """
@@ -84,10 +89,10 @@ class Trainer:
         Args:
             name: name of the model
         """
-        os.makedirs(f"{Path(__file__).parent.absolute()}/../../models/", exist_ok=True)
+        os.makedirs(f"{Path(__file__).parent.absolute()}/../../checkpoints/fasterrcnn/", exist_ok=True)
         torch.save(
             self.model.state_dict(),
-            f"{Path(__file__).parent.absolute()}/../../models/{name}",
+            f"{Path(__file__).parent.absolute()}/../../checkpoints/fasterrcnn/{name}",
         )
 
     def load(self, name: str = "") -> None:
@@ -133,6 +138,8 @@ class Trainer:
             img = img.to(self.device)
             target["boxes"] = target["boxes"][0].to(self.device)
             target["labels"] = target["labels"][0].to(self.device)
+
+            print(img.shape)
 
             self.optimizer.zero_grad()
             output = model([img[0]], [target])
@@ -204,7 +211,16 @@ class Trainer:
             target["boxes"] = target["boxes"][0].to(self.device)
             target["labels"] = target["labels"][0].to(self.device)
 
-            output = self.model([img[0]], [target])
+            try:
+                output = self.model([img[0]], [target])
+            except AssertionError:
+                _, _, tb = sys.exc_info()
+                traceback.print_tb(tb)  # Fixed format
+                tb_info = traceback.extract_tb(tb)
+                filename, line, func, text = tb_info[-1]
+                print('An error occurred on line {} in statement {}'.format(line, text))
+                print(target["img_number"])
+                exit(1)
 
             loss.append(sum(v for v in output.values()).cpu().detach())
             loss_classifier.append(output["loss_classifier"].detach().cpu().item())
@@ -252,7 +268,12 @@ class Trainer:
             "ground truth": self.train_example_target["boxes"],
             "prediction": pred[0]["boxes"].detach().cpu(),
         }
-        result = get_image(self.train_example_image, boxes)
+        colors = ["green" for i in range(boxes['prediction'].shape[0])] + ["red" for i in
+                                                                           range(boxes['ground truth'].shape[0])]
+        labels = ["Pred" for i in range(boxes['prediction'].shape[0])] + ["Ground" for i in
+                                                                          range(boxes['ground truth'].shape[0])]
+        result = draw_bounding_boxes(image=self.train_example_image, boxes=torch.vstack((boxes['prediction'], boxes['ground truth'])), colors=colors, labels=labels)
+
         self.writer.add_image(
             "Training/example", result[:, ::2, ::2], global_step=self.epoch
         )  # type: ignore
@@ -263,7 +284,13 @@ class Trainer:
             "ground truth": self.example_target["boxes"],
             "prediction": pred[0]["boxes"].detach().cpu(),
         }
-        result = get_image(self.example_image, boxes)
+        colors = ["green" for i in range(boxes['prediction'].shape[0])] + ["red" for i in
+                                                                           range(boxes['ground truth'].shape[0])]
+        labels = ["Pred" for i in range(boxes['prediction'].shape[0])] + ["Ground" for i in
+                                                                          range(boxes['ground truth'].shape[0])]
+        result = draw_bounding_boxes(image=self.example_image,
+                                     boxes=torch.vstack((boxes['prediction'], boxes['ground truth'])), colors=colors,
+                                     labels=labels)
         self.writer.add_image(
             "Valid/example", result[:, ::2, ::2], global_step=self.epoch
         )  # type: ignore
@@ -285,10 +312,7 @@ def get_model(objective: str, load_weights: Optional[str] = None) -> FasterRCNN:
         FasterRCNN model
     """
     params = {
-        "table": {"box_detections_per_img": 100},
-        "cell": {"box_detections_per_img": 200},
-        "row": {"box_detections_per_img": 100},
-        "col": {"box_detections_per_img": 100},
+        "fullimage": {"box_detections_per_img": 200},
     }
 
     model = fasterrcnn_resnet50_fpn(
@@ -298,7 +322,7 @@ def get_model(objective: str, load_weights: Optional[str] = None) -> FasterRCNN:
     if load_weights:
         model.load_state_dict(
             torch.load(
-                f"{Path(__file__).parent.absolute()}/../../models/" f"{load_weights}.pt"
+                f"{Path(__file__).parent.absolute()}/../../checkpoints/fasterrcnn/" f"{load_weights}.pt"
             )
         )
 
@@ -329,7 +353,7 @@ def get_args() -> argparse.Namespace:
         "--dataset",
         "-d",
         type=str,
-        default="BonnData",
+        default="Tablesinthewild",
         help="which dataset should be used for training",
     )
 
@@ -337,8 +361,8 @@ def get_args() -> argparse.Namespace:
         "--objective",
         "-o",
         type=str,
-        default="table",
-        help="objective of the model ('table', 'cell', 'row' or 'col')",
+        default="fullimage",
+        help="objective of the model ('fullimage')",
     )
 
     parser.add_argument(
@@ -349,7 +373,9 @@ def get_args() -> argparse.Namespace:
         help="name of a model to load",
     )
 
-    parser.add_argument('--augmentations', "-a", action=argparse.BooleanOptionalAction)
+    #parser.add_argument('--augmentations', "-a", action=argparse.BooleanOptionalAction)
+    parser.add_argument('--augmentations', action='store_true')
+    parser.add_argument('--no-augmentations', dest='augmentations', action='store_false')
     parser.set_defaults(augmentations=False)
 
     return parser.parse_args()
@@ -364,11 +390,11 @@ if __name__ == "__main__":
     if args.name == 'model':
         raise ValueError("Please enter a valid model name!")
 
-    if args.objective not in ['table', 'col', 'row', 'cell']:
-        raise ValueError("Please enter a valid objective must be 'table', 'col', 'row' or 'cell'!")
+    if args.objective not in ['fullimage']:
+        raise ValueError("Please enter a valid objective must be 'fullimage'!")
 
-    if args.dataset not in ['BonnData', 'GloSAT']:
-        raise ValueError("Please enter a valid dataset must be 'BonnData' or 'GloSAT'!")
+    if args.dataset not in ['BonnData', 'GloSAT', 'Tablesinthewild']:
+        raise ValueError("Please enter a valid dataset must be 'BonnData' or 'GloSAT' or 'Tablesinthewild'!")
 
     if args.epochs <= 0:
         raise ValueError("Please enter a valid number of epochs must be >= 0!")
@@ -408,9 +434,14 @@ if __name__ == "__main__":
         transforms=transform,
     )
 
-    validdataset = CustomDataset(
-        f"{Path(__file__).parent.absolute()}/../../data/{args.dataset}/valid/", args.objective
-    )
+    if args.dataset in ['Tablesinthewild']:
+        validdataset = CustomDataset(
+            f"{Path(__file__).parent.absolute()}/../../data/{args.dataset}/test/", args.objective
+        )
+    else:
+        validdataset = CustomDataset(
+            f"{Path(__file__).parent.absolute()}/../../data/{args.dataset}/valid/", args.objective
+        )
 
     print(f"{len(traindataset)=}")
     print(f"{len(validdataset)=}")
