@@ -1,4 +1,4 @@
-"""Dataset Class for training. Code from
+"""Dataset Class for training. Code  modified from
 https://github.com/Digital-History-Bonn/HistorischeTabellenSemanticExtraction/blob/main/src/TableExtraction
 /customdataset.py"""
 
@@ -11,9 +11,11 @@ import torch
 from torch.nn import Module
 from PIL import Image
 from torch.utils.data import Dataset
+from torchvision.utils import draw_bounding_boxes
+from torchvision.io import read_image
 
 
-class CustomDataset(Dataset):   # type: ignore
+class CustomDataset(Dataset):  # type: ignore
     """Dataset Class for training."""
 
     def __init__(self, path: str, objective: str, transforms: Optional[Module] = None) -> None:
@@ -22,14 +24,15 @@ class CustomDataset(Dataset):   # type: ignore
 
         Args:
             path: path to folder with images
-            objective: detection object ('table', 'cell', 'row' or 'col')
+            objective: detection type (fullimage only for now)
             transforms: torchvision transforms for on-the-fly augmentations
         """
         super().__init__()
-        if objective == "table":
-            self.data = sorted(list(glob.glob(f"{path}/*")), key=lambda x: int(x.split(os.sep)[-1]))
+        if objective == "fullimage":
+            self.data = sorted(list(glob.glob(f"{path}/*")), key=lambda x: str(x.split(os.sep)[-1]))
         else:
-            self.data = list(glob.glob(f"{path}/*/*_table_*.pt"))
+            "not yet implemented since there is no need, left in so it can be added in future"
+            pass
         self.objective = objective
         self.transforms = transforms
 
@@ -45,18 +48,13 @@ class CustomDataset(Dataset):   # type: ignore
 
         """
         # load image and targets depending on objective
-        if self.objective == "table":
+        if self.objective == "fullimage":
             imgnum = self.data[index].split(os.sep)[-1]
-            img = torch.load(f"{self.data[index]}/{imgnum}.pt") / 256
-            target = torch.load(f"{self.data[index]}/{imgnum}_tables.pt")
+            img = read_image(f"{self.data[index]}/{imgnum}.jpg")
+            target = torch.load(f"{self.data[index]}/{imgnum}.pt")
         else:
-            imgnum = self.data[index].split(os.sep)[-2]
-            tablenum = self.data[index].split(os.sep)[-1].split("_")[-1][-4]
-            img = torch.load(self.data[index]) / 256
-            target = torch.load(
-                f"{'/'.join(self.data[index].split(os.sep)[:-1])}/{imgnum}"
-                f"_{self.objective}_{tablenum}.pt"
-            )
+            "not yet implemented since there is no need, left in so it can be added in future"
+            pass
 
         if self.transforms:
             img = self.transforms(img)
@@ -67,7 +65,8 @@ class CustomDataset(Dataset):   # type: ignore
                 "boxes": target,
                 "labels": torch.ones(len(target), dtype=torch.int64),
                 "img_number": imgnum,
-            },
+                "index": index
+            }
         )
 
     def __len__(self) -> int:
@@ -79,6 +78,12 @@ class CustomDataset(Dataset):   # type: ignore
 
         """
         return len(self.data)
+
+    def getidx(self, imname: str) -> int:
+        """"
+        returns index of given image name in dataset
+        """
+        return self.data.index(list(filter(lambda d: imname in d, self.data))[0])
 
 
 if __name__ == "__main__":
@@ -104,16 +109,18 @@ if __name__ == "__main__":
     )
 
     dataset = CustomDataset(
-        f"{Path(__file__).parent.absolute()}/../data/Tables/preprocessed/",
-        "tables",
-        transforms=transform,
+        f"{Path(__file__).parent.absolute()}/../../data/Tablesinthewild/train/preprocessed",
+        "fullimage",
+        transforms=None,
     )
 
-    img, target = dataset[3]
+    img, target = dataset[dataset.getidx("mit_google_image_search-10918758-cdcd82db9ce0b61da60155c5c822b0be3884a2cf")]
 
-    result = Image.fromarray((img.permute(1, 2, 0).numpy() * 255).astype(np.uint8))
-
+    #mit_google_image_search-10918758-cdcd82db9ce0b61da60155c5c822b0be3884a2cf.jpg
+    result = draw_bounding_boxes(image=img, boxes=target['boxes'],
+                                 colors=["green" for i in range(target['boxes'].shape[0])],
+                                 labels=["Pred" for i in range(target['boxes'].shape[0])])
+    result = Image.fromarray(result.permute(1, 2, 0).numpy())
     result.save(
-        f"{Path(__file__).parent.absolute()}/../data/assets/"
-        f"Originals_SampleImage.png"
+        f"{Path(__file__).parent.absolute()}/../../images/rcnn/Tablesinthewild/example.jpg"
     )
