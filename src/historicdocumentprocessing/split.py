@@ -9,7 +9,7 @@ from typing import List, Dict
 import pandas as pd
 import torch
 from tqdm import tqdm
-from dataprocessing import processdata_wildtable_kosmos
+from dataprocessing import processdata_wildtable_inner
 
 def subclasssplitwildtables(impath: str = f"{Path(__file__).parent.absolute()}/../../data/Tablesinthewild/test/images", xmlpath: str =  f"{Path(__file__).parent.absolute()}/../../data/Tablesinthewild/test/test-xml-revise/test-xml-revise", txtfolder:str = f"{Path(__file__).parent.absolute()}/../../data/Tablesinthewild/test/sub_classes"):
     """split wildtables into subclasses (TO ADD: Preprocessing for xml files)"""
@@ -26,7 +26,7 @@ def subclasssplitwildtables(impath: str = f"{Path(__file__).parent.absolute()}/.
 
                 im = glob.glob(f"{impath}/{line.rstrip()}")[0]
                 xml = glob.glob(f"{xmlpath}/{line.split('.')[-2]}.xml")[0]
-                processedpt = processdata_wildtable_kosmos(xml)
+                processedpt = processdata_wildtable_inner(xml)
                 #print(processedpt)
                 imfolder = f"{destfolder}/{line.split('.')[-2]}"
                 os.makedirs(imfolder, exist_ok=True)
