@@ -1,4 +1,5 @@
 import os
+import shutil
 from pathlib import Path
 import glob
 import json
@@ -163,7 +164,7 @@ def processdata_engnews_kosmos(targetloc: str = f"{Path(__file__).parent.absolut
                     out.write(currentjson)
 
 
-def processdata_wildtable_kosmos(datapath):
+def processdata_wildtable_inner(datapath):
     """process data to pt bbox file used in project group"""
     with open(datapath) as d:
         xml = BeautifulSoup(d, "xml")
@@ -178,9 +179,26 @@ def processdata_wildtable_kosmos(datapath):
     #print(bboxes)
     return bboxes
 
+def processdata_wildtable_outer(datapath: str = f"{Path(__file__).parent.absolute()}/../../data/Tablesinthewild/train"):
+    xmlfolder = f"{datapath}/xml"
+    imfolder = f"{datapath}/images"
+    target = f"{datapath}/preprocessed"
+    for xml in tqdm(glob.glob(f"{xmlfolder}/*xml")):
+        bboxfile = processdata_wildtable_inner(xml)
+        impath = glob.glob(f"{imfolder}/{xml.split('/')[-1].split('.')[-3]}*")[0]
+        tarfolder = f"{target}/{xml.split('/')[-1].split('.')[-3]}"
+        #print(xml)
+        os.makedirs(tarfolder, exist_ok=True)
+        #print(f"{tarfolder}/{impath.split('/')[-1]}")
+        #print(f"{tarfolder}/{xml.split('/')[-1].split('.')[-3]}.pt")
+        shutil.copy(impath, dst=f"{tarfolder}/{impath.split('/')[-1]}")
+        torch.save(bboxfile, f"{tarfolder}/{xml.split('/')[-1].split('.')[-3]}.pt")
+
+
 
 if __name__ == '__main__':
-    processdata_wildtable_kosmos(f"{Path(__file__).parent.absolute()}/../../data/Tablesinthewild/test/test-xml-revise/test-xml-revise/0hZg6EpcTdKXk6j44umj3gAAACMAAQED.xml")
+    processdata_wildtable_outer()
+    #processdata_wildtable_inner(f"{Path(__file__).parent.absolute()}/../../data/Tablesinthewild/test/test-xml-revise/test-xml-revise/0hZg6EpcTdKXk6j44umj3gAAACMAAQED.xml")
     pass
     #processdata_engnews_kosmos()
     #processdata_engnews_donut()
