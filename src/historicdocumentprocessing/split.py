@@ -11,12 +11,20 @@ import torch
 from tqdm import tqdm
 from dataprocessing import processdata_wildtable_inner
 
-def subclassjoinwildtables(path: str = f"{Path(__file__).parent.absolute()}/../../data/Tablesinthewild/preprocessed", dst: str = f"{Path(__file__).parent.absolute()}/../../data/Tablesinthewild/test"):
+from torchvision.io import read_image
+
+
+def subclassjoinwildtables(path: str = f"{Path(__file__).parent.absolute()}/../../data/Tablesinthewild/preprocessed",
+                           dst: str = f"{Path(__file__).parent.absolute()}/../../data/Tablesinthewild/test"):
     for folder in glob.glob(f"{path}/*"):
         #print(folder, dst)
         shutil.copytree(src=folder, dst=dst, dirs_exist_ok=True)
 
-def subclasssplitwildtables(impath: str = f"{Path(__file__).parent.absolute()}/../../data/Tablesinthewild/rawdata/test/images", xmlpath: str =  f"{Path(__file__).parent.absolute()}/../../data/Tablesinthewild/rawdata/test/test-xml-revise/test-xml-revise", txtfolder:str = f"{Path(__file__).parent.absolute()}/../../data/Tablesinthewild/rawdata/test/sub_classes"):
+
+def subclasssplitwildtables(
+        impath: str = f"{Path(__file__).parent.absolute()}/../../data/Tablesinthewild/rawdata/test/images",
+        xmlpath: str = f"{Path(__file__).parent.absolute()}/../../data/Tablesinthewild/rawdata/test/test-xml-revise/test-xml-revise",
+        txtfolder: str = f"{Path(__file__).parent.absolute()}/../../data/Tablesinthewild/rawdata/test/sub_classes"):
     """split wildtables test into subclasses"""
     txts = glob.glob(f"{txtfolder}/*txt")
     for txt in txts:
@@ -35,13 +43,17 @@ def subclasssplitwildtables(impath: str = f"{Path(__file__).parent.absolute()}/.
                 processedpt = processdata_wildtable_inner(xml)
                 imfolder = f"{destfolder}/{line.split('.')[-2]}"
                 if processedpt.numel():
-                    os.makedirs(imfolder, exist_ok=True)
-                    #print(f"{imfolder}/{line.split('.')[-2]}.pt",  f"{imfolder}/{line.rstrip()}")
-                    shutil.copy(im, f"{imfolder}/{line.rstrip()}")
-                    #print(f"{imfolder}/{line.split('.')[-2]}.pt")
-                    torch.save(processedpt, f"{imfolder}/{line.split('.')[-2]}.pt")
+                    if read_image(im).shape[0] == 3:
+                        os.makedirs(imfolder, exist_ok=True)
+                        #print(f"{imfolder}/{line.split('.')[-2]}.pt",  f"{imfolder}/{line.rstrip()}")
+                        shutil.copy(im, f"{imfolder}/{line.rstrip()}")
+                        #print(f"{imfolder}/{line.split('.')[-2]}.pt")
+                        torch.save(processedpt, f"{imfolder}/{line.split('.')[-2]}.pt")
+                    else:
+                        print(f"Wrong image dim at {im}")
                 else:
                     print("f")
+
 
 def recreatetablesplit(datapath: str = f"{Path(__file__).parent.absolute()}/../../data/BonnData/Tabellen/preprocessed",
                        csvpath: str = f"{Path(__file__).parent.absolute()}/../../data/BonnData/Tabellen/run3_BonnData_cell_aug_loadrun_GloSAT_cell_aug_e250_es_e250_es.csv"):
@@ -136,5 +148,5 @@ if __name__ == '__main__':
     #recreatetablesplit()
     #recreatenewspapersplit()
     #newsplit()
-    #subclasssplitwildtables()
+    subclasssplitwildtables()
     subclassjoinwildtables()

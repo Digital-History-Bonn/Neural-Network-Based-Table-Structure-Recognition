@@ -57,15 +57,18 @@ class Trainer:
             else torch.device("cpu")
         )
         print(f"using {self.device}")
+        print(f"Cuda is available: ", torch.cuda.is_available())
+        if not torch.cuda.is_available():
+            torch.zeros(1).cuda()
 
         self.model = model.to(self.device)
         self.optimizer = optimizer
 
         self.trainloader = DataLoader(
-            traindataset, batch_size=1, shuffle=True, num_workers=4
+            traindataset, batch_size=1, shuffle=True, num_workers=2
         )
         self.testloader = DataLoader(
-            testdataset, batch_size=1, shuffle=False, num_workers=4
+            testdataset, batch_size=1, shuffle=False, num_workers=2
         )
 
         self.bestavrgloss: Union[float, None] = None
@@ -139,10 +142,10 @@ class Trainer:
             target["boxes"] = target["boxes"][0].to(self.device)
             target["labels"] = target["labels"][0].to(self.device)
 
-            print(img.shape)
+            #print(img.shape)
 
             self.optimizer.zero_grad()
-            output = model([img[0]], [target])
+            output = self.model([img[0]], [target])
             loss = sum(v for v in output.values())
             loss.backward()
             self.optimizer.step()
@@ -263,7 +266,7 @@ class Trainer:
         self.model.eval()
 
         # predict example form training set
-        pred = self.model([self.train_example_image.to(self.device)])
+        pred = self.model([self.train_example_image.to(self.device)/255])
         boxes = {
             "ground truth": self.train_example_target["boxes"],
             "prediction": pred[0]["boxes"].detach().cpu(),
@@ -279,7 +282,7 @@ class Trainer:
         )  # type: ignore
 
         # predict example form validation set
-        pred = self.model([self.example_image.to(self.device)])
+        pred = self.model([self.example_image.to(self.device)/255])
         boxes = {
             "ground truth": self.example_target["boxes"],
             "prediction": pred[0]["boxes"].detach().cpu(),
@@ -298,6 +301,7 @@ class Trainer:
         self.model.train()
 
         return meanloss
+
 
 
 def get_model(objective: str, load_weights: Optional[str] = None) -> FasterRCNN:
