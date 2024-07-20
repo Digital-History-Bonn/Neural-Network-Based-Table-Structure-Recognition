@@ -439,7 +439,7 @@ if __name__ == "__main__":
             transforms.RandomGrayscale(p=0.1))
 
     traindataset = CustomDataset(
-        f"{Path(__file__).parent.absolute()}/../../data/{args.dataset}/train/",
+        f"{Path(__file__).parent.absolute()}/../../data/{args.dataset}/train",
         args.objective,
         transforms=transform,
     )
@@ -448,11 +448,11 @@ if __name__ == "__main__":
 
     if args.valid:
         validdataset = CustomDataset(
-            f"{Path(__file__).parent.absolute()}/../../data/{args.dataset}/valid/", args.objective
+            f"{Path(__file__).parent.absolute()}/../../data/{args.dataset}/valid", args.objective
         )
     else:
         validdataset = CustomDataset(
-            f"{Path(__file__).parent.absolute()}/../../data/{args.dataset}/test/", args.objective
+            f"{Path(__file__).parent.absolute()}/../../data/{args.dataset}/test", args.objective
         )
 
     print(f"{len(traindataset)=}")

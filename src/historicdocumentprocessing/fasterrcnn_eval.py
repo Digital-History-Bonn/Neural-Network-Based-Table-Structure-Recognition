@@ -20,7 +20,8 @@ def inference_fullimg(targetloc: str = f"{Path(__file__).parent.absolute()}/../.
                       modelpath: str = f"{Path(__file__).parent.absolute()}/../../checkpoints/fasterrcnn"
                                        f"/test4_Tablesinthewild_fullimage_e50_es.pt",
                       datasetname: str = "Tablesinthewild",
-                      iou_thresholds: List[float] = [0.5, 0.6, 0.7, 0.8, 0.9], filtering=False, tablerelative: bool = False):
+                      iou_thresholds: List[float] = [0.5, 0.6, 0.7, 0.8, 0.9], filtering=False,
+                      tablerelative: bool = False):
     model = fasterrcnn_resnet50_fpn(
         weights=FasterRCNN_ResNet50_FPN_Weights.DEFAULT, **{"box_detections_per_img": 200}
     )
@@ -36,10 +37,10 @@ def inference_fullimg(targetloc: str = f"{Path(__file__).parent.absolute()}/../.
     else:
         print("Cuda not available")
         return
-    saveloc = f"{Path(__file__).parent.absolute()}/../../results/fasterrcnn/testeval/{datasetname}_iou_{'_'.join([str(iou_thresholds[0]), str(iou_thresholds[-1])])}"
+    saveloc = f"{Path(__file__).parent.absolute()}/../../results/fasterrcnn/testeval/{datasetname}/iou_{'_'.join([str(iou_thresholds[0]), str(iou_thresholds[-1])])}"
     #boxsaveloc = f"{Path(__file__).parent.absolute()}/../../results/fasterrcnn/{datasetname}"
     if filtering:
-        saveloc = f"{Path(__file__).parent.absolute()}/../../results/fasterrcnn/testeval/{datasetname}_filtering_iou{'_'.join([str(iou_thresholds[0]), str(iou_thresholds[-1])])}"
+        saveloc = f"{Path(__file__).parent.absolute()}/../../results/fasterrcnn/testeval/{datasetname}/filtering_iou{'_'.join([str(iou_thresholds[0]), str(iou_thresholds[-1])])}"
     os.makedirs(saveloc, exist_ok=True)
 
     ### initializing variables ###
@@ -78,7 +79,7 @@ def inference_fullimg(targetloc: str = f"{Path(__file__).parent.absolute()}/../.
             fullimagegroundbox = reversetablerelativebboxes_outer(folder)
         else:
             fullimagegroundbox = torch.load(glob.glob(f"{folder}/{folder.split('/')[-1]}.pt")[0])
-        img = (read_image(impath)/255).to(device)
+        img = (read_image(impath) / 255).to(device)
         output = model([img])
         output = {k: v.detach().cpu() for k, v in output[0].items()}
         # print(output['boxes'], output['boxes'][output['scores']>0.8])
@@ -208,7 +209,6 @@ def inference_fullimg(targetloc: str = f"{Path(__file__).parent.absolute()}/../.
     conclusiondf.to_csv(f"{saveloc}/overview.csv")
 
 
-
 def inference_tablecutout(datapath: str = f"{Path(__file__).parent.absolute()}/../../data/BonnData/Tabellen/test",
                           modelpath: str = f"{Path(__file__).parent.absolute()}/../../checkpoints/fasterrcnn"
                                            f"/run3_BonnData_cell_aug_loadrun_GloSAT_cell_aug_e250_es_e250_es.pt",
@@ -234,7 +234,7 @@ def inference_tablecutout(datapath: str = f"{Path(__file__).parent.absolute()}/.
     saveloc = f"{Path(__file__).parent.absolute()}/../../results/fasterrcnn/testeval/{datasetname}"
     boxsaveloc = f"{Path(__file__).parent.absolute()}/../../results/fasterrcnn/{datasetname}"
     if filtering:
-        saveloc = f"{Path(__file__).parent.absolute()}/../../results/fasterrcnn/testeval/{datasetname}_filtering"
+        saveloc = f"{Path(__file__).parent.absolute()}/../../results/fasterrcnn/testeval/{datasetname}/filtering"
     os.makedirs(saveloc, exist_ok=True)
     if saveboxes:
         os.makedirs(boxsaveloc, exist_ok=True)
@@ -338,11 +338,16 @@ def inference_tablecutout(datapath: str = f"{Path(__file__).parent.absolute()}/.
 
 
 if __name__ == '__main__':
-    inference_fullimg()
-    pass
+    #inference_fullimg()
+    #pass
+    #inference_fullimg(iou_thresholds=[0.9])
+    #for cat in glob.glob(f"{Path(__file__).parent.absolute()}/../../data/Tablesinthewild/preprocessed/*"):
+    #    print(cat)
+    #    inference_fullimg(targetloc=cat, datasetname=cat.split('/')[-1])
+    inference_fullimg(targetloc=f"{Path(__file__).parent.absolute()}/../../data/Tablesinthewild/preprocessed/simple", datasetname='simple')
     #inference_tablecutout(datapath=)
-#inference_tablecutout(filtering=True, saveboxes=True)
-#inference_tablecutout(datapath = f"{Path(__file__).parent.absolute()}/../../data/GloSat/test",
-#           modelpath = f"{Path(__file__).parent.absolute()}/../../checkpoints/fasterrcnn"
-#                            f"/run_GloSAT_cell_aug_e250_es.pt",
-#           datasetname = "GloSat")
+    #inference_tablecutout(filtering=True, saveboxes=True)
+    #inference_tablecutout(datapath = f"{Path(__file__).parent.absolute()}/../../data/GloSat/test",
+    #          modelpath = f"{Path(__file__).parent.absolute()}/../../checkpoints/fasterrcnn"
+    #                           f"/run_GloSAT_cell_aug_e250_es.pt",
+    #          datasetname = "GloSat")

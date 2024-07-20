@@ -13,6 +13,9 @@ from PIL import Image
 from torch.utils.data import Dataset
 from torchvision.utils import draw_bounding_boxes
 from torchvision.io import read_image
+from tqdm import tqdm
+
+from src.historicdocumentprocessing.kosmos_eval import reversetablerelativebboxes_outer
 
 
 class CustomDataset(Dataset):  # type: ignore
@@ -35,6 +38,7 @@ class CustomDataset(Dataset):  # type: ignore
             pass
         self.objective = objective
         self.transforms = transforms
+        self.dataset = path.split(os.sep)[-2]
 
     def __getitem__(self, index: int) -> Tuple[torch.Tensor, Dict[str, Union[torch.Tensor, str]]]:
         """
@@ -51,7 +55,10 @@ class CustomDataset(Dataset):  # type: ignore
         if self.objective == "fullimage":
             imgnum = self.data[index].split(os.sep)[-1]
             img = read_image(f"{self.data[index]}/{imgnum}.jpg")/255
-            target = torch.load(f"{self.data[index]}/{imgnum}.pt")
+            if self.dataset in ['BonnData', 'GloSat']:
+                target = reversetablerelativebboxes_outer(self.data[index])
+            else:
+                target = torch.load(f"{self.data[index]}/{imgnum}.pt")
             #print(img.dtype)
         else:
             "not yet implemented since there is no need, left in so it can be added in future"
@@ -60,8 +67,8 @@ class CustomDataset(Dataset):  # type: ignore
         if self.transforms:
             img = self.transforms(img)
 
-        if img.shape[0]!=3:
-            print(self.data[index])
+        #if img.shape[0]!=3:
+        #    print(self.data[index])
 
         return (
             img,
@@ -90,6 +97,7 @@ class CustomDataset(Dataset):  # type: ignore
         return self.data.index(list(filter(lambda d: imname in d, self.data))[0])
 
 
+
 if __name__ == "__main__":
     import numpy as np
     from torch.nn import Sequential, ModuleList
@@ -112,28 +120,38 @@ if __name__ == "__main__":
         transforms.RandomGrayscale(p=1),
     )
 
-    dataset = CustomDataset(
-        f"{Path(__file__).parent.absolute()}/../../data/Tablesinthewild/test",
-        "fullimage",
-        transforms=None,
-    )
+    #dataset = CustomDataset(
+    #    f"{Path(__file__).parent.absolute()}/../../data/Tablesinthewild/test",
+    #    "fullimage",
+    #    transforms=None,
+    #)
 
-    img, target = dataset[dataset.getidx("mit_google_image_search-10918758-be4b5fa7bf3fea80823dabbe1e17e4136f0da811")]
-    print(target['boxes'])
-    img,target = dataset[dataset.getidx('customs-declaration-12689')]
-    print(target['boxes'])
-    dataset = CustomDataset(
-       f"{Path(__file__).parent.absolute()}/../../data/Tablesinthewild/train",
-        "fullimage",
-        transforms=None,
-    )
+    dataset = CustomDataset(f"{Path(__file__).parent.absolute()}/../../data/BonnData/train", "fullimage", transforms=None)
+
+    #for i in tqdm(range(dataset.__len__())):
+    #    img, target = dataset[i]
+    #    if img.shape[0]!=3:
+    #        print(img.shape)
+    #        print(target['img_number'])
+
+    #img, target = dataset[dataset.getidx("mit_google_image_search-10918758-be4b5fa7bf3fea80823dabbe1e17e4136f0da811")]
+    #print(target['boxes'])
+    #img,target = dataset[dataset.getidx('customs-declaration-12689')]
+    #print(target['boxes'])
+    #dataset = CustomDataset(
+    #   f"{Path(__file__).parent.absolute()}/../../data/Tablesinthewild/train",
+    #    "fullimage",
+    #    transforms=None,
+    #)
 
     #img, target = dataset[dataset.getidx("mit_google_image_search-10918758-cdcd82db9ce0b61da60155c5c822b0be3884a2cf")]
 
+    img, target = dataset[0]
+    #print(target['boxes'])
     result = draw_bounding_boxes(image=(img*255).to(torch.uint8), boxes=target['boxes'],
                                  colors=["red" for i in range(target['boxes'].shape[0])],
                                  labels=["Ground" for i in range(target['boxes'].shape[0])])
     result = Image.fromarray(result.permute(1, 2, 0).numpy())
     result.save(
-        f"{Path(__file__).parent.absolute()}/../../images/rcnn/Tablesinthewild/example_test_2.jpg"
+        f"{Path(__file__).parent.absolute()}/../../images/rcnn/testest_4.jpg"
     )

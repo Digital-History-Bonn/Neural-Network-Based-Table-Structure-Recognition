@@ -14,6 +14,24 @@ from dataprocessing import processdata_wildtable_inner
 from torchvision.io import read_image
 
 
+def validsplit(path: str = f"{Path(__file__).parent.absolute()}/../../data/BonnData"):
+    total = glob.glob(f"{path}/preprocessed/*")
+    test = glob.glob(f"{path}/test/*")
+    validlen = len(test)
+    newtotal = [t for t in total if f"{path}/test/{t.split('/')[-1]}" not in test]
+    #print(len(newtotal), len(test), len(total))
+    assert len(newtotal) + len(test) == len(total)
+    random.shuffle(newtotal)
+    valid = newtotal[:validlen]
+    train = newtotal[validlen:]
+    #print(train)
+    assert len(valid) + len(train) == len(newtotal)
+    for cats, names in ((train, "train"), (valid, "valid")):
+        os.makedirs(f"{path}/{names}")
+        for im in cats:
+            shutil.copytree(src=im, dst=f"{path}/{names}/{im.split('/')[-1]}")
+
+
 def wildtablesvalidsplit(path: str = f"{Path(__file__).parent.absolute()}/../../data/Tablesinthewild/train",
                          ratio: List[float] = [0.7, 0.3]):
     """
@@ -40,7 +58,6 @@ def wildtablesvalidsplit(path: str = f"{Path(__file__).parent.absolute()}/../../
     for v in valid:
         shutil.move(v, f"{dst}/{v.split('/')[-1]}")
         #print(f"{dst}/{v.split('/')[-1]}")
-
 
 
 def subclassjoinwildtables(path: str = f"{Path(__file__).parent.absolute()}/../../data/Tablesinthewild/preprocessed",
@@ -84,7 +101,7 @@ def subclasssplitwildtables(
                     print("f")
 
 
-def recreatetablesplit(datapath: str = f"{Path(__file__).parent.absolute()}/../../data/BonnData/Tabellen/preprocessed",
+def recreatetablesplit(datapath: str = f"{Path(__file__).parent.absolute()}/../../data/BonnData/preprocessed",
                        csvpath: str = f"{Path(__file__).parent.absolute()}/../../data/BonnData/Tabellen/run3_BonnData_cell_aug_loadrun_GloSAT_cell_aug_e250_es_e250_es.csv"):
     """
     Recreate the Test Split of the Bonn Table Dataset from the csv result file
@@ -179,4 +196,6 @@ if __name__ == '__main__':
     #newsplit()
     #subclasssplitwildtables()
     #subclassjoinwildtables()
-    wildtablesvalidsplit()
+    #wildtablesvalidsplit()
+    validsplit(f"{Path(__file__).parent.absolute()}/../../data/GloSat")
+
