@@ -14,6 +14,35 @@ from dataprocessing import processdata_wildtable_inner
 from torchvision.io import read_image
 
 
+def wildtablesvalidsplit(path: str = f"{Path(__file__).parent.absolute()}/../../data/Tablesinthewild/train",
+                         ratio: List[float] = [0.7, 0.3]):
+    """
+    create train/valid split for tables in the wild dataset
+    Args:
+        path:
+        ratio: ratio of split, default chosen to keep test and valid set roughly the same size, also used in
+    https://conferences.computer.org/icdar/2019/pdfs/ICDAR2019-5vPIU32iQjjaLtHlc8g8pO/6MI7Y73lJOE71Gh1fhZUQh
+    /1lFyKkB62yWFXMh1YoqJmC.pdf competition paper which was used as reference for train/test split in Wired Tables in
+    the Wild Dataset
+
+    Returns:
+
+    """
+    dst = f"{'/'.join(path.split('/')[:-1])}/valid"
+    trainlist = glob.glob(f"{path}/*")
+    random.shuffle(trainlist)
+    train = trainlist[:round(len(trainlist) * ratio[0])]
+    valid = trainlist[round(len(trainlist) * ratio[0]):round(len(trainlist) * (ratio[1] + ratio[0]))]
+    assert len(train) + len(valid) == len(trainlist)
+    #print(len(valid))
+    os.makedirs(dst, exist_ok=True)
+    #print(dst)
+    for v in valid:
+        shutil.move(v, f"{dst}/{v.split('/')[-1]}")
+        #print(f"{dst}/{v.split('/')[-1]}")
+
+
+
 def subclassjoinwildtables(path: str = f"{Path(__file__).parent.absolute()}/../../data/Tablesinthewild/preprocessed",
                            dst: str = f"{Path(__file__).parent.absolute()}/../../data/Tablesinthewild/test"):
     for folder in glob.glob(f"{path}/*"):
@@ -148,5 +177,6 @@ if __name__ == '__main__':
     #recreatetablesplit()
     #recreatenewspapersplit()
     #newsplit()
-    subclasssplitwildtables()
-    subclassjoinwildtables()
+    #subclasssplitwildtables()
+    #subclassjoinwildtables()
+    wildtablesvalidsplit()

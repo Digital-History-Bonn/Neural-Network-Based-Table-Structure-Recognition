@@ -1,16 +1,16 @@
 #!/bin/bash
-#SBATCH --partition=A40devel
+#SBATCH --partition=A100medium
 #SBATCH --nodes=1
 #SBATCH --tasks-per-node=1
 #SBATCH --job-name=test
-#SBATCH --output=outputs/rcnn-wild-train-%j.out
-#SBATCH --error=outputs/rcnn-wild-train-%j.err
+#SBATCH --output=outputs/rcnn-wild-train-test-%j.out
+#SBATCH --error=outputs/rcnn-wild-train-test_%j.err
 #SBATCH --gres gpu:1
 #SBATCH --cpus-per-task=1
-#SBATCH --time=1:00:00
+#SBATCH --time=24:00:00
 #SBATCH --mem=10gb
 source /home/s6anthel/.bashrc
 module load CUDA
 conda activate kosmos2
 
-python -m src.historicdocumentprocessing.fasterrcnn_trainer --name "test1" --epochs 2
+python -m src.historicdocumentprocessing.fasterrcnn_trainer --name "test5_with_valid_split" --epochs 50

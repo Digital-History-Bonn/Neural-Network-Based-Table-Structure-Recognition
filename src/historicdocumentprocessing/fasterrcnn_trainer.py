@@ -80,8 +80,10 @@ class Trainer:
         print(f"{train_log_dir=}")
         self.writer = SummaryWriter(train_log_dir)  # type: ignore
 
-        self.example_image, self.example_target = testdataset[testdataset.getidx("mit_google_image_search-10918758-be4b5fa7bf3fea80823dabbe1e17e4136f0da811")]
-        self.train_example_image, self.train_example_target = traindataset[traindataset.getidx("mit_google_image_search-10918758-cdcd82db9ce0b61da60155c5c822b0be3884a2cf")]
+        #self.example_image, self.example_target = testdataset[testdataset.getidx("mit_google_image_search-10918758-be4b5fa7bf3fea80823dabbe1e17e4136f0da811")]
+        #self.train_example_image, self.train_example_target = traindataset[traindataset.getidx("mit_google_image_search-10918758-cdcd82db9ce0b61da60155c5c822b0be3884a2cf")]
+        self.example_image, self.example_target = testdataset[0]
+        self.train_example_image, self.train_example_target = traindataset[0]
         self.example_image = (self.example_image*255).to(torch.uint8)
         self.train_example_image = (self.train_example_image*255).to(torch.uint8)
 
@@ -382,6 +384,10 @@ def get_args() -> argparse.Namespace:
     parser.add_argument('--no-augmentations', dest='augmentations', action='store_false')
     parser.set_defaults(augmentations=False)
 
+    parser.add_argument('--valid', action='store_true')
+    parser.add_argument('--no-valid', dest='valid', action='store_false')
+    parser.set_defaults(valid=True)
+
     return parser.parse_args()
 
 
@@ -438,13 +444,15 @@ if __name__ == "__main__":
         transforms=transform,
     )
 
-    if args.dataset in ['Tablesinthewild']:
+    print(f"Use Valid Set: {args.valid}")
+
+    if args.valid:
         validdataset = CustomDataset(
-            f"{Path(__file__).parent.absolute()}/../../data/{args.dataset}/test/", args.objective
+            f"{Path(__file__).parent.absolute()}/../../data/{args.dataset}/valid/", args.objective
         )
     else:
         validdataset = CustomDataset(
-            f"{Path(__file__).parent.absolute()}/../../data/{args.dataset}/valid/", args.objective
+            f"{Path(__file__).parent.absolute()}/../../data/{args.dataset}/test/", args.objective
         )
 
     print(f"{len(traindataset)=}")
