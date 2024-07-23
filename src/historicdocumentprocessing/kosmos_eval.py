@@ -13,6 +13,7 @@ from torchvision.ops import box_area
 from tqdm import tqdm
 
 
+
 def reversetablerelativebboxes_inner(tablebbox: torch.Tensor, cellbboxes: torch.Tensor) -> torch.Tensor:
     """
     returns bounding boxes relative to table rather than relative to image so that evaluation of bounding box accuracy is possible on whole image
@@ -244,9 +245,8 @@ def calcstats(predbox: torch.tensor, targetbox: torch.tensor,
     #print(tp, fp, fn, ioumat.shape)
 
     #from our project group
-    # n_pred, n_target = ioumat.shape
-    #tp = torch.sum(
-    #    predious.expand(len(iou_thresholds), n_pred) >= threshold_tensor[:, None], dim=1)
+    #n_pred, n_target = ioumat.shape
+    #tp = torch.sum(predious.expand(len(iou_thresholds), n_pred) >= threshold_tensor[:, None], dim=1)
     #fp = len(ioumat) - tp
     #fn = torch.sum(
     #    targetious.expand(len(iou_thresholds), n_target) < threshold_tensor[:, None], dim=1)
@@ -386,7 +386,7 @@ def calcmetrics_tables(targetloc: str = f"{Path(__file__).parent.absolute()}/../
         else:
             fullimagegroundbox = torch.load(glob.glob(f"{targetloc}/{preds.split('/')[-1]}/*pt")[0])
 
-        imname = fullimagepred.split("/")[-1].split(".")[-3]
+        imname = preds.split('/')[-1]
 
         #.......................................
         #fullimagemetrics with IoDT
