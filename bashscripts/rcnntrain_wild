@@ -13,4 +13,12 @@ source /home/s6anthel/.bashrc
 module load CUDA
 conda activate kosmos2
 
-python -m src.historicdocumentprocessing.fasterrcnn_trainer --name "test5_with_valid_split" --epochs 50
+epoch=$1
+startepoch=$2
+model=$3
+
+echo "$epoch"
+echo "$startepoch"
+echo "$model"
+
+python -m src.historicdocumentprocessing.fasterrcnn_trainer --name "testseveralcalls_4_with_valid_split" --epochs "$epoch" --startepoch "$startepoch" --load "$model"
