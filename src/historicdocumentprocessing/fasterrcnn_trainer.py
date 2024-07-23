@@ -39,6 +39,7 @@ class Trainer:
             optimizer: Optimizer,
             name: str,
             cuda: int = 0,
+            startepoch: int = 1
     ) -> None:
         """
         Trainer class to train models.
@@ -72,8 +73,9 @@ class Trainer:
         )
 
         self.bestavrgloss: Union[float, None] = None
-        self.epoch = 0
+        self.epoch = startepoch
         self.name = name
+        self.startepoch = startepoch
 
         # setup tensor board
         train_log_dir = f"{Path(__file__).parent.absolute()}/../../logs/runs/{self.name}"
@@ -84,8 +86,8 @@ class Trainer:
         #self.train_example_image, self.train_example_target = traindataset[traindataset.getidx("mit_google_image_search-10918758-cdcd82db9ce0b61da60155c5c822b0be3884a2cf")]
         self.example_image, self.example_target = testdataset[0]
         self.train_example_image, self.train_example_target = traindataset[0]
-        self.example_image = (self.example_image*255).to(torch.uint8)
-        self.train_example_image = (self.train_example_image*255).to(torch.uint8)
+        self.example_image = (self.example_image * 255).to(torch.uint8)
+        self.train_example_image = (self.train_example_image * 255).to(torch.uint8)
 
     def save(self, name: str = "") -> None:
         """
@@ -118,7 +120,8 @@ class Trainer:
         Args:
             epoch: number of epochs
         """
-        for self.epoch in range(1, epoch + 1):
+        for i in range(self.startepoch, self.startepoch + epoch):
+            self.epoch = i
             print(f"start epoch {self.epoch}:")
             self.train_epoch()
             avgloss = self.valid()
@@ -268,7 +271,7 @@ class Trainer:
         self.model.eval()
 
         # predict example form training set
-        pred = self.model([self.train_example_image.to(self.device)/255])
+        pred = self.model([self.train_example_image.to(self.device) / 255])
         boxes = {
             "ground truth": self.train_example_target["boxes"],
             "prediction": pred[0]["boxes"].detach().cpu(),
@@ -277,14 +280,16 @@ class Trainer:
                                                                            range(boxes['ground truth'].shape[0])]
         labels = ["Pred" for i in range(boxes['prediction'].shape[0])] + ["Ground" for i in
                                                                           range(boxes['ground truth'].shape[0])]
-        result = draw_bounding_boxes(image=self.train_example_image, boxes=torch.vstack((boxes['prediction'], boxes['ground truth'])), colors=colors, labels=labels)
+        result = draw_bounding_boxes(image=self.train_example_image,
+                                     boxes=torch.vstack((boxes['prediction'], boxes['ground truth'])), colors=colors,
+                                     labels=labels)
 
         self.writer.add_image(
             "Training/example", result[:, ::2, ::2], global_step=self.epoch
         )  # type: ignore
 
         # predict example form validation set
-        pred = self.model([self.example_image.to(self.device)/255])
+        pred = self.model([self.example_image.to(self.device) / 255])
         boxes = {
             "ground truth": self.example_target["boxes"],
             "prediction": pred[0]["boxes"].detach().cpu(),
@@ -303,7 +308,6 @@ class Trainer:
         self.model.train()
 
         return meanloss
-
 
 
 def get_model(objective: str, load_weights: Optional[str] = None) -> FasterRCNN:
@@ -379,6 +383,8 @@ def get_args() -> argparse.Namespace:
         help="name of a model to load",
     )
 
+    parser.add_argument("--startepoch", "-se", type=int, default=1, help="number of starting epoch")
+
     #parser.add_argument('--augmentations', "-a", action=argparse.BooleanOptionalAction)
     parser.add_argument('--augmentations', action='store_true')
     parser.add_argument('--no-augmentations', dest='augmentations', action='store_false')
@@ -403,7 +409,7 @@ if __name__ == "__main__":
     if args.objective not in ['fullimage']:
         raise ValueError("Please enter a valid objective must be 'fullimage'!")
 
-    if args.dataset not in ['BonnData', 'GloSAT', 'Tablesinthewild']:
+    if args.dataset not in ['BonnData', 'GloSat', 'Tablesinthewild', 'GloSAT']:
         raise ValueError("Please enter a valid dataset must be 'BonnData' or 'GloSAT' or 'Tablesinthewild'!")
 
     if args.epochs <= 0:
@@ -460,5 +466,5 @@ if __name__ == "__main__":
 
     optimizer = AdamW(model.parameters(), lr=LR)
 
-    trainer = Trainer(model, traindataset, validdataset, optimizer, name)
+    trainer = Trainer(model, traindataset, validdataset, optimizer, name, startepoch=args.startepoch)
     trainer.train(args.epochs)
