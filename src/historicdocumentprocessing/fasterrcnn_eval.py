@@ -1,7 +1,7 @@
 import glob
 import os
 from pathlib import Path
-from typing import List
+from typing import List, Tuple
 
 import pandas
 import torch
@@ -10,10 +10,21 @@ from torchvision.models.detection import fasterrcnn_resnet50_fpn, FasterRCNN_Res
 from PIL import Image
 from torchvision.io import read_image
 
-from src.historicdocumentprocessing.kosmos_eval import calcstats, calcmetric, reversetablerelativebboxes_outer, calcstats_overlap, calcmetric_overlap
-from src.historicdocumentprocessing.kosmos_eval import calcstats_IoDT, get_dataframe
+from src.historicdocumentprocessing.kosmos_eval import calcstats, calcmetric, reversetablerelativebboxes_outer, \
+    calcstats_overlap, calcmetric_overlap
+from src.historicdocumentprocessing.kosmos_eval import calcstats_IoDT, get_dataframe, boxoverlap
 
 from tqdm import tqdm
+
+
+def tableareabboxes(bboxes: Tuple[int, int, int, int], tablepath: str) -> torch.tensor:
+    bboxlist = []
+    tablebboxes = torch.load(glob.glob(f"{tablepath}/*tables.pt")[0])
+    for bbox in bboxes:
+        for tablebbox in tablebboxes:
+            if boxoverlap(bbox, tablebbox):
+                bboxlist.append(bbox)
+    return torch.tensor(bboxlist) if bboxlist else torch.empty(0, 4)
 
 
 def inference_fullimg(targetloc: str = f"{Path(__file__).parent.absolute()}/../../data/Tablesinthewild/test",
@@ -90,6 +101,8 @@ def inference_fullimg(targetloc: str = f"{Path(__file__).parent.absolute()}/../.
         # print(output['boxes'], output['boxes'][output['scores']>0.8])
         if filtering:
             output['boxes'] = output['boxes'][output['scores'] > 0.8]
+        if tableareaonly:
+            output['boxes'] = tableareabboxes(output['boxes'], folder)
         fullimagepredbox = output['boxes']
 
         # .......................................
@@ -343,8 +356,13 @@ def inference_tablecutout(datapath: str = f"{Path(__file__).parent.absolute()}/.
 
 
 if __name__ == '__main__':
-    inference_fullimg()
-    inference_fullimg(modelpath=f"{Path(__file__).parent.absolute()}/../../data/checkpoints/fasterrcnn/test5_with_valid_split_Tablesinthewild_fullimage_e50_es.pt")
+    #inference_fullimg()
+    inference_fullimg(
+        modelpath=f"{Path(__file__).parent.absolute()}/../../checkpoints/fasterrcnn/test5_with_valid_split_Tablesinthewild_fullimage_e50_es.pt")
+    inference_fullimg(
+        modelpath=f"{Path(__file__).parent.absolute()}/../../checkpoints/fasterrcnn/testseveralcalls_4_with_valid_split_Tablesinthewild_fullimage_e50_es.pt")
+    inference_fullimg(
+        modelpath=f"{Path(__file__).parent.absolute()}/../../checkpoints/fasterrcnn/testseveralcalls_4_with_valid_split_Tablesinthewild_fullimage_e50_end.pt")
     #pass
     #inference_fullimg(iou_thresholds=[0.9])
     for cat in glob.glob(f"{Path(__file__).parent.absolute()}/../../data/Tablesinthewild/preprocessed/*"):
@@ -352,8 +370,11 @@ if __name__ == '__main__':
         inference_fullimg(targetloc=cat, datasetname=f"Tablesinthewild/cat.split('/')[-1]")
     for cat in glob.glob(f"{Path(__file__).parent.absolute()}/../../data/Tablesinthewild/preprocessed/*"):
         print(cat)
-        inference_fullimg(targetloc=cat, datasetname=f"Tablesinthewild/cat.split('/')[-1]", modelpath=f"{Path(__file__).parent.absolute()}/../../data/checkpoints/fasterrcnn/test5_with_valid_split_Tablesinthewild_fullimage_e50_es.pt")
-    inference_fullimg(targetloc=f"{Path(__file__).parent.absolute()}/../../data/BonnData/test", datasetname="BonnData", modelpath=f"{Path(__file__).parent.absolute()}/../../checkpoints/fasterrcnn/BonnDataFullImage1_BonnData_fullimage_e250_es.pt", tablerelative=True)
+        inference_fullimg(targetloc=cat, datasetname=f"Tablesinthewild/cat.split('/')[-1]",
+                          modelpath=f"{Path(__file__).parent.absolute()}/../../checkpoints/fasterrcnn/test5_with_valid_split_Tablesinthewild_fullimage_e50_es.pt")
+    inference_fullimg(targetloc=f"{Path(__file__).parent.absolute()}/../../data/BonnData/test", datasetname="BonnData",
+                      modelpath=f"{Path(__file__).parent.absolute()}/../../checkpoints/fasterrcnn/BonnDataFullImage1_BonnData_fullimage_e250_es.pt",
+                      tablerelative=True)
     inference_fullimg(targetloc=f"{Path(__file__).parent.absolute()}/../../data/GloSat/test",
                       datasetname="GloSat",
                       modelpath=f"{Path(__file__).parent.absolute()}/../../checkpoints/fasterrcnn/GloSatFullImage1_GloSat_fullimage_e250_es.pt",
