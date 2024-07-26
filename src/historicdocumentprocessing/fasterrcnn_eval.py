@@ -17,14 +17,16 @@ from src.historicdocumentprocessing.kosmos_eval import calcstats_IoDT, get_dataf
 from tqdm import tqdm
 
 
-def tableareabboxes(bboxes: Tuple[int, int, int, int], tablepath: str) -> torch.tensor:
+def tableareabboxes(bboxes: torch.tensor, tablepath: str) -> torch.tensor:
     bboxlist = []
     tablebboxes = torch.load(glob.glob(f"{tablepath}/*tables.pt")[0])
     for bbox in bboxes:
+        #print(bbox)
         for tablebbox in tablebboxes:
             if boxoverlap(bbox, tablebbox):
                 bboxlist.append(bbox)
-    return torch.tensor(bboxlist) if bboxlist else torch.empty(0, 4)
+    #print(bboxlist)
+    return torch.vstack(bboxlist) if bboxlist else torch.empty(0, 4)
 
 
 def inference_fullimg(targetloc: str = f"{Path(__file__).parent.absolute()}/../../data/Tablesinthewild/test",
@@ -249,10 +251,10 @@ def inference_tablecutout(datapath: str = f"{Path(__file__).parent.absolute()}/.
         print("Cuda not available")
         return
     model.eval()
-    saveloc = f"{Path(__file__).parent.absolute()}/../../results/fasterrcnn/testeval/{datasetname}"
-    boxsaveloc = f"{Path(__file__).parent.absolute()}/../../results/fasterrcnn/{datasetname}"
+    saveloc = f"{Path(__file__).parent.absolute()}/../../results/fasterrcnn/testeval/tableareacutout/{datasetname}"
+    boxsaveloc = f"{Path(__file__).parent.absolute()}/../../results/fasterrcnn/tableareacutout/{datasetname}"
     if filtering:
-        saveloc = f"{Path(__file__).parent.absolute()}/../../results/fasterrcnn/testeval/{datasetname}/filtering"
+        saveloc = f"{Path(__file__).parent.absolute()}/../../results/fasterrcnn/testeval/tableareacutout/{datasetname}/filtering"
     os.makedirs(saveloc, exist_ok=True)
     if saveboxes:
         os.makedirs(boxsaveloc, exist_ok=True)
@@ -357,28 +359,29 @@ def inference_tablecutout(datapath: str = f"{Path(__file__).parent.absolute()}/.
 
 if __name__ == '__main__':
     #inference_fullimg()
-    inference_fullimg(
-        modelpath=f"{Path(__file__).parent.absolute()}/../../checkpoints/fasterrcnn/test5_with_valid_split_Tablesinthewild_fullimage_e50_es.pt")
-    inference_fullimg(
-        modelpath=f"{Path(__file__).parent.absolute()}/../../checkpoints/fasterrcnn/testseveralcalls_4_with_valid_split_Tablesinthewild_fullimage_e50_es.pt")
-    inference_fullimg(
-        modelpath=f"{Path(__file__).parent.absolute()}/../../checkpoints/fasterrcnn/testseveralcalls_4_with_valid_split_Tablesinthewild_fullimage_e50_end.pt")
+    #inference_fullimg(
+    #    modelpath=f"{Path(__file__).parent.absolute()}/../../checkpoints/fasterrcnn/test5_with_valid_split_Tablesinthewild_fullimage_e50_es.pt")
+    #inference_fullimg(
+    #    modelpath=f"{Path(__file__).parent.absolute()}/../../checkpoints/fasterrcnn/testseveralcalls_4_with_valid_split_Tablesinthewild_fullimage_e50_es.pt")
+    #inference_fullimg(
+    #    modelpath=f"{Path(__file__).parent.absolute()}/../../checkpoints/fasterrcnn/testseveralcalls_4_with_valid_split_Tablesinthewild_fullimage_e50_end.pt")
     #pass
     #inference_fullimg(iou_thresholds=[0.9])
-    for cat in glob.glob(f"{Path(__file__).parent.absolute()}/../../data/Tablesinthewild/preprocessed/*"):
-        print(cat)
-        inference_fullimg(targetloc=cat, datasetname=f"Tablesinthewild/cat.split('/')[-1]")
-    for cat in glob.glob(f"{Path(__file__).parent.absolute()}/../../data/Tablesinthewild/preprocessed/*"):
-        print(cat)
-        inference_fullimg(targetloc=cat, datasetname=f"Tablesinthewild/cat.split('/')[-1]",
-                          modelpath=f"{Path(__file__).parent.absolute()}/../../checkpoints/fasterrcnn/test5_with_valid_split_Tablesinthewild_fullimage_e50_es.pt")
+    #for cat in glob.glob(f"{Path(__file__).parent.absolute()}/../../data/Tablesinthewild/preprocessed/*"):
+    #    print(cat)
+    #    inference_fullimg(targetloc=cat, datasetname=f"Tablesinthewild/{cat.split('/')[-1]}")
+    #for cat in glob.glob(f"{Path(__file__).parent.absolute()}/../../data/Tablesinthewild/preprocessed/*"):
+    #    print(cat)
+    #    inference_fullimg(targetloc=cat, datasetname=f"Tablesinthewild/{cat.split('/')[-1]}",
+    #                      modelpath=f"{Path(__file__).parent.absolute()}/../../checkpoints/fasterrcnn/test5_with_valid_split_Tablesinthewild_fullimage_e50_es.pt")
     inference_fullimg(targetloc=f"{Path(__file__).parent.absolute()}/../../data/BonnData/test", datasetname="BonnData",
                       modelpath=f"{Path(__file__).parent.absolute()}/../../checkpoints/fasterrcnn/BonnDataFullImage1_BonnData_fullimage_e250_es.pt",
-                      tablerelative=True)
+                      tablerelative=True, tableareaonly=True)
     inference_fullimg(targetloc=f"{Path(__file__).parent.absolute()}/../../data/GloSat/test",
                       datasetname="GloSat",
                       modelpath=f"{Path(__file__).parent.absolute()}/../../checkpoints/fasterrcnn/GloSatFullImage1_GloSat_fullimage_e250_es.pt",
-                      tablerelative=True)
+                      tablerelative=True, tableareaonly=True)
+
     #inference_fullimg(targetloc=f"{Path(__file__).parent.absolute()}/../../data/Tablesinthewild/preprocessed/simple", datasetname='simple')
     #inference_tablecutout(datapath=)
     #inference_tablecutout(filtering=True, saveboxes=True)

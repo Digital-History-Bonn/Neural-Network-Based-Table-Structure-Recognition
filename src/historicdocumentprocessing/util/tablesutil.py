@@ -4,7 +4,7 @@ import pandas as pd
 
 
 def BonnTablebyCat(categoryfile: str = f"{Path(__file__).parent.absolute()}/../../../data/BonnData/Tabellen/allinfosubset_manuell_vervollständigt.xlsx",
-                   resultfile: str = f"{Path(__file__).parent.absolute()}/../../../results/kosmos25/testevaltotal/BonnData_Tables/fullimageiodt.csv"):
+                   resultfile: str = f"{Path(__file__).parent.absolute()}/../../../results/kosmos25/testevaltotal/BonnData_Tables/fullimageiodt.csv", resultmetric: str = "iodt"):
     """
     filter bonntable eval results by category and calculate wf1 over different categories
     Args:
@@ -33,10 +33,14 @@ def BonnTablebyCat(categoryfile: str = f"{Path(__file__).parent.absolute()}/../.
         subsetwf1df['category'].append('no category')
         subsetwf1df['len'].append(len(subset))
         subsetwf1df['wf1'].append(subset.wf1.sum() / len(subset))
-    saveloc = f"{'/'.join(resultfile.split('/')[:-1])}/bycategory.xlsx"
+    saveloc = f"{'/'.join(resultfile.split('/')[:-1])}/{resultmetric}_bycategory.xlsx"
     pd.DataFrame(subsetwf1df).to_excel(saveloc)
 
 if __name__ == '__main__':
-    BonnTablebyCat()
-    BonnTablebyCat(resultfile=f"{Path(__file__).parent.absolute()}/../../../results/fasterrcnn/testeval/BonnData/iodt.csv")
+    #BonnTablebyCat()
+    BonnTablebyCat(resultfile=f"{Path(__file__).parent.absolute()}/../../../results/fasterrcnn/testeval/BonnData/projectgroupmodelinference/iou.csv", resultmetric="iou")
+    BonnTablebyCat(resultfile=f"{Path(__file__).parent.absolute()}/../../../results/fasterrcnn/testeval/fullimg/BonnData/BonnDataFullImage1_BonnData_fullimage_e250_es.pt/tableareaonly/iou_0.5_0.9/fullimageiodt.csv")
+    BonnTablebyCat(resultfile=f"{Path(__file__).parent.absolute()}/../../../results/fasterrcnn/testeval/fullimg/BonnData/BonnDataFullImage1_BonnData_fullimage_e250_es.pt/iou_0.5_0.9/fullimageiodt.csv")
+    BonnTablebyCat(resultfile=f"{Path(__file__).parent.absolute()}/../../../results/fasterrcnn/testeval/fullimg/BonnData/BonnDataFullImage1_BonnData_fullimage_e250_es.pt/tableareaonly/iou_0.5_0.9/fullimageiou.csv", resultmetric="iou")
+    BonnTablebyCat(resultfile=f"{Path(__file__).parent.absolute()}/../../../results/fasterrcnn/testeval/fullimg/BonnData/BonnDataFullImage1_BonnData_fullimage_e250_es.pt/iou_0.5_0.9/fullimageiou.csv", resultmetric="iou")
 
