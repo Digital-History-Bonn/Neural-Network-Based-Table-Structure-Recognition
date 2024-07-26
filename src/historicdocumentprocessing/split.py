@@ -33,7 +33,7 @@ def validsplit(path: str = f"{Path(__file__).parent.absolute()}/../../data/BonnD
 
 
 def wildtablesvalidsplit(path: str = f"{Path(__file__).parent.absolute()}/../../data/Tablesinthewild/train",
-                         ratio: List[float] = [0.7, 0.3]):
+                         ratio: List[float] = [0.7, 0.3], validfile: str = None):
     """
     create train/valid split for tables in the wild dataset
     Args:
@@ -48,16 +48,39 @@ def wildtablesvalidsplit(path: str = f"{Path(__file__).parent.absolute()}/../../
     """
     dst = f"{'/'.join(path.split('/')[:-1])}/valid"
     trainlist = glob.glob(f"{path}/*")
-    random.shuffle(trainlist)
-    train = trainlist[:round(len(trainlist) * ratio[0])]
-    valid = trainlist[round(len(trainlist) * ratio[0]):round(len(trainlist) * (ratio[1] + ratio[0]))]
-    assert len(train) + len(valid) == len(trainlist)
+    if not validfile:
+        random.shuffle(trainlist)
+        train = trainlist[:round(len(trainlist) * ratio[0])]
+        valid = trainlist[round(len(trainlist) * ratio[0]):round(len(trainlist) * (ratio[1] + ratio[0]))]
+        assert len(train) + len(valid) == len(trainlist)
+    else:
+        imnames = pd.read_json(validfile)["validation"]
+        valid = []
+        pass
     #print(len(valid))
     os.makedirs(dst, exist_ok=True)
     #print(dst)
     for v in valid:
         shutil.move(v, f"{dst}/{v.split('/')[-1]}")
         #print(f"{dst}/{v.split('/')[-1]}")
+
+def reversewildtablesvalidsplit(path: str = f"{Path(__file__).parent.absolute()}/../../data/Tablesinthewild"):
+    """
+    reverse train/valid split for tables in the wild dataset
+    Args:
+        path:
+    Returns:
+
+    """
+    validpath = glob.glob(f"{path}/valid/*")
+    trainpath= f"{path}/train"
+    dict = {"validation": [v.split("/")[-1] for v in validpath]}
+    with open(f"{path}/split.json", "w") as file:
+        json.dump(dict, file, indent=2)
+    #print(len(validpath))
+    for v in validpath:
+        #print(f"{trainpath}/{v.split('/')[-1]}")
+        shutil.copytree(v, f"{trainpath}/{v.split('/')[-1]}")
 
 
 def subclassjoinwildtables(path: str = f"{Path(__file__).parent.absolute()}/../../data/Tablesinthewild/preprocessed",
@@ -197,5 +220,6 @@ if __name__ == '__main__':
     #subclasssplitwildtables()
     #subclassjoinwildtables()
     #wildtablesvalidsplit()
-    validsplit(f"{Path(__file__).parent.absolute()}/../../data/GloSat")
+    #validsplit(f"{Path(__file__).parent.absolute()}/../../data/GloSat")
+    reversewildtablesvalidsplit()
 
