@@ -65,7 +65,7 @@ def boxoverlap(bbox: Tuple[int, int, int, int], tablebox: Tuple[int, int, int, i
         bbox[3] <= tablebox[3] + fuzzy
 
 
-def extractboxes(boxdict: dict, fpath: str = None) -> torch.tensor:
+def extractboxes(boxdict: dict, fpath: str = None) -> torch.Tensor:
     """Takes a Kosmos2.5-Output-Style Dict and extracts the bounding boxes
     Args:
         fpath: path to table folder (if only bboxes in a table wanted)
