@@ -4,14 +4,22 @@ from logging import warning
 from pathlib import Path
 import glob
 import json
+from typing import List
 
 import torch
 from bs4 import BeautifulSoup
+from pyarrow import table
 from torchvision.io import read_image
+from torchvision.transforms.functional import pil_to_tensor
+from torchvision.utils import draw_bounding_boxes
 from tqdm import tqdm
 import warnings
 
 import re
+
+from src.historicdocumentprocessing.util.tablesutil import getsurroundingtable, gettablerelativebboxes
+
+from PIL import Image
 
 
 def getlabelname(label: str):
@@ -189,12 +197,45 @@ def processdata_wildtable_inner(datapath) -> torch.Tensor:
         print(datapath)
     return torch.vstack(bboxes) if bboxes else torch.empty(0, 4)
 
+def processdata_wildtable_tablerelative(datapath:str) -> (List[torch.Tensor], List[torch.Tensor]):
+    with open(datapath) as d:
+        xml = BeautifulSoup(d, "xml")
+    tablelist = []
+    celllist = []
+    idx = 0
+    bboxes = []
+    for box in xml.find_all("bndbox"):
+        new = torch.tensor(
+            [int(float(box.xmin.get_text())), int(float(box.ymin.get_text())), int(float(box.xmax.get_text())),
+             int(float(box.ymax.get_text()))], dtype=torch.float)
+        # print(new)
+        if new[0] < new[2] and new[1] < new[3]:
+            if int(box.tableid.get_text())==idx:
+                bboxes.append(new)
+            else:
+                tablelist.append(getsurroundingtable(torch.vstack(bboxes)))
+                celllist.append(gettablerelativebboxes(torch.vstack(bboxes)))
+                bboxes.clear()
+                bboxes.append(new)
+        else:
+            warnings.warn("invalid bbox found")
+            print(datapath)
+    tablelist.append(getsurroundingtable(torch.vstack(bboxes)))
+    celllist.append(gettablerelativebboxes(torch.vstack(bboxes)))
+        # print(bboxes)
+    if not bboxes:
+        warnings.warn("no bboxes on img")
+        print(datapath)
+    #print(tablelist, celllist)
+    return tablelist, celllist
+
+
 
 def processdata_wildtable_outer(
-        datapath: str = f"{Path(__file__).parent.absolute()}/../../data/Tablesinthewild/rawdata/train"):
+        datapath: str = f"{Path(__file__).parent.absolute()}/../../data/Tablesinthewild/rawdata/train", tablerelative=False):
     xmlfolder = f"{datapath}/xml"
     imfolder = f"{datapath}/images"
-    target = f"{datapath}/../../train"
+    target = f"{datapath}/../../{datapath.split('/')[-1]}"
     for xml in tqdm(glob.glob(f"{xmlfolder}/*xml")):
         bboxfile = processdata_wildtable_inner(xml)
         impath = glob.glob(f"{imfolder}/{xml.split('/')[-1].split('.')[-3]}.jpg")[0]
@@ -202,6 +243,7 @@ def processdata_wildtable_outer(
         #print(xml)
         #print(f"{tarfolder}/{impath.split('/')[-1]}")
         #print(f"{tarfolder}/{xml.split('/')[-1].split('.')[-3]}.pt")
+
         if bboxfile.numel():
             if (read_image(impath) / 255).shape[0] == 3:
                 os.makedirs(tarfolder, exist_ok=True)
@@ -213,9 +255,31 @@ def processdata_wildtable_outer(
         else:
             warnings.warn("empty bbox, image not added to preprocessed training data")
 
+        if tablerelative:
+            tablelist, celllist = processdata_wildtable_tablerelative(xml)
+            if tablelist and celllist:
+                assert len(tablelist)==len(celllist)
+                for idx in range(0, len(tablelist)):
+                    torch.save(celllist[idx], f"{tarfolder}/{xml.split('/')[-1].split('.')[-3]}_cell_{idx}.pt")
+                    #print(f"{tarfolder}/{xml.split('/')[-1].split('.')[-3]}_cell_{idx}.pt")
+                    img = Image.open(impath)
+                    tableimg = img.crop((tuple(tablelist[idx].to(int).tolist())))
+                    tableimg.save(f"{tarfolder}/{xml.split('/')[-1].split('.')[-3]}_table_{idx}.jpg")
+                torch.save(torch.vstack(tablelist), f"{tarfolder}/{xml.split('/')[-1].split('.')[-3]}_tables.pt")
+                #print(f"{tarfolder}/{xml.split('/')[-1].split('.')[-3]}_tables.pt")
+            #if len(tablelist)==2:
+            #    for i in range(0,len(tablelist)):
+            #        img = Image.open(impath)
+            #        tableimg = img.crop((tuple(tablelist[i].to(int).tolist())))
+            #        test = draw_bounding_boxes(image=pil_to_tensor(tableimg), boxes=celllist[i])
+            #        img = Image.fromarray(test.permute(1, 2, 0).numpy())
+            #        img.save(f"{Path(__file__).parent.absolute()}/../../images/test/train_2_croptest_{i}.jpg")
+            #    return
+
+
 
 if __name__ == '__main__':
-    processdata_wildtable_outer()
+    #processdata_wildtable_outer(tablerelative=True)
     #processdata_wildtable_inner(f"{Path(__file__).parent.absolute()}/../../data/Tablesinthewild/test/test-xml-revise/test-xml-revise/0hZg6EpcTdKXk6j44umj3gAAACMAAQED.xml")
     pass
     #processdata_engnews_kosmos()
