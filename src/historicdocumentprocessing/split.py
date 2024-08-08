@@ -3,15 +3,19 @@ import json
 import os
 import random
 import shutil
+import warnings
 from pathlib import Path
 from typing import List, Dict
 
 import pandas as pd
 import torch
+from PIL import Image
 from tqdm import tqdm
-from dataprocessing import processdata_wildtable_inner
+from dataprocessing import processdata_wildtable_inner, processdata_wildtable_tablerelative
 
 from torchvision.io import read_image
+from torchvision.utils import draw_bounding_boxes
+from torchvision.transforms.functional import pil_to_tensor
 
 
 def validsplit(path: str = f"{Path(__file__).parent.absolute()}/../../data/BonnData"):
@@ -93,8 +97,8 @@ def subclassjoinwildtables(path: str = f"{Path(__file__).parent.absolute()}/../.
 def subclasssplitwildtables(
         impath: str = f"{Path(__file__).parent.absolute()}/../../data/Tablesinthewild/rawdata/test/images",
         xmlpath: str = f"{Path(__file__).parent.absolute()}/../../data/Tablesinthewild/rawdata/test/test-xml-revise/test-xml-revise",
-        txtfolder: str = f"{Path(__file__).parent.absolute()}/../../data/Tablesinthewild/rawdata/test/sub_classes"):
-    """split wildtables test into subclasses"""
+        txtfolder: str = f"{Path(__file__).parent.absolute()}/../../data/Tablesinthewild/rawdata/test/sub_classes", tablerelative = False):
+    """split wildtables test into subclasses and do preprocessing"""
     txts = glob.glob(f"{txtfolder}/*txt")
     for txt in txts:
         with open(txt) as f:
@@ -121,7 +125,31 @@ def subclasssplitwildtables(
                     else:
                         print(f"Wrong image dim at {im}")
                 else:
-                    print("f")
+                    warnings.warn("empty bbox, image not added to preprocessed test data")
+                if tablerelative and read_image(im).shape[0]== 3:
+                    tablelist, celllist = processdata_wildtable_tablerelative(xml)
+                    if tablelist and celllist:
+                        assert len(tablelist) == len(celllist)
+                        for idx in range(0, len(tablelist)):
+                            #print(f"{imfolder}/{line.split('.')[-2]}_cell_{idx}.pt")
+                            torch.save(celllist[idx], f"{imfolder}/{line.split('.')[-2]}_cell_{idx}.pt")
+                            img = Image.open(im)
+                            tableimg = img.crop((tuple(tablelist[idx].to(int).tolist())))
+                            tableimg.save(f"{imfolder}/{line.split('.')[-2]}_table_{idx}.jpg")
+                        torch.save(torch.vstack(tablelist),
+                                   f"{imfolder}/{line.split('.')[-2]}_tables.pt")
+                        #print(f"{imfolder}/{line.split('.')[-2]}_tables.pt")
+
+                        #if len(tablelist)==1:
+                        #    for i in range(0,len(tablelist)):
+                        #        img = Image.open(im)
+                        #        tableimg = img.crop((tuple(tablelist[i].to(int).tolist())))
+                        #        test = draw_bounding_boxes(image=pil_to_tensor(tableimg), boxes=celllist[i])
+                        #        img = Image.fromarray(test.permute(1, 2, 0).numpy())
+                        #        img.save(f"{Path(__file__).parent.absolute()}/../../images/test/croptest_{i}.jpg")
+                        #    return
+
+
 
 
 def recreatetablesplit(datapath: str = f"{Path(__file__).parent.absolute()}/../../data/BonnData/preprocessed",
@@ -217,9 +245,9 @@ if __name__ == '__main__':
     #recreatetablesplit()
     #recreatenewspapersplit()
     #newsplit()
-    #subclasssplitwildtables()
+    subclasssplitwildtables(tablerelative=True)
     #subclassjoinwildtables()
     #wildtablesvalidsplit()
     #validsplit(f"{Path(__file__).parent.absolute()}/../../data/GloSat")
-    reversewildtablesvalidsplit()
+    #reversewildtablesvalidsplit()
 

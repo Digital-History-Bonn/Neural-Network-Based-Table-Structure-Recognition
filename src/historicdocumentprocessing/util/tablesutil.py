@@ -6,6 +6,7 @@ from typing import Tuple
 import pandas as pd
 import numpy as np
 import torch
+from pyarrow import table
 from tensorboard.summary.v1 import image
 from torchvision.io import read_image
 
@@ -43,16 +44,38 @@ def eucsimilarity(x, y):
     print(res)
     return res
 
-def clustertables(boxes:torch.Tensor):
+def clustertables(boxes:torch.Tensor, epsprefactor:float = 1/6):
     tables = []
     eps = avrgeuc(boxes)
     print("eps: ", eps)
-    clustering = DBSCAN(eps=(1/6)*eps, min_samples=2, metric=eucsimilarity).fit(boxes.numpy())
+    clustering = DBSCAN(eps=(epsprefactor)*eps, min_samples=2, metric=eucsimilarity).fit(boxes.numpy())
     for label in set(clustering.labels_):
         table = boxes[clustering.labels_==label]
         print(label, clustering.labels_)
         tables.append(table)
     return tables
+
+def getsurroundingtable(boxes:torch.Tensor)->torch.Tensor:
+    """get surrounding table of a group of bounding boxes given as torch.Tensor
+    Args:
+        boxes: (cell) bounding boxes as torch.Tensor
+
+    Returns: surrounding table"""
+    return torch.hstack([torch.min(boxes[:,0]),torch.min(boxes[:,1]), torch.max(boxes[:,2]), torch.max(boxes[:,3])])
+
+def gettablerelativebbox(box:torch.Tensor, table:torch.Tensor) -> torch.Tensor:
+    #print(box, table)
+    return torch.hstack([box[0]-table[0], box[1]-table[1], box[2]-table[0], box[3]-table[1]])
+
+
+def gettablerelativebboxes(boxes:torch.Tensor)->torch.Tensor:
+    tablecoords = getsurroundingtable(boxes)
+    #print(tablecoords)
+    newboxes=[]
+    for box in boxes:
+        newboxes.append(gettablerelativebbox(box, tablecoords))
+    #print(newboxes)
+    return torch.vstack(newboxes)
 
 
 def BonnTablebyCat(categoryfile: str = f"{Path(__file__).parent.absolute()}/../../../data/BonnData/Tabellen/allinfosubset_manuell_vervollständigt.xlsx",
