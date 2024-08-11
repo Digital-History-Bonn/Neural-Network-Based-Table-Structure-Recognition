@@ -64,6 +64,15 @@ def boxoverlap(bbox: Tuple[int, int, int, int], tablebox: Tuple[int, int, int, i
     return bbox[0] >= tablebox[0] - fuzzy and bbox[1] >= tablebox[1] - fuzzy and bbox[2] <= tablebox[2] + fuzzy and \
         bbox[3] <= tablebox[3] + fuzzy
 
+def boxoverlap1(bbox: Tuple[int, int, int, int], tablebox: Tuple[int, int, int, int], fuzzy: int = 0) ->bool:
+    iou = box_iou(torch.Tensor(bbox), torch.Tensor(tablebox))
+    print(iou)
+    if iou[0]>0:
+        return True
+    else:
+        return False
+
+
 
 def extractboxes(boxdict: dict, fpath: str = None) -> torch.Tensor:
     """Takes a Kosmos2.5-Output-Style Dict and extracts the bounding boxes
@@ -232,10 +241,12 @@ def calcstats_IoU(predbox: torch.tensor, targetbox: torch.tensor,
             threshold_tensor.shape), torch.zeros(threshold_tensor.shape), torch.full(threshold_tensor.shape,
                                                                                      fill_value=targetbox.shape[0])
     ioumat = box_iou(predbox, targetbox)
-    print("ioumat:", ioumat)
+    #print("ioumat:", ioumat)
     predious = ioumat.amax(dim=1)
     targetious = ioumat.amax(dim=0)
-
+    #print(len(targetious),predbox.shape[1])
+    assert len(predious)==predbox.shape[0]
+    assert len(targetious)==targetbox.shape[0]
     #print(predious)
     #print(targetious)
     #mine
@@ -260,18 +271,19 @@ def calcmetric(tp: torch.Tensor, fp: torch.Tensor, fn: torch.Tensor,
     """
     Calculate Metrics from true positives, false positives, false negatives at given iou thresholds
     Args:
-        tp:
-        fp:
-        fn:
-        iou_thresholds:
+        tp: True Positives
+        fp: False Positives
+        fn: False Negatives
+        iou_thresholds: List of IoU Thresholds
 
-    Returns:
+    Returns: precision, recall, f1, wf1
 
     """
     threshold_tensor = torch.tensor(iou_thresholds)
     precision = torch.nan_to_num(tp / (tp + fp))
     recall = torch.nan_to_num(tp / (tp + fn))
     f1 = torch.nan_to_num(2 * (precision * recall) / (precision + recall))
+    #print(f1, threshold_tensor)
     wf1 = f1 @ threshold_tensor / torch.sum(threshold_tensor)
     return precision, recall, f1, wf1
 
@@ -324,7 +336,7 @@ def calcmetrics_tables(targetloc: str = f"{Path(__file__).parent.absolute()}/../
                                       f"/Tabellen/test",
                        iou_thresholds: List[float] = [0.5, 0.6, 0.7, 0.8, 0.9],
                        saveloc: str = f"{Path(__file__).parent.absolute()}/../../results/kosmos25/BonnData/Tabellen"
-                                      f"/testevalnew",
+                                      f"/testevalfinal",
                        tableavail: bool = True) -> \
         Tuple[
             List[torch.Tensor], List[torch.Tensor], List[
@@ -337,6 +349,7 @@ def calcmetrics_tables(targetloc: str = f"{Path(__file__).parent.absolute()}/../
 
     """
     predfolder = glob.glob(f"{predloc}/*")
+    saveloc = f"{saveloc}/iou_{'_'.join([str(iou_thresholds[0]), str(iou_thresholds[-1])])}"
     if tableavail:
         saveloc = f"{saveloc}/tableareaonly"
     #fullimagevars
@@ -390,7 +403,7 @@ def calcmetrics_tables(targetloc: str = f"{Path(__file__).parent.absolute()}/../
         if tableavail:
             fullimagegroundbox = reversetablerelativebboxes_outer(targets)
         else:
-            fullimagegroundbox = torch.load(glob.glob(f"{targetloc}/{preds.split('/')[-1]}/*pt")[0])
+            fullimagegroundbox = torch.load(glob.glob(f"{targetloc}/{preds.split('/')[-1]}/{preds.split('/')[-1]}.pt")[0])
 
         imname = preds.split('/')[-1]
 
@@ -526,13 +539,13 @@ def calcmetrics_tables(targetloc: str = f"{Path(__file__).parent.absolute()}/../
     totalmetrics = get_dataframe(fnsum, fpsum, tpsum, iou_thresholds=iou_thresholds)
     #print(totalfullmetrics)
     overlapprec, overlaprec, overlapf1 = calcmetric_overlap(tp=tpsum_overlap, fp=fpsum_overlap, fn=fnsum_overlap)
-    totaloverlapdf = pandas.DataFrame({"f1": overlapf1, "prec": overlaprec, "recall": overlaprec}, index=["overlap"])
+    totaloverlapdf = pandas.DataFrame({"f1": overlapf1, "prec": overlapprec, "recall": overlaprec}, index=["overlap"])
     overlapprec_predonly, overlaprec_predonly, overlapf1_predonly = calcmetric_overlap(tp=tpsum_overlap_predonly,
                                                                                        fp=fpsum_overlap_predonly,
                                                                                        fn=fnsum_overlap_predonly)
     predonlyoverlapdf = pandas.DataFrame({f"Number of evaluated files": overlapdf.shape[0],
                                           f"Evaluated files without predictions:": overlapdf.shape[0] - predcount,
-                                          "f1": overlapf1_predonly, "prec": overlaprec_predonly,
+                                          "f1": overlapf1_predonly, "prec": overlapprec_predonly,
                                           "recall": overlaprec_predonly}, index=["overlap with valid preds"])
     totaliodt = get_dataframe(fnsum=fnsum_IoDT, fpsum=fpsum_IoDT, tpsum=tpsum_IoDT,
                               nopredcount=iodtdf.shape[0] - predcount, imnum=iodtdf.shape[0],
@@ -569,7 +582,7 @@ def calcmetrics_tables(targetloc: str = f"{Path(__file__).parent.absolute()}/../
 
 def get_dataframe(fnsum, fpsum, tpsum, nopredcount: int = None, imnum: int = None,
                   iou_thresholds: List[float] = [0.5, 0.6, 0.7, 0.8, 0.9]):
-    totalfullprec, totalfullrec, totalfullf1, totalfullwf1 = calcmetric(tpsum, fpsum, fnsum)
+    totalfullprec, totalfullrec, totalfullf1, totalfullwf1 = calcmetric(tpsum, fpsum, fnsum, iou_thresholds=iou_thresholds)
     totalfullmetrics = {"wf1": totalfullwf1.item()}
     totalfullmetrics.update({f"Number of evaluated files": imnum})
     totalfullmetrics.update({f"Evaluated files without predictions:": nopredcount})
@@ -586,89 +599,89 @@ if __name__ == '__main__':
     calcmetrics_tables(targetloc=f"{Path(__file__).parent.absolute()}/../../data/Tablesinthewild/preprocessed/simple",
                        predloc=f"{Path(__file__).parent.absolute()}/../../results/kosmos25/Tablesinthewild/simple",
                        iou_thresholds=[0.5, 0.6, 0.7, 0.8, 0.9],
-                       saveloc=f"{Path(__file__).parent.absolute()}/../../results/kosmos25/testevalnew"
+                       saveloc=f"{Path(__file__).parent.absolute()}/../../results/kosmos25/testevalfinal"
                                f"/TitW_simple/tableavail")
     calcmetrics_tables(targetloc=f"{Path(__file__).parent.absolute()}/../../data/Tablesinthewild/preprocessed/curved",
                        predloc=f"{Path(__file__).parent.absolute()}/../../results/kosmos25/Tablesinthewild/curved",
                        iou_thresholds=[0.5, 0.6, 0.7, 0.8, 0.9],
-                       saveloc=f"{Path(__file__).parent.absolute()}/../../results/kosmos25/testevalnew"
+                       saveloc=f"{Path(__file__).parent.absolute()}/../../results/kosmos25/testevalfinal"
                                f"/TitW_curved/tableavail")
     calcmetrics_tables(targetloc=f"{Path(__file__).parent.absolute()}/../../data/Tablesinthewild/preprocessed/occblu",
                        predloc=f"{Path(__file__).parent.absolute()}/../../results/kosmos25/Tablesinthewild/occblu",
                        iou_thresholds=[0.5, 0.6, 0.7, 0.8, 0.9],
-                       saveloc=f"{Path(__file__).parent.absolute()}/../../results/kosmos25/testevalnew"
+                       saveloc=f"{Path(__file__).parent.absolute()}/../../results/kosmos25/testevalfinal"
                                f"/TitW_occblu/tableavail")
     calcmetrics_tables(targetloc=f"{Path(__file__).parent.absolute()}/../../data/Tablesinthewild/preprocessed/overlaid",
                        predloc=f"{Path(__file__).parent.absolute()}/../../results/kosmos25/Tablesinthewild/overlaid",
                        iou_thresholds=[0.5, 0.6, 0.7, 0.8, 0.9],
-                       saveloc=f"{Path(__file__).parent.absolute()}/../../results/kosmos25/testevalnew"
+                       saveloc=f"{Path(__file__).parent.absolute()}/../../results/kosmos25/testevalfinal"
                                f"/TitW_overlaid/tableavail")
     calcmetrics_tables(targetloc=f"{Path(__file__).parent.absolute()}/../../data/Tablesinthewild/preprocessed/Inclined",
                        predloc=f"{Path(__file__).parent.absolute()}/../../results/kosmos25/Tablesinthewild/Inclined1",
                        iou_thresholds=[0.5, 0.6, 0.7, 0.8, 0.9],
-                       saveloc=f"{Path(__file__).parent.absolute()}/../../results/kosmos25/testevalnew"
+                       saveloc=f"{Path(__file__).parent.absolute()}/../../results/kosmos25/testevalfinal"
                                f"/TitW_Inclined/tableavail")
     calcmetrics_tables(
         targetloc=f"{Path(__file__).parent.absolute()}/../../data/Tablesinthewild/preprocessed/extremeratio",
         predloc=f"{Path(__file__).parent.absolute()}/../../results/kosmos25/Tablesinthewild/extremeratio1",
         iou_thresholds=[0.5, 0.6, 0.7, 0.8, 0.9],
-        saveloc=f"{Path(__file__).parent.absolute()}/../../results/kosmos25/testevalnew"
+        saveloc=f"{Path(__file__).parent.absolute()}/../../results/kosmos25/testevalfinal"
                 f"/TitW_extremeratio/tableavail")
     calcmetrics_tables(
         targetloc=f"{Path(__file__).parent.absolute()}/../../data/Tablesinthewild/preprocessed/muticolorandgrid",
         predloc=f"{Path(__file__).parent.absolute()}/../../results/kosmos25/Tablesinthewild/muticolorandgrid1",
         iou_thresholds=[0.5, 0.6, 0.7, 0.8, 0.9],
-        saveloc=f"{Path(__file__).parent.absolute()}/../../results/kosmos25/testevalnew"
+        saveloc=f"{Path(__file__).parent.absolute()}/../../results/kosmos25/testevalfinal"
                 f"/TitW_muticolorandgrid/tableavail")
     #print(calcmetrics_jsoninput())
     calcmetrics_tables(
-        saveloc=f"{Path(__file__).parent.absolute()}/../../results/kosmos25/testevalnew/BonnData_Tables")
+        saveloc=f"{Path(__file__).parent.absolute()}/../../results/kosmos25/testevalfinal/BonnData_Tables")
     calcmetrics_tables(targetloc=f"{Path(__file__).parent.absolute()}/../../data/GloSat/test",
                        predloc=f"{Path(__file__).parent.absolute()}/../../results/kosmos25/GloSat/test1",
                        iou_thresholds=[0.5, 0.6, 0.7, 0.8, 0.9],
-                       saveloc=f"{Path(__file__).parent.absolute()}/../../results/kosmos25/testevalnew/GloSAT")
+                       saveloc=f"{Path(__file__).parent.absolute()}/../../results/kosmos25/testevalfinal/GloSAT")
     calcmetrics_tables(targetloc=f"{Path(__file__).parent.absolute()}/../../data/Tablesinthewild/preprocessed/simple",
                        predloc=f"{Path(__file__).parent.absolute()}/../../results/kosmos25/Tablesinthewild/simple",
                        iou_thresholds=[0.5, 0.6, 0.7, 0.8, 0.9],
-                       saveloc=f"{Path(__file__).parent.absolute()}/../../results/kosmos25/testevalnew"
+                       saveloc=f"{Path(__file__).parent.absolute()}/../../results/kosmos25/testevalfinal"
                                f"/TitW_simple",
                        tableavail=False)
     calcmetrics_tables(targetloc=f"{Path(__file__).parent.absolute()}/../../data/Tablesinthewild/preprocessed/curved",
                        predloc=f"{Path(__file__).parent.absolute()}/../../results/kosmos25/Tablesinthewild/curved",
                        iou_thresholds=[0.5, 0.6, 0.7, 0.8, 0.9],
-                       saveloc=f"{Path(__file__).parent.absolute()}/../../results/kosmos25/testevalnew"
+                       saveloc=f"{Path(__file__).parent.absolute()}/../../results/kosmos25/testevalfinal"
                                f"/TitW_curved",
                        tableavail=False)
     calcmetrics_tables(targetloc=f"{Path(__file__).parent.absolute()}/../../data/Tablesinthewild/preprocessed/occblu",
                        predloc=f"{Path(__file__).parent.absolute()}/../../results/kosmos25/Tablesinthewild/occblu",
                        iou_thresholds=[0.5, 0.6, 0.7, 0.8, 0.9],
-                       saveloc=f"{Path(__file__).parent.absolute()}/../../results/kosmos25/testevalnew"
+                       saveloc=f"{Path(__file__).parent.absolute()}/../../results/kosmos25/testevalfinal"
                                f"/TitW_occblu",
                        tableavail=False)
     calcmetrics_tables(targetloc=f"{Path(__file__).parent.absolute()}/../../data/Tablesinthewild/preprocessed/overlaid",
                        predloc=f"{Path(__file__).parent.absolute()}/../../results/kosmos25/Tablesinthewild/overlaid",
                        iou_thresholds=[0.5, 0.6, 0.7, 0.8, 0.9],
-                       saveloc=f"{Path(__file__).parent.absolute()}/../../results/kosmos25/testevalnew"
+                       saveloc=f"{Path(__file__).parent.absolute()}/../../results/kosmos25/testevalfinal"
                                f"/TitW_overlaid",
                        tableavail=False)
     calcmetrics_tables(targetloc=f"{Path(__file__).parent.absolute()}/../../data/Tablesinthewild/preprocessed/Inclined",
                        predloc=f"{Path(__file__).parent.absolute()}/../../results/kosmos25/Tablesinthewild/Inclined1",
                        iou_thresholds=[0.5, 0.6, 0.7, 0.8, 0.9],
-                       saveloc=f"{Path(__file__).parent.absolute()}/../../results/kosmos25/testevalnew"
+                       saveloc=f"{Path(__file__).parent.absolute()}/../../results/kosmos25/testevalfinal"
                                f"/TitW_Inclined",
                        tableavail=False)
     calcmetrics_tables(
         targetloc=f"{Path(__file__).parent.absolute()}/../../data/Tablesinthewild/preprocessed/extremeratio",
         predloc=f"{Path(__file__).parent.absolute()}/../../results/kosmos25/Tablesinthewild/extremeratio1",
         iou_thresholds=[0.5, 0.6, 0.7, 0.8, 0.9],
-        saveloc=f"{Path(__file__).parent.absolute()}/../../results/kosmos25/testevalnew"
+        saveloc=f"{Path(__file__).parent.absolute()}/../../results/kosmos25/testevalfinal"
                 f"/TitW_extremeratio",
         tableavail=False)
     calcmetrics_tables(
         targetloc=f"{Path(__file__).parent.absolute()}/../../data/Tablesinthewild/preprocessed/muticolorandgrid",
         predloc=f"{Path(__file__).parent.absolute()}/../../results/kosmos25/Tablesinthewild/muticolorandgrid1",
         iou_thresholds=[0.5, 0.6, 0.7, 0.8, 0.9],
-        saveloc=f"{Path(__file__).parent.absolute()}/../../results/kosmos25/testevalnew"
+        saveloc=f"{Path(__file__).parent.absolute()}/../../results/kosmos25/testevalfinal"
                 f"/TitW_muticolorandgrid",
         tableavail=False)
     #print(reversetablerelativebboxes_outer(f"{Path(__file__).parent.absolute()}/../../data/BonnData/Tabellen/preprocessed/I_HA_Rep_89_Nr_16160_0090"))

@@ -10,7 +10,7 @@ from torchvision.models.detection import fasterrcnn_resnet50_fpn, FasterRCNN_Res
 from PIL import Image
 from torchvision.io import read_image
 
-from src.historicdocumentprocessing.kosmos_eval import calcstats, calcmetric, reversetablerelativebboxes_outer, \
+from src.historicdocumentprocessing.kosmos_eval import calcstats_IoU, calcmetric, reversetablerelativebboxes_outer, \
     calcstats_overlap, calcmetric_overlap
 from src.historicdocumentprocessing.kosmos_eval import calcstats_IoDT, get_dataframe, boxoverlap
 
@@ -51,14 +51,14 @@ def inference_fullimg(targetloc: str = f"{Path(__file__).parent.absolute()}/../.
         print("Cuda not available")
         return
     modelname = modelpath.split(os.sep)[-1]
-    saveloc = f"{Path(__file__).parent.absolute()}/../../results/fasterrcnn/testeval/fullimg/{datasetname}/{modelname}/iou_{'_'.join([str(iou_thresholds[0]), str(iou_thresholds[-1])])}"
+    saveloc = f"{Path(__file__).parent.absolute()}/../../results/fasterrcnn/testevalfinal/fullimg/{datasetname}/{modelname}/iou_{'_'.join([str(iou_thresholds[0]), str(iou_thresholds[-1])])}"
     if tableareaonly and not filtering:
-        saveloc = f"{Path(__file__).parent.absolute()}/../../results/fasterrcnn/testeval/fullimg/{datasetname}/{modelname}/tableareaonly/iou_{'_'.join([str(iou_thresholds[0]), str(iou_thresholds[-1])])}"
+        saveloc = f"{Path(__file__).parent.absolute()}/../../results/fasterrcnn/testevalfinal/fullimg/{datasetname}/{modelname}/tableareaonly/iou_{'_'.join([str(iou_thresholds[0]), str(iou_thresholds[-1])])}"
     #boxsaveloc = f"{Path(__file__).parent.absolute()}/../../results/fasterrcnn/{datasetname}"
     elif filtering and not tableareaonly:
-        saveloc = f"{Path(__file__).parent.absolute()}/../../results/fasterrcnn/testeval/fullimg/{datasetname}/{modelname}/filtering_iou{'_'.join([str(iou_thresholds[0]), str(iou_thresholds[-1])])}"
+        saveloc = f"{Path(__file__).parent.absolute()}/../../results/fasterrcnn/testevalfinal/fullimg/{datasetname}/{modelname}/filtering_iou{'_'.join([str(iou_thresholds[0]), str(iou_thresholds[-1])])}"
     elif filtering and tableareaonly:
-        saveloc = f"{Path(__file__).parent.absolute()}/../../results/fasterrcnn/testeval/fullimg/{datasetname}/{modelname}/tableareaonly/filtering_iou{'_'.join([str(iou_thresholds[0]), str(iou_thresholds[-1])])}"
+        saveloc = f"{Path(__file__).parent.absolute()}/../../results/fasterrcnn/testevalfinal/fullimg/{datasetname}/{modelname}/tableareaonly/filtering_iou{'_'.join([str(iou_thresholds[0]), str(iou_thresholds[-1])])}"
     os.makedirs(saveloc, exist_ok=True)
 
     ### initializing variables ###
@@ -135,9 +135,9 @@ def inference_fullimg(targetloc: str = f"{Path(__file__).parent.absolute()}/../.
         # .................................
         # fullimagemetrics with iou
         # .................................
-        fullprediou, fulltargetiou, fulltp, fullfp, fullfn = calcstats(fullimagepredbox, fullimagegroundbox,
-                                                                       iou_thresholds=iou_thresholds,
-                                                                       imname=imname)
+        fullprediou, fulltargetiou, fulltp, fullfp, fullfn = calcstats_IoU(fullimagepredbox, fullimagegroundbox,
+                                                                           iou_thresholds=iou_thresholds,
+                                                                           imname=imname)
         # print(calcstats(fullimagepredbox, fullimagegroundbox,
         #                                                               iou_thresholds=iou_thresholds, imname=preds.split('/')[-1]), fullfp, targets[0])
         fullprec, fullrec, fullf1, fullwf1 = calcmetric(fulltp, fullfp, fullfn, iou_thresholds=iou_thresholds)
@@ -203,8 +203,9 @@ def inference_fullimg(targetloc: str = f"{Path(__file__).parent.absolute()}/../.
                                                                                        fn=fnsum_overlap_predonly)
     predonlyoverlapdf = pandas.DataFrame({f"Number of evaluated files": overlapdf.shape[0],
                                           f"Evaluated files without predictions:": overlapdf.shape[0] - predcount,
-                                          "f1": overlapf1_predonly, "prec": overlaprec_predonly,
+                                          "f1": overlapf1_predonly, "prec": overlapprec_predonly,
                                           "recall": overlaprec_predonly}, index=["overlap with valid preds"])
+    totaloverlapdf = pandas.DataFrame({"f1": overlapf1, "prec": overlapprec, "recall": overlaprec}, index=["overlap"])
     totaliodt = get_dataframe(fnsum=fnsum_IoDT, fpsum=fpsum_IoDT, tpsum=tpsum_IoDT,
                               nopredcount=iodtdf.shape[0] - predcount, imnum=iodtdf.shape[0],
                               iou_thresholds=iou_thresholds)
@@ -214,7 +215,7 @@ def inference_fullimg(targetloc: str = f"{Path(__file__).parent.absolute()}/../.
     conclusiondf = pandas.DataFrame(columns=["wf1"])
 
     conclusiondf = pandas.concat([conclusiondf, pandas.DataFrame(totalfullmetrics, index=["full image IoU"]),
-                                  pandas.DataFrame(partialfullmetrics, index=["full image IoU with valid preds"]),
+                                  pandas.DataFrame(partialfullmetrics, index=["full image IoU with valid preds"]), totaloverlapdf,
                                   predonlyoverlapdf, pandas.DataFrame(totaliodt, index=["full image IoDt"]),
                                   pandas.DataFrame(predonlyiodt, index=[" full image IoDt with valid preds"])])
 
@@ -252,10 +253,10 @@ def inference_tablecutout(datapath: str = f"{Path(__file__).parent.absolute()}/.
         return
     model.eval()
     modelname = modelpath.split(os.sep)[-1]
-    saveloc = f"{Path(__file__).parent.absolute()}/../../results/fasterrcnn/testeval/tableareacutout/{datasetname}/{modelname}"
+    saveloc = f"{Path(__file__).parent.absolute()}/../../results/fasterrcnn/testevalfinal/tableareacutout/{datasetname}/{modelname}"
     boxsaveloc = f"{Path(__file__).parent.absolute()}/../../results/fasterrcnn/tableareacutout/{datasetname}/{modelname}"
     if filtering:
-        saveloc = f"{Path(__file__).parent.absolute()}/../../results/fasterrcnn/testeval/tableareacutout/{datasetname}/{modelname}/filtering"
+        saveloc = f"{Path(__file__).parent.absolute()}/../../results/fasterrcnn/testevalfinal/tableareacutout/{datasetname}/{modelname}/filtering"
     os.makedirs(saveloc, exist_ok=True)
     if saveboxes:
         os.makedirs(boxsaveloc, exist_ok=True)
@@ -297,9 +298,9 @@ def inference_tablecutout(datapath: str = f"{Path(__file__).parent.absolute()}/.
                 #print(f"{boxsaveloc}/{folder.split('/')[-1]}")
 
             #..................IoU
-            prediou, targetiou, tp, fp, fn = calcstats(predbox=output['boxes'], targetbox=target,
-                                                       iou_thresholds=iou_thresholds,
-                                                       imname=folder.split('/')[-1] + "_" + num)
+            prediou, targetiou, tp, fp, fn = calcstats_IoU(predbox=output['boxes'], targetbox=target,
+                                                           iou_thresholds=iou_thresholds,
+                                                           imname=folder.split('/')[-1] + "_" + num)
             prec, rec, f1, wf1 = calcmetric(tp, fp, fn, iou_thresholds=iou_thresholds)
             tpsum += tp
             fpsum += fp
@@ -359,74 +360,87 @@ def inference_tablecutout(datapath: str = f"{Path(__file__).parent.absolute()}/.
 
 
 if __name__ == '__main__':
-    #inference_fullimg()
-    #inference_fullimg(
-    #    modelpath=f"{Path(__file__).parent.absolute()}/../../checkpoints/fasterrcnn/test5_with_valid_split_Tablesinthewild_fullimage_e50_es.pt")
-    #inference_fullimg(
-    #    modelpath=f"{Path(__file__).parent.absolute()}/../../checkpoints/fasterrcnn/testseveralcalls_4_with_valid_split_Tablesinthewild_fullimage_e50_es.pt")
-    #inference_fullimg(
-    #    modelpath=f"{Path(__file__).parent.absolute()}/../../checkpoints/fasterrcnn/testseveralcalls_4_with_valid_split_Tablesinthewild_fullimage_e50_end.pt")
-    #inference_fullimg(
-    #    modelpath=f"{Path(__file__).parent.absolute()}/../../checkpoints/fasterrcnn/testseveralcalls_5_without_valid_split_Tablesinthewild_fullimage_e50_es.pt")
-    #inference_fullimg(
-    #    modelpath=f"{Path(__file__).parent.absolute()}/../../checkpoints/fasterrcnn/testseveralcalls_5_without_valid_split_Tablesinthewild_fullimage_e50_end.pt")
-    #pass
-    #inference_fullimg(iou_thresholds=[0.9])
-    #for cat in glob.glob(f"{Path(__file__).parent.absolute()}/../../data/Tablesinthewild/preprocessed/*"):
-    #    print(cat)
-    #    inference_fullimg(targetloc=cat, datasetname=f"Tablesinthewild/{cat.split('/')[-1]}")
-    #for cat in glob.glob(f"{Path(__file__).parent.absolute()}/../../data/Tablesinthewild/preprocessed/*"):
-    #    print(cat)
-    #    inference_fullimg(targetloc=cat, datasetname=f"Tablesinthewild/{cat.split('/')[-1]}",
-    #                      modelpath=f"{Path(__file__).parent.absolute()}/../../checkpoints/fasterrcnn/testseveralcalls_4_with_valid_split_Tablesinthewild_fullimage_e50_es.pt")
-    #    inference_fullimg(targetloc=cat, datasetname=f"Tablesinthewild/{cat.split('/')[-1]}",
-    #                      modelpath=f"{Path(__file__).parent.absolute()}/../../checkpoints/fasterrcnn/testseveralcalls_5_without_valid_split_Tablesinthewild_fullimage_e50_end.pt")
-    #for cat in glob.glob(f"{Path(__file__).parent.absolute()}/../../data/Tablesinthewild/preprocessed/*"):
-    #    print(cat)
-    #    inference_fullimg(targetloc=cat, datasetname=f"Tablesinthewild/{cat.split('/')[-1]}",
-    #                      modelpath=f"{Path(__file__).parent.absolute()}/../../checkpoints/fasterrcnn/test5_with_valid_split_Tablesinthewild_fullimage_e50_es.pt")
-    #inference_fullimg(targetloc=f"{Path(__file__).parent.absolute()}/../../data/BonnData/test", datasetname="BonnData",
-    #                  modelpath=f"{Path(__file__).parent.absolute()}/../../checkpoints/fasterrcnn/BonnDataFullImage1_BonnData_fullimage_e250_es.pt",
-    #                  tablerelative=True, tableareaonly=True)
-    #inference_fullimg(targetloc=f"{Path(__file__).parent.absolute()}/../../data/GloSat/test",
-    #                  datasetname="GloSat",
-    #                  modelpath=f"{Path(__file__).parent.absolute()}/../../checkpoints/fasterrcnn/GloSatFullImage1_GloSat_fullimage_e250_es.pt",
-    #                  tablerelative=True, tableareaonly=True)
-    #inference_fullimg(targetloc=f"{Path(__file__).parent.absolute()}/../../data/BonnData/test", datasetname="BonnData",
-    #                  modelpath=f"{Path(__file__).parent.absolute()}/../../checkpoints/fasterrcnn/BonnDataFullImage_pretrain_GloSatFullImage1_GloSat_fullimage_e250_es_BonnData_fullimage_e250_es.pt",
-    #                  tablerelative=True, tableareaonly=True)
-    #inference_fullimg(targetloc=f"{Path(__file__).parent.absolute()}/../../data/BonnData/test", datasetname="BonnData",
-    #                  modelpath=f"{Path(__file__).parent.absolute()}/../../checkpoints/fasterrcnn/BonnDataFullImage_pretrain_GloSatFullImage1_GloSat_fullimage_e250_es_BonnData_fullimage_e250_end.pt",
-    #                  tablerelative=True, tableareaonly=True)
-    #inference_fullimg(targetloc=f"{Path(__file__).parent.absolute()}/../../data/BonnData/test", datasetname="BonnData",
-    #                  modelpath=f"{Path(__file__).parent.absolute()}/../../checkpoints/fasterrcnn/BonnDataFullImage_pretrain_GloSatFullImage1_GloSat_fullimage_e250_es_BonnData_fullimage_e250_es.pt",
-    #                  tablerelative=True, tableareaonly=False)
-    #inference_fullimg(targetloc=f"{Path(__file__).parent.absolute()}/../../data/BonnData/test", datasetname="BonnData",
-    #                  modelpath=f"{Path(__file__).parent.absolute()}/../../checkpoints/fasterrcnn/BonnDataFullImage_pretrain_GloSatFullImage1_GloSat_fullimage_e250_es_BonnData_fullimage_e250_end.pt",
-    #                  tablerelative=True, tableareaonly=False)
+    for cat in glob.glob(f"{Path(__file__).parent.absolute()}/../../data/Tablesinthewild/preprocessed/*"):
+        print(cat)
+        inference_fullimg(targetloc=cat, datasetname=f"Tablesinthewild/{cat.split('/')[-1]}/tablerelative",
+                          modelpath=f"{Path(__file__).parent.absolute()}/../../checkpoints/fasterrcnn/testseveralcalls_4_with_valid_split_Tablesinthewild_fullimage_e50_es.pt", tablerelative=True, tableareaonly=True)
+        inference_fullimg(targetloc=cat, datasetname=f"Tablesinthewild/{cat.split('/')[-1]}/tablerelative",
+                          modelpath=f"{Path(__file__).parent.absolute()}/../../checkpoints/fasterrcnn/testseveralcalls_5_without_valid_split_Tablesinthewild_fullimage_e50_end.pt", tablerelative=True, tableareaonly=True)
+    for cat in glob.glob(f"{Path(__file__).parent.absolute()}/../../data/Tablesinthewild/preprocessed/*"):
+        print(cat)
+        inference_fullimg(targetloc=cat, datasetname=f"Tablesinthewild/{cat.split('/')[-1]}",
+                          modelpath=f"{Path(__file__).parent.absolute()}/../../checkpoints/fasterrcnn/testseveralcalls_4_with_valid_split_Tablesinthewild_fullimage_e50_es.pt", tableareaonly=True)
+        inference_fullimg(targetloc=cat, datasetname=f"Tablesinthewild/{cat.split('/')[-1]}",
+                          modelpath=f"{Path(__file__).parent.absolute()}/../../checkpoints/fasterrcnn/testseveralcalls_5_without_valid_split_Tablesinthewild_fullimage_e50_end.pt", tableareaonly=True)
+    inference_fullimg(
+        modelpath=f"{Path(__file__).parent.absolute()}/../../checkpoints/fasterrcnn/testseveralcalls_5_without_valid_split_Tablesinthewild_fullimage_e50_end.pt", targetloc=f"{Path(__file__).parent.absolute()}/../../data/Tablesinthewild/test1", datasetname="Tablesinthewild_oldxml")
+    inference_fullimg()
+    inference_fullimg(
+        modelpath=f"{Path(__file__).parent.absolute()}/../../checkpoints/fasterrcnn/test5_with_valid_split_Tablesinthewild_fullimage_e50_es.pt")
+    inference_fullimg(
+        modelpath=f"{Path(__file__).parent.absolute()}/../../checkpoints/fasterrcnn/testseveralcalls_4_with_valid_split_Tablesinthewild_fullimage_e50_es.pt")
+    inference_fullimg(
+        modelpath=f"{Path(__file__).parent.absolute()}/../../checkpoints/fasterrcnn/testseveralcalls_4_with_valid_split_Tablesinthewild_fullimage_e50_end.pt")
+    inference_fullimg(
+        modelpath=f"{Path(__file__).parent.absolute()}/../../checkpoints/fasterrcnn/testseveralcalls_5_without_valid_split_Tablesinthewild_fullimage_e50_es.pt")
+    inference_fullimg(
+        modelpath=f"{Path(__file__).parent.absolute()}/../../checkpoints/fasterrcnn/testseveralcalls_5_without_valid_split_Tablesinthewild_fullimage_e50_end.pt")
+    inference_fullimg(iou_thresholds=[0.9])
+    for cat in glob.glob(f"{Path(__file__).parent.absolute()}/../../data/Tablesinthewild/preprocessed/*"):
+        print(cat)
+        inference_fullimg(targetloc=cat, datasetname=f"Tablesinthewild/{cat.split('/')[-1]}")
+    for cat in glob.glob(f"{Path(__file__).parent.absolute()}/../../data/Tablesinthewild/preprocessed/*"):
+        print(cat)
+        inference_fullimg(targetloc=cat, datasetname=f"Tablesinthewild/{cat.split('/')[-1]}",
+                          modelpath=f"{Path(__file__).parent.absolute()}/../../checkpoints/fasterrcnn/testseveralcalls_4_with_valid_split_Tablesinthewild_fullimage_e50_es.pt")
+        inference_fullimg(targetloc=cat, datasetname=f"Tablesinthewild/{cat.split('/')[-1]}",
+                          modelpath=f"{Path(__file__).parent.absolute()}/../../checkpoints/fasterrcnn/testseveralcalls_5_without_valid_split_Tablesinthewild_fullimage_e50_end.pt")
+    for cat in glob.glob(f"{Path(__file__).parent.absolute()}/../../data/Tablesinthewild/preprocessed/*"):
+        print(cat)
+        inference_fullimg(targetloc=cat, datasetname=f"Tablesinthewild/{cat.split('/')[-1]}",
+                          modelpath=f"{Path(__file__).parent.absolute()}/../../checkpoints/fasterrcnn/test5_with_valid_split_Tablesinthewild_fullimage_e50_es.pt")
+    inference_fullimg(targetloc=f"{Path(__file__).parent.absolute()}/../../data/BonnData/test", datasetname="BonnData",
+                      modelpath=f"{Path(__file__).parent.absolute()}/../../checkpoints/fasterrcnn/BonnDataFullImage1_BonnData_fullimage_e250_es.pt",
+                      tablerelative=True, tableareaonly=True)
+    inference_fullimg(targetloc=f"{Path(__file__).parent.absolute()}/../../data/GloSat/test",
+                      datasetname="GloSat",
+                      modelpath=f"{Path(__file__).parent.absolute()}/../../checkpoints/fasterrcnn/GloSatFullImage1_GloSat_fullimage_e250_es.pt",
+                      tablerelative=True, tableareaonly=True)
+    inference_fullimg(targetloc=f"{Path(__file__).parent.absolute()}/../../data/BonnData/test", datasetname="BonnData",
+                      modelpath=f"{Path(__file__).parent.absolute()}/../../checkpoints/fasterrcnn/BonnDataFullImage_pretrain_GloSatFullImage1_GloSat_fullimage_e250_es_BonnData_fullimage_e250_es.pt",
+                      tablerelative=True, tableareaonly=True)
+    inference_fullimg(targetloc=f"{Path(__file__).parent.absolute()}/../../data/BonnData/test", datasetname="BonnData",
+                      modelpath=f"{Path(__file__).parent.absolute()}/../../checkpoints/fasterrcnn/BonnDataFullImage_pretrain_GloSatFullImage1_GloSat_fullimage_e250_es_BonnData_fullimage_e250_end.pt",
+                      tablerelative=True, tableareaonly=True)
+    inference_fullimg(targetloc=f"{Path(__file__).parent.absolute()}/../../data/BonnData/test", datasetname="BonnData",
+                      modelpath=f"{Path(__file__).parent.absolute()}/../../checkpoints/fasterrcnn/BonnDataFullImage_pretrain_GloSatFullImage1_GloSat_fullimage_e250_es_BonnData_fullimage_e250_es.pt",
+                      tablerelative=True, tableareaonly=False)
+    inference_fullimg(targetloc=f"{Path(__file__).parent.absolute()}/../../data/BonnData/test", datasetname="BonnData",
+                      modelpath=f"{Path(__file__).parent.absolute()}/../../checkpoints/fasterrcnn/BonnDataFullImage_pretrain_GloSatFullImage1_GloSat_fullimage_e250_es_BonnData_fullimage_e250_end.pt",
+                      tablerelative=True, tableareaonly=False)
 
-    #inference_fullimg(targetloc=f"{Path(__file__).parent.absolute()}/../../data/Tablesinthewild/preprocessed/simple", datasetname='simple')
-    inference_tablecutout()
-    inference_tablecutout(filtering=True)
-    inference_tablecutout(datapath = f"{Path(__file__).parent.absolute()}/../../data/GloSat/test",
-              modelpath = f"{Path(__file__).parent.absolute()}/../../checkpoints/fasterrcnn"
-                               f"/run_GloSAT_cell_aug_e250_es.pt",
-              datasetname = "GloSat")
-    inference_tablecutout(modelpath=f"{Path(__file__).parent.absolute()}/../../checkpoints/fasterrcnn/run_BonnData_cell_e250_es.pt")
-    inference_tablecutout(modelpath=f"{Path(__file__).parent.absolute()}/../../checkpoints/fasterrcnn/run3_BonnData_cell_loadrun_GloSAT_cell_e250_es_e250_es.pt")
-    inference_tablecutout(datapath = f"{Path(__file__).parent.absolute()}/../../data/GloSat/test",
-              modelpath = f"{Path(__file__).parent.absolute()}/../../checkpoints/fasterrcnn"
-                               f"/run_GloSAT_cell_e250_es.pt",
-              datasetname = "GloSat")
-    inference_tablecutout(datapath=f"{Path(__file__).parent.absolute()}/../../data/GloSat/test",
-                          modelpath=f"{Path(__file__).parent.absolute()}/../../checkpoints/fasterrcnn"
-                                    f"/run_GloSAT_cell_aug_e250_es.pt",
-                          datasetname="GloSat", filtering=True)
-    inference_tablecutout(
-        modelpath=f"{Path(__file__).parent.absolute()}/../../checkpoints/fasterrcnn/run_BonnData_cell_e250_es.pt", filtering=True)
-    inference_tablecutout(
-        modelpath=f"{Path(__file__).parent.absolute()}/../../checkpoints/fasterrcnn/run3_BonnData_cell_loadrun_GloSAT_cell_e250_es_e250_es.pt", filtering=True)
-    inference_tablecutout(datapath=f"{Path(__file__).parent.absolute()}/../../data/GloSat/test",
-                          modelpath=f"{Path(__file__).parent.absolute()}/../../checkpoints/fasterrcnn"
-                                    f"/run_GloSAT_cell_e250_es.pt",
-                          datasetname="GloSat", filtering=True)
+    inference_fullimg(targetloc=f"{Path(__file__).parent.absolute()}/../../data/Tablesinthewild/preprocessed/simple", datasetname='simple')
+    #inference_tablecutout()
+    #inference_tablecutout(filtering=True)
+    #inference_tablecutout(datapath = f"{Path(__file__).parent.absolute()}/../../data/GloSat/test",
+    #          modelpath = f"{Path(__file__).parent.absolute()}/../../checkpoints/fasterrcnn"
+    #                           f"/run_GloSAT_cell_aug_e250_es.pt",
+    #          datasetname = "GloSat")
+    #inference_tablecutout(modelpath=f"{Path(__file__).parent.absolute()}/../../checkpoints/fasterrcnn/run_BonnData_cell_e250_es.pt")
+    #inference_tablecutout(modelpath=f"{Path(__file__).parent.absolute()}/../../checkpoints/fasterrcnn/run3_BonnData_cell_loadrun_GloSAT_cell_e250_es_e250_es.pt")
+    #inference_tablecutout(datapath = f"{Path(__file__).parent.absolute()}/../../data/GloSat/test",
+    #          modelpath = f"{Path(__file__).parent.absolute()}/../../checkpoints/fasterrcnn"
+    #                           f"/run_GloSAT_cell_e250_es.pt",
+    #          datasetname = "GloSat")
+    #inference_tablecutout(datapath=f"{Path(__file__).parent.absolute()}/../../data/GloSat/test",
+    #                      modelpath=f"{Path(__file__).parent.absolute()}/../../checkpoints/fasterrcnn"
+    #                                f"/run_GloSAT_cell_aug_e250_es.pt",
+    #                      datasetname="GloSat", filtering=True)
+    #inference_tablecutout(
+    #    modelpath=f"{Path(__file__).parent.absolute()}/../../checkpoints/fasterrcnn/run_BonnData_cell_e250_es.pt", filtering=True)
+    #inference_tablecutout(
+    #    modelpath=f"{Path(__file__).parent.absolute()}/../../checkpoints/fasterrcnn/run3_BonnData_cell_loadrun_GloSAT_cell_e250_es_e250_es.pt", filtering=True)
+    #inference_tablecutout(datapath=f"{Path(__file__).parent.absolute()}/../../data/GloSat/test",
+    #                      modelpath=f"{Path(__file__).parent.absolute()}/../../checkpoints/fasterrcnn"
+    #                                f"/run_GloSAT_cell_e250_es.pt",
+    #                      datasetname="GloSat", filtering=True)
