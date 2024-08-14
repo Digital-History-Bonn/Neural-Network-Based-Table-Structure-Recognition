@@ -13,8 +13,9 @@ from torchvision.io import read_image
 from sklearn.cluster import DBSCAN
 
 import numpy as np
+from torchvision.models.detection import fasterrcnn_resnet50_fpn, FasterRCNN_ResNet50_FPN_Weights
 
-from src.historicdocumentprocessing.kosmos_eval import extractboxes
+from src.historicdocumentprocessing.kosmos_eval import extractboxes, calcmetric
 from torchvision.utils import draw_bounding_boxes
 from PIL import Image
 
@@ -93,35 +94,111 @@ def BonnTablebyCat(categoryfile: str = f"{Path(__file__).parent.absolute()}/../.
     catinfo = pd.read_excel(categoryfile)
     df = df.rename(columns={'img': 'Dateiname'})
     df1 = pd.merge(df, catinfo, on='Dateiname')
-    subsetwf1df = {'wf1': [], 'category': [], 'len': []}
-    #replace category 1 by 2 since there are no images without tables in test dataset
-    df1 = df1.replace({'category':1},2)
-    #print(df1.category, df1.Dateiname)
+    subsetwf1df = {'wf1': [], 'category': [], 'len': [], 'nopred': []}
+    # replace category 1 by 2 since there are no images without tables in test dataset
+    df1 = df1.replace({'category': 1}, 2)
+    # print(df1.category, df1.Dateiname)
     for cat in df1.category.unique():
         if not pd.isna(cat):
             subset = df1[df1.category == cat]
-            subsetwf1df['wf1'].append(subset.wf1.sum() / len(subset))
+            tp = []
+            fp = []
+            fn = []
+            for i in [0.5, 0.6, 0.7, 0.8, 0.9]:
+                tp.append(subset[f"tp@{str(i)}"].sum())
+                fp.append(subset[f"fp@{str(i)}"].sum())
+                fn.append(subset[f"fn@{str(i)}"].sum())
+            # subsetwf1df['wf1'].append(subset.wf1.sum() / len(subset))
+            prec, rec, f1, wf1 = calcmetric(tp=torch.Tensor(tp), fp=torch.Tensor(fp), fn=torch.Tensor(fn))
+            subsetwf1df['wf1'].append(wf1.item())
             subsetwf1df['category'].append(cat)
             subsetwf1df['len'].append(len(subset))
+            print(subset[subset['nopred'].eq(0) == True])
+            subsetwf1df['nopred'].append(len(subset[subset['nopred'].eq(0) == True]))
     if len(df1[pd.isna(df1.category)]) > 0:
         subset = df1[pd.isna(df1.category)]
         subsetwf1df['category'].append('no category')
         subsetwf1df['len'].append(len(subset))
         subsetwf1df['wf1'].append(subset.wf1.sum() / len(subset))
-    #print(subsetwf1df)
-    saveloc = f"{'/'.join(resultfile.split('/')[:-1])}/{resultmetric}_bycategory.xlsx"
-    pd.DataFrame(subsetwf1df).set_index('category').to_excel(saveloc)
+        subsetwf1df['nopred'].append(len(subset[subset['nopred'].eq(0) == True]))
 
 if __name__ == '__main__':
-    with open(f"{Path(__file__).parent.absolute()}/../../../results/kosmos25/BonnData/Tabellen/test/I_HA_Rep_89_Nr_16160_0170/I_HA_Rep_89_Nr_16160_0170.jpg.json") as p:
-        boxes = extractboxes(json.load(p))
-    tables = clustertables(boxes)
-    img = read_image(f"{Path(__file__).parent.absolute()}/../../../data/BonnData/test/I_HA_Rep_89_Nr_16160_0170/I_HA_Rep_89_Nr_16160_0170.jpg")
+    """
+    BonnTablebyCat(resultfile=f"{Path(__file__).parent.absolute()}/../../../results/kosmos25/testevalfinal/BonnData_Tables/iou_0.5_0.9/tableareaonly/fullimageiodt.csv")
+    BonnTablebyCat(
+        resultfile=f"{Path(__file__).parent.absolute()}/../../../results/kosmos25/testevalfinal/BonnData_Tables/iou_0.5_0.9/tableareaonly/fullimageiou.csv",
+        resultmetric="iou")
+    BonnTablebyCat(
+        resultfile=f"{Path(__file__).parent.absolute()}/../../../results/fasterrcnn/testevalfinal/fullimg/BonnData/BonnDataFullImage1_BonnData_fullimage_e250_es.pt/tableareaonly/iou_0.5_0.9/fullimageiodt.csv")
+    BonnTablebyCat(
+        resultfile=f"{Path(__file__).parent.absolute()}/../../../results/fasterrcnn/testevalfinal/fullimg/BonnData/BonnDataFullImage1_BonnData_fullimage_e250_es.pt/iou_0.5_0.9/fullimageiodt.csv")
+    BonnTablebyCat(
+        resultfile=f"{Path(__file__).parent.absolute()}/../../../results/fasterrcnn/testevalfinal/fullimg/BonnData/BonnDataFullImage1_BonnData_fullimage_e250_es.pt/tableareaonly/iou_0.5_0.9/fullimageiou.csv",
+        resultmetric="iou")
+    BonnTablebyCat(
+        resultfile=f"{Path(__file__).parent.absolute()}/../../../results/fasterrcnn/testevalfinal/fullimg/BonnData/BonnDataFullImage1_BonnData_fullimage_e250_es.pt/iou_0.5_0.9/fullimageiou.csv",
+        resultmetric="iou")
+    BonnTablebyCat(
+        resultfile=f"{Path(__file__).parent.absolute()}/../../../results/fasterrcnn/testevalfinal/fullimg/BonnData/BonnDataFullImage_pretrain_GloSatFullImage1_GloSat_fullimage_e250_es_BonnData_fullimage_e250_es.pt/tableareaonly/iou_0.5_0.9/fullimageiodt.csv")
+    BonnTablebyCat(
+        resultfile=f"{Path(__file__).parent.absolute()}/../../../results/fasterrcnn/testevalfinal/fullimg/BonnData/BonnDataFullImage_pretrain_GloSatFullImage1_GloSat_fullimage_e250_es_BonnData_fullimage_e250_es.pt/iou_0.5_0.9/fullimageiodt.csv")
+    BonnTablebyCat(
+        resultfile=f"{Path(__file__).parent.absolute()}/../../../results/fasterrcnn/testevalfinal/fullimg/BonnData/BonnDataFullImage_pretrain_GloSatFullImage1_GloSat_fullimage_e250_es_BonnData_fullimage_e250_es.pt/tableareaonly/iou_0.5_0.9/fullimageiou.csv",
+        resultmetric="iou")
+    BonnTablebyCat(
+        resultfile=f"{Path(__file__).parent.absolute()}/../../../results/fasterrcnn/testevalfinal/fullimg/BonnData/BonnDataFullImage_pretrain_GloSatFullImage1_GloSat_fullimage_e250_es_BonnData_fullimage_e250_es.pt/iou_0.5_0.9/fullimageiou.csv",
+        resultmetric="iou")
+    BonnTablebyCat(
+        resultfile=f"{Path(__file__).parent.absolute()}/../../../results/fasterrcnn/testevalfinal/fullimg/BonnData/BonnDataFullImage_pretrain_GloSatFullImage1_GloSat_fullimage_e250_es_BonnData_fullimage_e250_end.pt/tableareaonly/iou_0.5_0.9/fullimageiodt.csv")
+    BonnTablebyCat(
+        resultfile=f"{Path(__file__).parent.absolute()}/../../../results/fasterrcnn/testevalfinal/fullimg/BonnData/BonnDataFullImage_pretrain_GloSatFullImage1_GloSat_fullimage_e250_es_BonnData_fullimage_e250_end.pt/iou_0.5_0.9/fullimageiodt.csv")
+    BonnTablebyCat(
+        resultfile=f"{Path(__file__).parent.absolute()}/../../../results/fasterrcnn/testevalfinal/fullimg/BonnData/BonnDataFullImage_pretrain_GloSatFullImage1_GloSat_fullimage_e250_es_BonnData_fullimage_e250_end.pt/tableareaonly/iou_0.5_0.9/fullimageiou.csv",
+        resultmetric="iou")
+    BonnTablebyCat(
+        resultfile=f"{Path(__file__).parent.absolute()}/../../../results/fasterrcnn/testevalfinal/fullimg/BonnData/BonnDataFullImage_pretrain_GloSatFullImage1_GloSat_fullimage_e250_es_BonnData_fullimage_e250_end.pt/iou_0.5_0.9/fullimageiou.csv",
+        resultmetric="iou")
+    """
+    model = fasterrcnn_resnet50_fpn(
+        weights=FasterRCNN_ResNet50_FPN_Weights.DEFAULT, **{"box_detections_per_img": 200}
+    )
+    model.load_state_dict(
+        torch.load(
+            f"{Path(__file__).parent.absolute()}/../../../checkpoints/fasterrcnn/BonnDataFullImage1_BonnData_fullimage_e250_es.pt"
+        )
+    )
+    if torch.cuda.is_available():
+        device = torch.device("cuda")
+        model.to(device)
+        model.eval()
+    else:
+        print("Cuda not available")
+        exit()
+    #boxes = torch.load(f"{Path(__file__).parent.absolute()}/../../../results/fasterrcnn/BonnData/I_HA_Rep_89_Nr_16160_0170/I_HA_Rep_89_Nr_16160_0170.pt")
+    img = (read_image(f"{Path(__file__).parent.absolute()}/../../../data/BonnData/test/I_HA_Rep_89_Nr_16160_0170/I_HA_Rep_89_Nr_16160_0170.jpg") / 255).to(device)
+    output = model([img])
+    output = {k: v.detach().cpu() for k, v in output[0].items()}
+    boxes= output['boxes']
+    tables = clustertables(boxes, epsprefactor=1/6)
+    img = read_image(
+        f"{Path(__file__).parent.absolute()}/../../../data/BonnData/test/I_HA_Rep_89_Nr_16160_0170/I_HA_Rep_89_Nr_16160_0170.jpg")
     for i,t in enumerate(tables):
-        res = draw_bounding_boxes(image=img, boxes=t)
-        res = Image.fromarray(res.permute(1, 2, 0).numpy())
-        # print(f"{savepath}/{identifier}.jpg")
-        res.save(f"{Path(__file__).parent.absolute()}/../../../images/test/test_{i}.jpg")
+       res = draw_bounding_boxes(image=img, boxes=t)
+       res = Image.fromarray(res.permute(1, 2, 0).numpy())
+       # print(f"{savepath}/{identifier}.jpg")
+       res.save(f"{Path(__file__).parent.absolute()}/../../../images/test/test_rcnn_{i}.jpg")
+
+    #with open(f"{Path(__file__).parent.absolute()}/../../../results/kosmos25/BonnData/Tabellen/test/I_HA_Rep_89_Nr_16160_0170/I_HA_Rep_89_Nr_16160_0170.jpg.json") as p:
+    #    boxes = extractboxes(json.load(p))
+    #tables = clustertables(boxes)
+    #img = read_image(f"{Path(__file__).parent.absolute()}/../../../data/BonnData/test/I_HA_Rep_89_Nr_16160_0170/I_HA_Rep_89_Nr_16160_0170.jpg")
+    #for i,t in enumerate(tables):
+    #    res = draw_bounding_boxes(image=img, boxes=t)
+    #    res = Image.fromarray(res.permute(1, 2, 0).numpy())
+    #    # print(f"{savepath}/{identifier}.jpg")
+    #    res.save(f"{Path(__file__).parent.absolute()}/../../../images/test/test_{i}.jpg")
+
+
     """
     BonnTablebyCat()
     BonnTablebyCat(resultfile=f"{Path(__file__).parent.absolute()}/../../../results/kosmos25/testevaltotal/BonnData_Tables/fullimageiou.csv", resultmetric="iou")
