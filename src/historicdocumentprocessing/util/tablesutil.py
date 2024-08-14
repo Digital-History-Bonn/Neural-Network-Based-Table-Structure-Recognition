@@ -113,51 +113,74 @@ def BonnTablebyCat(categoryfile: str = f"{Path(__file__).parent.absolute()}/../.
             subsetwf1df['wf1'].append(wf1.item())
             subsetwf1df['category'].append(cat)
             subsetwf1df['len'].append(len(subset))
-            print(subset[subset['nopred'].eq(0) == True])
-            subsetwf1df['nopred'].append(len(subset[subset['nopred'].eq(0) == True]))
+            #print(subset[subset['prednum'].eq(0) == True])
+            subsetwf1df['nopred'].append(len(subset[subset['prednum'].eq(0) == True]))
     if len(df1[pd.isna(df1.category)]) > 0:
         subset = df1[pd.isna(df1.category)]
         subsetwf1df['category'].append('no category')
         subsetwf1df['len'].append(len(subset))
         subsetwf1df['wf1'].append(subset.wf1.sum() / len(subset))
         subsetwf1df['nopred'].append(len(subset[subset['nopred'].eq(0) == True]))
+    saveloc = f"{'/'.join(resultfile.split('/')[:-1])}/{resultmetric}_bycategory.xlsx"
+    pd.DataFrame(subsetwf1df).set_index('category').to_excel(saveloc)
 
 if __name__ == '__main__':
-    """
-    BonnTablebyCat(resultfile=f"{Path(__file__).parent.absolute()}/../../../results/kosmos25/testevalfinal/BonnData_Tables/iou_0.5_0.9/tableareaonly/fullimageiodt.csv")
+
+    BonnTablebyCat(resultfile=f"{Path(__file__).parent.absolute()}/../../../results/kosmos25/testevalfinal1/BonnData_Tables/iou_0.5_0.9/tableareaonly/fullimageiodt.csv")
     BonnTablebyCat(
-        resultfile=f"{Path(__file__).parent.absolute()}/../../../results/kosmos25/testevalfinal/BonnData_Tables/iou_0.5_0.9/tableareaonly/fullimageiou.csv",
+        resultfile=f"{Path(__file__).parent.absolute()}/../../../results/kosmos25/testevalfinal1/BonnData_Tables/iou_0.5_0.9/tableareaonly/fullimageiou.csv",
         resultmetric="iou")
     BonnTablebyCat(
-        resultfile=f"{Path(__file__).parent.absolute()}/../../../results/fasterrcnn/testevalfinal/fullimg/BonnData/BonnDataFullImage1_BonnData_fullimage_e250_es.pt/tableareaonly/iou_0.5_0.9/fullimageiodt.csv")
+        resultfile=f"{Path(__file__).parent.absolute()}/../../../results/fasterrcnn/testevalfinal1/fullimg/BonnData/BonnDataFullImage1_BonnData_fullimage_e250_es.pt/tableareaonly/iou_0.5_0.9/fullimageiodt.csv")
     BonnTablebyCat(
-        resultfile=f"{Path(__file__).parent.absolute()}/../../../results/fasterrcnn/testevalfinal/fullimg/BonnData/BonnDataFullImage1_BonnData_fullimage_e250_es.pt/iou_0.5_0.9/fullimageiodt.csv")
+        resultfile=f"{Path(__file__).parent.absolute()}/../../../results/fasterrcnn/testevalfinal1/fullimg/BonnData/BonnDataFullImage1_BonnData_fullimage_e250_es.pt/iou_0.5_0.9/fullimageiodt.csv")
     BonnTablebyCat(
-        resultfile=f"{Path(__file__).parent.absolute()}/../../../results/fasterrcnn/testevalfinal/fullimg/BonnData/BonnDataFullImage1_BonnData_fullimage_e250_es.pt/tableareaonly/iou_0.5_0.9/fullimageiou.csv",
+        resultfile=f"{Path(__file__).parent.absolute()}/../../../results/fasterrcnn/testevalfinal1/fullimg/BonnData/BonnDataFullImage1_BonnData_fullimage_e250_es.pt/tableareaonly/iou_0.5_0.9/fullimageiou.csv",
         resultmetric="iou")
     BonnTablebyCat(
-        resultfile=f"{Path(__file__).parent.absolute()}/../../../results/fasterrcnn/testevalfinal/fullimg/BonnData/BonnDataFullImage1_BonnData_fullimage_e250_es.pt/iou_0.5_0.9/fullimageiou.csv",
+        resultfile=f"{Path(__file__).parent.absolute()}/../../../results/fasterrcnn/testevalfinal1/fullimg/BonnData/BonnDataFullImage1_BonnData_fullimage_e250_es.pt/iou_0.5_0.9/fullimageiou.csv",
         resultmetric="iou")
     BonnTablebyCat(
-        resultfile=f"{Path(__file__).parent.absolute()}/../../../results/fasterrcnn/testevalfinal/fullimg/BonnData/BonnDataFullImage_pretrain_GloSatFullImage1_GloSat_fullimage_e250_es_BonnData_fullimage_e250_es.pt/tableareaonly/iou_0.5_0.9/fullimageiodt.csv")
+        resultfile=f"{Path(__file__).parent.absolute()}/../../../results/fasterrcnn/testevalfinal1/fullimg/BonnData/BonnDataFullImage_pretrain_GloSatFullImage1_GloSat_fullimage_e250_es_BonnData_fullimage_e250_es.pt/tableareaonly/iou_0.5_0.9/fullimageiodt.csv")
     BonnTablebyCat(
-        resultfile=f"{Path(__file__).parent.absolute()}/../../../results/fasterrcnn/testevalfinal/fullimg/BonnData/BonnDataFullImage_pretrain_GloSatFullImage1_GloSat_fullimage_e250_es_BonnData_fullimage_e250_es.pt/iou_0.5_0.9/fullimageiodt.csv")
+        resultfile=f"{Path(__file__).parent.absolute()}/../../../results/fasterrcnn/testevalfinal1/fullimg/BonnData/BonnDataFullImage_pretrain_GloSatFullImage1_GloSat_fullimage_e250_es_BonnData_fullimage_e250_es.pt/iou_0.5_0.9/fullimageiodt.csv")
     BonnTablebyCat(
-        resultfile=f"{Path(__file__).parent.absolute()}/../../../results/fasterrcnn/testevalfinal/fullimg/BonnData/BonnDataFullImage_pretrain_GloSatFullImage1_GloSat_fullimage_e250_es_BonnData_fullimage_e250_es.pt/tableareaonly/iou_0.5_0.9/fullimageiou.csv",
+        resultfile=f"{Path(__file__).parent.absolute()}/../../../results/fasterrcnn/testevalfinal1/fullimg/BonnData/BonnDataFullImage_pretrain_GloSatFullImage1_GloSat_fullimage_e250_es_BonnData_fullimage_e250_es.pt/tableareaonly/iou_0.5_0.9/fullimageiou.csv",
         resultmetric="iou")
     BonnTablebyCat(
-        resultfile=f"{Path(__file__).parent.absolute()}/../../../results/fasterrcnn/testevalfinal/fullimg/BonnData/BonnDataFullImage_pretrain_GloSatFullImage1_GloSat_fullimage_e250_es_BonnData_fullimage_e250_es.pt/iou_0.5_0.9/fullimageiou.csv",
+        resultfile=f"{Path(__file__).parent.absolute()}/../../../results/fasterrcnn/testevalfinal1/fullimg/BonnData/BonnDataFullImage_pretrain_GloSatFullImage1_GloSat_fullimage_e250_es_BonnData_fullimage_e250_es.pt/iou_0.5_0.9/fullimageiou.csv",
         resultmetric="iou")
     BonnTablebyCat(
-        resultfile=f"{Path(__file__).parent.absolute()}/../../../results/fasterrcnn/testevalfinal/fullimg/BonnData/BonnDataFullImage_pretrain_GloSatFullImage1_GloSat_fullimage_e250_es_BonnData_fullimage_e250_end.pt/tableareaonly/iou_0.5_0.9/fullimageiodt.csv")
+        resultfile=f"{Path(__file__).parent.absolute()}/../../../results/fasterrcnn/testevalfinal1/fullimg/BonnData/BonnDataFullImage_pretrain_GloSatFullImage1_GloSat_fullimage_e250_es_BonnData_fullimage_e250_end.pt/tableareaonly/iou_0.5_0.9/fullimageiodt.csv")
     BonnTablebyCat(
-        resultfile=f"{Path(__file__).parent.absolute()}/../../../results/fasterrcnn/testevalfinal/fullimg/BonnData/BonnDataFullImage_pretrain_GloSatFullImage1_GloSat_fullimage_e250_es_BonnData_fullimage_e250_end.pt/iou_0.5_0.9/fullimageiodt.csv")
+        resultfile=f"{Path(__file__).parent.absolute()}/../../../results/fasterrcnn/testevalfinal1/fullimg/BonnData/BonnDataFullImage_pretrain_GloSatFullImage1_GloSat_fullimage_e250_es_BonnData_fullimage_e250_end.pt/iou_0.5_0.9/fullimageiodt.csv")
     BonnTablebyCat(
-        resultfile=f"{Path(__file__).parent.absolute()}/../../../results/fasterrcnn/testevalfinal/fullimg/BonnData/BonnDataFullImage_pretrain_GloSatFullImage1_GloSat_fullimage_e250_es_BonnData_fullimage_e250_end.pt/tableareaonly/iou_0.5_0.9/fullimageiou.csv",
+        resultfile=f"{Path(__file__).parent.absolute()}/../../../results/fasterrcnn/testevalfinal1/fullimg/BonnData/BonnDataFullImage_pretrain_GloSatFullImage1_GloSat_fullimage_e250_es_BonnData_fullimage_e250_end.pt/tableareaonly/iou_0.5_0.9/fullimageiou.csv",
         resultmetric="iou")
     BonnTablebyCat(
-        resultfile=f"{Path(__file__).parent.absolute()}/../../../results/fasterrcnn/testevalfinal/fullimg/BonnData/BonnDataFullImage_pretrain_GloSatFullImage1_GloSat_fullimage_e250_es_BonnData_fullimage_e250_end.pt/iou_0.5_0.9/fullimageiou.csv",
+        resultfile=f"{Path(__file__).parent.absolute()}/../../../results/fasterrcnn/testevalfinal1/fullimg/BonnData/BonnDataFullImage_pretrain_GloSatFullImage1_GloSat_fullimage_e250_es_BonnData_fullimage_e250_end.pt/iou_0.5_0.9/fullimageiou.csv",
         resultmetric="iou")
+
+
+    BonnTablebyCat(
+        resultfile=f"{Path(__file__).parent.absolute()}/../../../results/fasterrcnn/testevalfinal1/tableareacutout/BonnData/run3_BonnData_cell_aug_loadrun_GloSAT_cell_aug_e250_es_e250_es.pt/iodt.csv")
+
+    BonnTablebyCat(
+        resultfile=f"{Path(__file__).parent.absolute()}/../../../results/fasterrcnn/testevalfinal1/tableareacutout/BonnData/run3_BonnData_cell_loadrun_GloSAT_cell_e250_es_e250_es.pt/iodt.csv")
+    BonnTablebyCat(
+        resultfile=f"{Path(__file__).parent.absolute()}/../../../results/fasterrcnn/testevalfinal1/tableareacutout/BonnData/run_BonnData_cell_e250_es.pt/iodt.csv")
+
+    BonnTablebyCat(
+        resultfile=f"{Path(__file__).parent.absolute()}/../../../results/fasterrcnn/testevalfinal1/tableareacutout/BonnData/run3_BonnData_cell_aug_loadrun_GloSAT_cell_aug_e250_es_e250_es.pt/iou.csv",
+        resultmetric="iou")
+
+    BonnTablebyCat(
+        resultfile=f"{Path(__file__).parent.absolute()}/../../../results/fasterrcnn/testevalfinal1/tableareacutout/BonnData/run3_BonnData_cell_loadrun_GloSAT_cell_e250_es_e250_es.pt/iou.csv",
+        resultmetric="iou")
+    BonnTablebyCat(
+        resultfile=f"{Path(__file__).parent.absolute()}/../../../results/fasterrcnn/testevalfinal1/tableareacutout/BonnData/run_BonnData_cell_e250_es.pt/iou.csv",
+        resultmetric="iou")
+
     """
     model = fasterrcnn_resnet50_fpn(
         weights=FasterRCNN_ResNet50_FPN_Weights.DEFAULT, **{"box_detections_per_img": 200}
@@ -199,7 +222,7 @@ if __name__ == '__main__':
     #    res.save(f"{Path(__file__).parent.absolute()}/../../../images/test/test_{i}.jpg")
 
 
-    """
+    
     BonnTablebyCat()
     BonnTablebyCat(resultfile=f"{Path(__file__).parent.absolute()}/../../../results/kosmos25/testevaltotal/BonnData_Tables/fullimageiou.csv", resultmetric="iou")
     BonnTablebyCat(
