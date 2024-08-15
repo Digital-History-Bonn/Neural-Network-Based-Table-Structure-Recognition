@@ -1,3 +1,4 @@
+import glob
 import json
 import math
 from pathlib import Path
@@ -6,6 +7,7 @@ from typing import Tuple
 import pandas as pd
 import numpy as np
 import torch
+from networkx.algorithms.bipartite import clustering
 from pyarrow import table
 from tensorboard.summary.v1 import image
 from torchvision.io import read_image
@@ -14,6 +16,7 @@ from sklearn.cluster import DBSCAN
 
 import numpy as np
 from torchvision.models.detection import fasterrcnn_resnet50_fpn, FasterRCNN_ResNet50_FPN_Weights
+from yaml import warnings
 
 from src.historicdocumentprocessing.kosmos_eval import extractboxes, calcmetric
 from torchvision.utils import draw_bounding_boxes
@@ -31,7 +34,10 @@ def avrgeuc(boxes: torch.Tensor)->float:
                 dist+=singledist
                 count+=1
             #singledist = abs(math.sqrt(pow((abs(box1[0]-box2[2])),2)+pow(abs(box1[3]-box2[1]),2)))
-    print(dist, count)
+    #print(dist, count)
+    if count==0:
+        #print(boxes, dist)
+        return 0
     return dist/count
 
 def eucsimilarity(x, y):
@@ -39,22 +45,60 @@ def eucsimilarity(x, y):
     #print(pow(torch.norm(torch.max(torch.zeros(2), x[:2]-y[2:])),2))
     #print(pow(torch.max(torch.zeros(2), y[:2]-x[2:]),2))
     #print(np.where((x[:2]-y[2:])<0,0, (x[:2]-y[2:])), x[:2]-y[2:])
-    res = math.sqrt(pow(np.linalg.norm(np.where((x[:2]-y[2:])<0,0, (x[:2]-y[2:]))),2)+pow(np.linalg.norm(np.where((y[:2]-x[2:])<0,0, y[:2]-x[2:])),2))
+    slice = int(x.shape[0]/2)
+    #print(slice)
+    res = math.sqrt(pow(np.linalg.norm(np.where((x[:slice] - y[slice:]) < 0, 0, (x[:slice] - y[slice:]))), 2) + pow(
+        np.linalg.norm(np.where((y[:slice] - x[slice:]) < 0, 0, y[:slice] - x[slice:])), 2))
+    #res = math.sqrt(pow(np.linalg.norm(np.where((x[:2]-y[2:])<0,0, (x[:2]-y[2:]))),2)+pow(np.linalg.norm(np.where((y[:2]-x[2:])<0,0, y[:2]-x[2:])),2))
     #res = abs(math.sqrt(pow(x[2]-x[0],2)+pow((x[3]-x[1]),2))-math.sqrt(pow(y[2]-y[0],2)+pow(y[3]-y[1],2)))
     #print(x, y)
-    print(res)
+    #print(res)
     return res
 
 def clustertables(boxes:torch.Tensor, epsprefactor:float = 1/6):
     tables = []
     eps = avrgeuc(boxes)
-    print("eps: ", eps)
-    clustering = DBSCAN(eps=(epsprefactor)*eps, min_samples=2, metric=eucsimilarity).fit(boxes.numpy())
-    for label in set(clustering.labels_):
-        table = boxes[clustering.labels_==label]
-        print(label, clustering.labels_)
-        tables.append(table)
+    #print("eps: ", eps)
+    if eps:
+        clustering = DBSCAN(eps=(epsprefactor)*eps, min_samples=2, metric=eucsimilarity).fit(boxes.numpy())
+        for label in set(clustering.labels_):
+            table = boxes[clustering.labels_==label]
+            #print(label, clustering.labels_)
+            tables.append(table)
     return tables
+
+
+def clustertablesseperately(boxes:torch.Tensor, epsprefactor:float = 1):
+    tables = []
+    xtables = []
+    #print(boxes.shape)
+    xboxes = boxes[:,[0,2]]
+    #yboxes = boxes[:,[1,3]]
+    #print(boxes[:,[0,2]].shape)
+    xdist = avrgeuc(xboxes)
+    #ydist = avrgeuc(yboxes)
+    if xdist:
+        clustering = DBSCAN(eps=(epsprefactor)*xdist, min_samples=2, metric=eucsimilarity).fit(xboxes.numpy())
+        for label in set(clustering.labels_):
+            xtable = boxes[clustering.labels_==label]
+            #print(label, clustering.labels_)
+            xtables.append(xtable)
+        for prototable in xtables:
+            yboxes = prototable[:,[1,3]]
+            ydist = avrgeuc(yboxes)
+            if ydist:
+                clustering = DBSCAN(eps=(epsprefactor)*(0.5)*ydist, min_samples=2, metric=eucsimilarity).fit(yboxes.numpy())
+                for label in set(clustering.labels_):
+                    table = prototable[(clustering.labels_ == label)]
+                    # print(label, clustering.labels_)
+                    tables.append(table)
+            elif len(prototable)==1:
+                tables.append(prototable)
+    return tables
+
+
+
+
 
 def getsurroundingtable(boxes:torch.Tensor)->torch.Tensor:
     """get surrounding table of a group of bounding boxes given as torch.Tensor
@@ -125,7 +169,7 @@ def BonnTablebyCat(categoryfile: str = f"{Path(__file__).parent.absolute()}/../.
     pd.DataFrame(subsetwf1df).set_index('category').to_excel(saveloc)
 
 if __name__ == '__main__':
-
+    """
     BonnTablebyCat(resultfile=f"{Path(__file__).parent.absolute()}/../../../results/kosmos25/testevalfinal1/BonnData_Tables/iou_0.5_0.9/tableareaonly/fullimageiodt.csv")
     BonnTablebyCat(
         resultfile=f"{Path(__file__).parent.absolute()}/../../../results/kosmos25/testevalfinal1/BonnData_Tables/iou_0.5_0.9/tableareaonly/fullimageiou.csv",
@@ -181,7 +225,7 @@ if __name__ == '__main__':
         resultfile=f"{Path(__file__).parent.absolute()}/../../../results/fasterrcnn/testevalfinal1/tableareacutout/BonnData/run_BonnData_cell_e250_es.pt/iou.csv",
         resultmetric="iou")
 
-    """
+
     model = fasterrcnn_resnet50_fpn(
         weights=FasterRCNN_ResNet50_FPN_Weights.DEFAULT, **{"box_detections_per_img": 200}
     )
