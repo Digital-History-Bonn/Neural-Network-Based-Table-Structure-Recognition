@@ -7,10 +7,10 @@ import torch
 from torchvision.utils import draw_bounding_boxes
 from torchvision.io import read_image
 from matplotlib import pyplot as plt
-import numpy as np
 from tqdm import tqdm
 from PIL import Image
 from src.historicdocumentprocessing.kosmos_eval import reversetablerelativebboxes_outer, extractboxes
+from src.historicdocumentprocessing.util.tablesutil import remove_invalid_bbox
 
 
 def drawimg_varformat(impath: str = f"{Path(__file__).parent.absolute()}/../../data/BonnData/test/Konflikttabelle.jpg",
@@ -59,20 +59,15 @@ def drawimg_varformat(impath: str = f"{Path(__file__).parent.absolute()}/../../d
     #print(img.shape)
     #print(predpath)
     #print(gbox)
+    #newbox = remove_invalid_bbox(box, impath)
     try:
         image = draw_bounding_boxes(image=img, boxes=box, labels=labels, colors=colors)
     except ValueError:
         #print(predpath)
         #print(box)
-        newbox = torch.empty((0, 4))
-        for b in box:
-            if b[0] < b[2] and b[1] < b[3]:
-                newbox= torch.vstack((newbox, b.clone()))
-            else:
-                print(f"Invalid bounding box in image {impath.split('/')[-1]}",b)
-        #print(newbox)
+        newbox = remove_invalid_bbox(box, impath)
         labels = ["Pred" for i in range(newbox.shape[0])]
-        image = draw_bounding_boxes(image=img, boxes=torch.tensor(newbox), labels=labels, colors=colors)
+        image = draw_bounding_boxes(image=img, boxes=newbox, labels=labels, colors=colors)
     #plt.imshow(image.permute(1, 2, 0))
     if savepath:
         os.makedirs(savepath, exist_ok=True)
@@ -162,11 +157,14 @@ def main():
 
 
 if __name__ == '__main__':
-    drawimg_varformat(savepath=f"{Path(__file__).parent.absolute()}/../../images/rcnn/BonnTables/test",
-                      impath=f"{Path(__file__).parent.absolute()}/../../data/BonnData/Tabellen/test/IMG_20190821_132903/IMG_20190821_132903_table_0.jpg",
-                      groundpath=f"{Path(__file__).parent.absolute()}/../../data/BonnData/Tabellen/test/IMG_20190821_132903/IMG_20190821_132903_cell_0.pt",
-                      predpath=f"{Path(__file__).parent.absolute()}/../../results/fasterrcnn/BonnData/IMG_20190821_132903/IMG_20190821_132903.pt")
-
+    #drawimg_varformat(savepath=f"{Path(__file__).parent.absolute()}/../../images/rcnn/BonnTables/test",
+    #                  impath=f"{Path(__file__).parent.absolute()}/../../data/BonnData/Tabellen/test/IMG_20190821_132903/IMG_20190821_132903_table_0.jpg",
+    #                  groundpath=f"{Path(__file__).parent.absolute()}/../../data/BonnData/Tabellen/test/IMG_20190821_132903/IMG_20190821_132903_cell_0.pt",
+    #                  predpath=f"{Path(__file__).parent.absolute()}/../../results/fasterrcnn/BonnData/IMG_20190821_132903/IMG_20190821_132903.pt")
+    drawimg_varformat(impath=f"{Path(__file__).parent.absolute()}/../../data/Tablesinthewild/preprocessed/curved/table_spider_00909/table_spider_00909.jpg",
+                      groundpath=f"{Path(__file__).parent.absolute()}/../../data/Tablesinthewild/preprocessed/curved/table_spider_00909/table_spider_00909.pt",
+                      predpath=f"{Path(__file__).parent.absolute()}/../../results/kosmos25/Tablesinthewild/curved/table_spider_00909/table_spider_00909.jpg.json",
+                      savepath=f"{Path(__file__).parent.absolute()}/../../images/test/tablespider", tableonly=False)
     #drawimages_var(impath=f"{Path(__file__).parent.absolute()}/../../data/Tablesinthewild/preprocessed/overlaid",
     #                  groundpath=f"{Path(__file__).parent.absolute()}/../../data/Tablesinthewild/preprocessed/overlaid",
     #                  jsonpath=f"{Path(__file__).parent.absolute()}/../../results/kosmos25/Tablesinthewild/overlaid",
