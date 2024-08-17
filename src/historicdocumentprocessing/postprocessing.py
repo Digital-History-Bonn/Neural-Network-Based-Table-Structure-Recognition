@@ -184,9 +184,10 @@ def postprocess_eval(datasetname:str, modeltype:Literal["kosmos25", "fasterrcnn"
     fullimagedf = pandas.DataFrame(columns=["img", "mean pred iou", "mean tar iou", "wf1", "prednum"])
     iodtdf = pandas.DataFrame(columns=["img", "mean pred iod", "mean tar iod", "wf1", "prednum"])
     ### initializing variables ###
-    for n, folder in tqdm(enumerate(glob.glob(f"{targetloc}/*"))):
+    for n, pred in tqdm(enumerate(glob.glob(f"{predloc}/*"))):
+        folder = f"{targetloc}/{predloc.split('/')[-1]}"
         imname = folder.split('/')[-1]
-        fullimagepredbox = torch.open(glob.glob(f"{predloc}/{folder.split('/')[-1]}/{folder.split('/')[-1]}.pt")[0])
+        fullimagepredbox = torch.open(glob.glob(f"{pred}/{pred.split('/')[-1]}.pt")[0])
         if tablerelative:
             fullimagegroundbox = reversetablerelativebboxes_outer(folder)
         else:
