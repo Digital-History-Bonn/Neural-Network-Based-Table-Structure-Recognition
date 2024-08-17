@@ -35,16 +35,19 @@ def avrgeuc(boxes: torch.Tensor)->float:
             if (not torch.equal(box1,box2)):
                 #print("j")
                 new = eucsimilarity(box1.numpy(),box2.numpy())
-                if not singledist or new<singledist:
+                if not singledist or 0<new<singledist:
                     singledist=new
             #singledist = abs(math.sqrt(pow((abs(box1[0]-box2[2])),2)+pow(abs(box1[3]-box2[1]),2)))
+#        print("f")
         dist+= singledist
         count+=1
     #if dist==0:
     #    print(boxes, dist)
     #print(dist, count)
-    if count==0:
+    if count!=0 and dist==0:
         #print(boxes, dist)
+        return 1
+    elif count==0:
         return 0
     return dist/count
 
@@ -85,21 +88,24 @@ def clustertablesseperately(boxes:torch.Tensor, epsprefactor:float = 1):
     #print(boxes[:,[0,2]].shape)
     xdist = avrgeuc(xboxes)
     #ydist = avrgeuc(yboxes)
+#    print("h")
     if xdist:
-        clustering = DBSCAN(eps=(epsprefactor)*4*xdist, min_samples=2, metric=eucsimilarity).fit(xboxes.numpy())
+        clustering = DBSCAN(eps=(epsprefactor)*xdist, min_samples=2, metric=eucsimilarity).fit(xboxes.numpy())
         for label in set(clustering.labels_):
             xtable = boxes[clustering.labels_==label]
             #print(label, clustering.labels_)
             xtables.append(xtable)
+            #print(xtable)
         for prototable in xtables:
             yboxes = prototable[:,[1,3]]
             ydist = avrgeuc(yboxes)
             if ydist:
-                clustering = DBSCAN(eps=(epsprefactor)*6*ydist, min_samples=2, metric=eucsimilarity).fit(yboxes.numpy())
+                clustering = DBSCAN(eps=(epsprefactor)*ydist, min_samples=2, metric=eucsimilarity).fit(yboxes.numpy())
                 for label in set(clustering.labels_):
                     table = prototable[(clustering.labels_ == label)]
                     # print(label, clustering.labels_)
                     tables.append(table)
+#                    print("y")
             elif len(prototable)==1:
                 tables.append(prototable)
     return tables
