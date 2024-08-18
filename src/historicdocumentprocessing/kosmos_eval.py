@@ -348,7 +348,7 @@ def calcmetrics_tables(targetloc: str = f"{Path(__file__).parent.absolute()}/../
     Returns: nested list of all ious
 
     """
-    tableareaonly= False
+    #tableareaonly= False
     predfolder = glob.glob(f"{predloc}/*")
     saveloc = f"{saveloc}/iou_{'_'.join([str(iou_thresholds[0]), str(iou_thresholds[-1])])}"
     if tableareaonly:

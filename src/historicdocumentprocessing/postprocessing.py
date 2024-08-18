@@ -157,13 +157,13 @@ def postprocess_rcnn(modelpath=None, targetloc=None, datasetname=None):
 def postprocess_eval(datasetname:str, modeltype:Literal["kosmos25", "fasterrcnn"]="kosmos25", targetloc:str=None, modelpath:str=None,
                      tablerelative=True, iou_thresholds: List[float] = [0.5, 0.6, 0.7, 0.8, 0.9], tableareaonly=False):
     predloc = f"{Path(__file__).parent.absolute()}/../../results/{modeltype}/postprocessed/fullimg/{datasetname}/eps_3.0_1.5/withoutoutlier"
-    saveloc = f"{Path(__file__).parent.absolute()}/../../results/{modeltype}/testevalfinal1/fullimg/{datasetname}/eps_3.0_1.5/withoutoutlier"
+    saveloc = f"{Path(__file__).parent.absolute()}/../../results/{modeltype}/testevalfinal1/fullimg/{datasetname}"
     if modelpath:
         modelname = modelpath.split(os.sep)[-1]
         predloc= f"{predloc}/{modelname}"
-        saveloc=f"{saveloc}/{modelname}/iou_{'_'.join([str(iou_thresholds[0]), str(iou_thresholds[-1])])}/postprocessed"
+        saveloc=f"{saveloc}/{modelname}/iou_{'_'.join([str(iou_thresholds[0]), str(iou_thresholds[-1])])}/postprocessed/eps_3.0_1.5/withoutoutlier"
     else:
-        saveloc=f"{saveloc}/iou_{'_'.join([str(iou_thresholds[0]), str(iou_thresholds[-1])])}/postprocessed"
+        saveloc=f"{saveloc}/iou_{'_'.join([str(iou_thresholds[0]), str(iou_thresholds[-1])])}/postprocessed/eps_3.0_1.5/withoutoutlier"
     print(saveloc)
     print(predloc)
     #saveloc = f"{Path(__file__).parent.absolute()}/../../results/{modeltype}/testevalfinal1/fullimg/{datasetname}/{modelname}/iou_{'_'.join([str(iou_thresholds[0]), str(iou_thresholds[-1])])}/postprocessed"
@@ -198,6 +198,7 @@ def postprocess_eval(datasetname:str, modeltype:Literal["kosmos25", "fasterrcnn"
         folder = f"{targetloc}/{pred.split('/')[-1]}"
         imname = folder.split('/')[-1]
         fullimagepredbox = torch.load(glob.glob(f"{pred}/{pred.split('/')[-1]}.pt")[0])
+        print(fullimagepredbox)
         #print(folder)
         if tablerelative:
             fullimagegroundbox = reversetablerelativebboxes_outer(folder)
@@ -379,6 +380,7 @@ if __name__=='__main__':
                          modelpath=f"{Path(__file__).parent.absolute()}/../../checkpoints/fasterrcnn/testseveralcalls_5_without_valid_split_Tablesinthewild_fullimage_e50_end.pt")
 
 
+
     """
     postprocess_kosmos(targetloc=f"{Path(__file__).parent.absolute()}/../../data/Tablesinthewild/preprocessed/simple",
                        predloc=f"{Path(__file__).parent.absolute()}/../../results/kosmos25/Tablesinthewild/simple",
@@ -403,15 +405,16 @@ if __name__=='__main__':
         targetloc=f"{Path(__file__).parent.absolute()}/../../data/Tablesinthewild/preprocessed/muticolorandgrid",
         predloc=f"{Path(__file__).parent.absolute()}/../../results/kosmos25/Tablesinthewild/muticolorandgrid1",
         datasetname="Tablesinthewild/muticolorandgrid")
-    #postprocess_kosmos()
+    
+    postprocess_kosmos()
 
-    #postprocess_kosmos(targetloc=f"{Path(__file__).parent.absolute()}/../../data/GloSat/test",
-    #                   predloc=f"{Path(__file__).parent.absolute()}/../../results/kosmos25/GloSat/test1", datasetname="GloSat")
+    postprocess_kosmos(targetloc=f"{Path(__file__).parent.absolute()}/../../data/GloSat/test",
+                       predloc=f"{Path(__file__).parent.absolute()}/../../results/kosmos25/GloSat/test1", datasetname="GloSat")
     #for cat in glob.glob(f"{Path(__file__).parent.absolute()}/../../data/Tablesinthewild/preprocessed/*"):
     #    print(cat)
     #    postprocess_kosmos(targetloc=cat, predloc=f"{Path(__file__).parent.absolute()}/../../results/kosmos25/Tablesinthewild/{cat.split('/')[-1]}", datasetname=f"Tablesinthewild/{cat.split('/')[-1]}")
 
-
+    
     postprocess_rcnn(modelpath=f"{Path(__file__).parent.absolute()}/../../checkpoints/fasterrcnn/BonnDataFullImage1_BonnData_fullimage_e250_es.pt", targetloc = f"{Path(__file__).parent.absolute()}/../../data/BonnData/test", datasetname="BonnData")
     postprocess_rcnn(
         modelpath=f"{Path(__file__).parent.absolute()}/../../checkpoints/fasterrcnn/BonnDataFullImage_pretrain_GloSatFullImage1_GloSat_fullimage_e250_es_BonnData_fullimage_e250_end.pt",
