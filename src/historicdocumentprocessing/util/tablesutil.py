@@ -7,16 +7,12 @@ from typing import Tuple
 import pandas as pd
 import numpy as np
 import torch
-from networkx.algorithms.bipartite import clustering
-from pyarrow import table
-from tensorboard.summary.v1 import image
 from torchvision.io import read_image
 
 from sklearn.cluster import DBSCAN
 
 import numpy as np
 from torchvision.models.detection import fasterrcnn_resnet50_fpn, FasterRCNN_ResNet50_FPN_Weights
-from yaml import warnings
 
 from src.historicdocumentprocessing.kosmos_eval import extractboxes, calcmetric
 from torchvision.utils import draw_bounding_boxes
