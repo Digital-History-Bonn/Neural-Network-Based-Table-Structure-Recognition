@@ -21,6 +21,7 @@ from src.historicdocumentprocessing.util.glosat_paper_postprocessing_method impo
 from src.historicdocumentprocessing.util.tablesutil import clustertables, clustertablesseperately, remove_invalid_bbox, \
     getsurroundingtable
 
+
 def reconstruct_bboxes(rows:list, colls:list, tablecoords:list)->torch.Tensor:
     rows= rows+[tablecoords[1],tablecoords[3]]
     colls= colls + [tablecoords[0],tablecoords[2]]
@@ -39,7 +40,7 @@ def reconstruct_bboxes(rows:list, colls:list, tablecoords:list)->torch.Tensor:
 
 def postprocess_kosmos(targetloc: str = f"{Path(__file__).parent.absolute()}/../../data/BonnData/test", predloc:str = f"{Path(__file__).parent.absolute()}/../../results/kosmos25/BonnData"
                                       f"/Tabellen/test", datasetname:str = "BonnData"):
-    saveloc = f"{Path(__file__).parent.absolute()}/../../results/kosmos25/postprocessed/{datasetname}"
+    saveloc = f"{Path(__file__).parent.absolute()}/../../results/kosmos25/postprocessed/fullimg/{datasetname}"
     for n, targets in tqdm(enumerate(glob.glob(f"{targetloc}/*"))):
         preds = glob.glob(f"{predloc}/{targets.split('/')[-1]}")[0]
         # imagepred = [file for file in glob.glob(f"{preds}/*.json") if "_table_" not in file][0]
@@ -56,9 +57,10 @@ def postprocess_kosmos(targetloc: str = f"{Path(__file__).parent.absolute()}/../
             postprocess(fullimagepredbox, imname, saveloc)
 
 
-def postprocess(fullimagepredbox:torch.Tensor, imname:str, saveloc:str):
-    for epsprefactor in [3]:
-        clusteredtables = clustertablesseperately(fullimagepredbox, epsprefactor=epsprefactor)
+def postprocess(fullimagepredbox:torch.Tensor, imname:str, saveloc:str, includeoutlier:bool=False):
+    #for epsprefactor in [tuple([3.0,1.5]), tuple([4.0,1.5])]:
+        epsprefactor = tuple([3.0,1.5])
+        clusteredtables = clustertablesseperately(fullimagepredbox, epsprefactor=epsprefactor, includeoutlier=includeoutlier)
         #print(len(clusteredtables))
         #if tableavail and clusteredtables:
         #    tablenum = len(glob.glob(f"{targets}/*cell*"))
@@ -66,7 +68,13 @@ def postprocess(fullimagepredbox:torch.Tensor, imname:str, saveloc:str):
         #    if tablenum != len(clusteredtables):
         #        print("imname: ", imname, epsprefactor, tablenum, len(clusteredtables))
         boxes = []
+        saveloc = f"{saveloc}/eps_{epsprefactor[0]}_{epsprefactor[1]}"
+        if not includeoutlier:
+            saveloc = f"{saveloc}/withoutoutlier"
+        else:
+            saveloc = f"{saveloc}/withoutlier"
         saveloc = f"{saveloc}/{imname}"
+        print(saveloc)
         #img = read_image(glob.glob(f"{targets}/*jpg")[0])
         for i, t in enumerate(clusteredtables):
             tablecoord = getsurroundingtable(t).tolist()
@@ -115,7 +123,7 @@ def postprocess(fullimagepredbox:torch.Tensor, imname:str, saveloc:str):
 
 
 def postprocess_rcnn(modelpath=None, targetloc=None, datasetname=None):
-    saveloc = f"{Path(__file__).parent.absolute()}/../../results/fasterrcnn/postprocessed/{datasetname}"
+    saveloc = f"{Path(__file__).parent.absolute()}/../../results/fasterrcnn/postprocessed/fullimg/{datasetname}"
     model = fasterrcnn_resnet50_fpn(
         weights=FasterRCNN_ResNet50_FPN_Weights.DEFAULT, **{"box_detections_per_img": 200}
     )
@@ -147,15 +155,17 @@ def postprocess_rcnn(modelpath=None, targetloc=None, datasetname=None):
         postprocess(fullimagepredbox, imname, saveloc)
 
 def postprocess_eval(datasetname:str, modeltype:Literal["kosmos25", "fasterrcnn"]="kosmos25", targetloc:str=None, modelpath:str=None,
-                     tablerelative=True, iou_thresholds: List[float] = [0.5, 0.6, 0.7, 0.8, 0.9]):
-    predloc = f"{Path(__file__).parent.absolute()}/../../results/{modeltype}/postprocessed/{datasetname}"
-    saveloc = f"{Path(__file__).parent.absolute()}/../../results/{modeltype}/testevalfinal1/fullimg/{datasetname}"
+                     tablerelative=True, iou_thresholds: List[float] = [0.5, 0.6, 0.7, 0.8, 0.9], tableareaonly=False):
+    predloc = f"{Path(__file__).parent.absolute()}/../../results/{modeltype}/postprocessed/fullimg/{datasetname}/eps_3.0_1.5/withoutoutlier"
+    saveloc = f"{Path(__file__).parent.absolute()}/../../results/{modeltype}/testevalfinal1/fullimg/{datasetname}/eps_3.0_1.5/withoutoutlier"
     if modelpath:
         modelname = modelpath.split(os.sep)[-1]
         predloc= f"{predloc}/{modelname}"
         saveloc=f"{saveloc}/{modelname}/iou_{'_'.join([str(iou_thresholds[0]), str(iou_thresholds[-1])])}/postprocessed"
     else:
         saveloc=f"{saveloc}/iou_{'_'.join([str(iou_thresholds[0]), str(iou_thresholds[-1])])}/postprocessed"
+    print(saveloc)
+    print(predloc)
     #saveloc = f"{Path(__file__).parent.absolute()}/../../results/{modeltype}/testevalfinal1/fullimg/{datasetname}/{modelname}/iou_{'_'.join([str(iou_thresholds[0]), str(iou_thresholds[-1])])}/postprocessed"
     ### initializing variables ###
     fullioulist = []
@@ -185,9 +195,10 @@ def postprocess_eval(datasetname:str, modeltype:Literal["kosmos25", "fasterrcnn"
     iodtdf = pandas.DataFrame(columns=["img", "mean pred iod", "mean tar iod", "wf1", "prednum"])
     ### initializing variables ###
     for n, pred in tqdm(enumerate(glob.glob(f"{predloc}/*"))):
-        folder = f"{targetloc}/{predloc.split('/')[-1]}"
+        folder = f"{targetloc}/{pred.split('/')[-1]}"
         imname = folder.split('/')[-1]
-        fullimagepredbox = torch.open(glob.glob(f"{pred}/{pred.split('/')[-1]}.pt")[0])
+        fullimagepredbox = torch.load(glob.glob(f"{pred}/{pred.split('/')[-1]}.pt")[0])
+        #print(folder)
         if tablerelative:
             fullimagegroundbox = reversetablerelativebboxes_outer(folder)
         else:
@@ -310,7 +321,7 @@ def postprocess_eval(datasetname:str, modeltype:Literal["kosmos25", "fasterrcnn"
 
     # print(conclusiondf)
     # save results
-    # os.makedirs(saveloc, exist_ok=True)
+    os.makedirs(saveloc, exist_ok=True)
     # print(fullimagedf.loc[50])
     # print(saveloc)
     overlapdf.to_csv(f"{saveloc}/fullimageoverlapeval.csv")
@@ -321,6 +332,54 @@ def postprocess_eval(datasetname:str, modeltype:Literal["kosmos25", "fasterrcnn"
 
 if __name__=='__main__':
 
+    postprocess_eval(datasetname="BonnData", modeltype="kosmos25", targetloc=f"{Path(__file__).parent.absolute()}/../../data/BonnData/test")
+    postprocess_eval(
+        modelpath=f"{Path(__file__).parent.absolute()}/../../checkpoints/fasterrcnn/BonnDataFullImage1_BonnData_fullimage_e250_es.pt",
+        targetloc=f"{Path(__file__).parent.absolute()}/../../data/BonnData/test", datasetname="BonnData", modeltype="fasterrcnn")
+    postprocess_eval(
+        modelpath=f"{Path(__file__).parent.absolute()}/../../checkpoints/fasterrcnn/BonnDataFullImage_pretrain_GloSatFullImage1_GloSat_fullimage_e250_es_BonnData_fullimage_e250_end.pt",
+        targetloc=f"{Path(__file__).parent.absolute()}/../../data/BonnData/test", datasetname="BonnData", modeltype="fasterrcnn")
+    postprocess_eval(
+        modelpath=f"{Path(__file__).parent.absolute()}/../../checkpoints/fasterrcnn/BonnDataFullImage_pretrain_GloSatFullImage1_GloSat_fullimage_e250_es_BonnData_fullimage_e250_es.pt",
+        targetloc=f"{Path(__file__).parent.absolute()}/../../data/BonnData/test", datasetname="BonnData", modeltype="fasterrcnn")
+    postprocess_eval(datasetname="GloSat", modeltype="kosmos25",
+                     targetloc=f"{Path(__file__).parent.absolute()}/../../data/GloSat/test")
+    postprocess_eval(
+        modelpath=f"{Path(__file__).parent.absolute()}/../../checkpoints/fasterrcnn/GloSatFullImage1_GloSat_fullimage_e250_es.pt",
+        targetloc=f"{Path(__file__).parent.absolute()}/../../data/GloSat/test", datasetname="GloSat", modeltype="fasterrcnn")
+
+    postprocess_eval(targetloc=f"{Path(__file__).parent.absolute()}/../../data/Tablesinthewild/preprocessed/simple", modeltype="kosmos25",
+                       datasetname="Tablesinthewild/simple")
+    postprocess_eval(targetloc=f"{Path(__file__).parent.absolute()}/../../data/Tablesinthewild/preprocessed/curved",
+                       modeltype="kosmos25",
+                       datasetname="Tablesinthewild/curved")
+    postprocess_eval(targetloc=f"{Path(__file__).parent.absolute()}/../../data/Tablesinthewild/preprocessed/occblu",
+                       modeltype="kosmos25",
+                       datasetname="Tablesinthewild/occblu")
+    postprocess_eval(targetloc=f"{Path(__file__).parent.absolute()}/../../data/Tablesinthewild/preprocessed/overlaid",
+                       modeltype="kosmos25",
+                       datasetname="Tablesinthewild/overlaid")
+    postprocess_eval(targetloc=f"{Path(__file__).parent.absolute()}/../../data/Tablesinthewild/preprocessed/Inclined",
+                       modeltype="kosmos25",
+                       datasetname="Tablesinthewild/Inclined")
+    postprocess_eval(
+        targetloc=f"{Path(__file__).parent.absolute()}/../../data/Tablesinthewild/preprocessed/extremeratio",
+        modeltype="kosmos25",
+        datasetname="Tablesinthewild/extremeratio")
+    postprocess_eval(
+        targetloc=f"{Path(__file__).parent.absolute()}/../../data/Tablesinthewild/preprocessed/muticolorandgrid",
+        modeltype="kosmos25",
+        datasetname="Tablesinthewild/muticolorandgrid")
+    for cat in glob.glob(f"{Path(__file__).parent.absolute()}/../../data/Tablesinthewild/preprocessed/*"):
+        print(cat)
+        postprocess_eval(modeltype="fasterrcnn",targetloc=cat, datasetname=f"Tablesinthewild/{cat.split('/')[-1]}",
+                         modelpath=f"{Path(__file__).parent.absolute()}/../../checkpoints/fasterrcnn/testseveralcalls_4_with_valid_split_Tablesinthewild_fullimage_e50_es.pt")
+        postprocess_eval(modeltype="fasterrcnn",
+                         targetloc=cat, datasetname=f"Tablesinthewild/{cat.split('/')[-1]}",
+                         modelpath=f"{Path(__file__).parent.absolute()}/../../checkpoints/fasterrcnn/testseveralcalls_5_without_valid_split_Tablesinthewild_fullimage_e50_end.pt")
+
+
+    """
     postprocess_kosmos(targetloc=f"{Path(__file__).parent.absolute()}/../../data/Tablesinthewild/preprocessed/simple",
                        predloc=f"{Path(__file__).parent.absolute()}/../../results/kosmos25/Tablesinthewild/simple",
                        datasetname="Tablesinthewild/simple")
@@ -367,3 +426,4 @@ if __name__=='__main__':
                           modelpath=f"{Path(__file__).parent.absolute()}/../../checkpoints/fasterrcnn/testseveralcalls_4_with_valid_split_Tablesinthewild_fullimage_e50_es.pt")
         postprocess_rcnn(targetloc=cat, datasetname=f"Tablesinthewild/{cat.split('/')[-1]}",
                           modelpath=f"{Path(__file__).parent.absolute()}/../../checkpoints/fasterrcnn/testseveralcalls_5_without_valid_split_Tablesinthewild_fullimage_e50_end.pt")
+    """

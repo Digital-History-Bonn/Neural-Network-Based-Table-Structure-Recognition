@@ -79,7 +79,7 @@ def clustertables(boxes:torch.Tensor, epsprefactor:float = 1/6):
     return tables
 
 
-def clustertablesseperately(boxes:torch.Tensor, epsprefactor:float = 1):
+def clustertablesseperately(boxes:torch.Tensor, epsprefactor: Tuple[float,float] = tuple([3,1.5]), includeoutlier:bool = True):
     tables = []
     xtables = []
     #print(boxes.shape)
@@ -89,22 +89,30 @@ def clustertablesseperately(boxes:torch.Tensor, epsprefactor:float = 1):
     xdist = avrgeuc(xboxes)
     #ydist = avrgeuc(yboxes)
 #    print("h")
+    epsprefactor1=epsprefactor[0]
+    epsprefactor2=epsprefactor[1]
     if xdist:
-        clustering = DBSCAN(eps=(epsprefactor)*xdist, min_samples=2, metric=eucsimilarity).fit(xboxes.numpy())
+        clustering = DBSCAN(eps=(epsprefactor1)*xdist, min_samples=4, metric=eucsimilarity).fit(xboxes.numpy())
         for label in set(clustering.labels_):
             xtable = boxes[clustering.labels_==label]
             #print(label, clustering.labels_)
-            xtables.append(xtable)
+            if includeoutlier or (int(label)!=-1):
+                xtables.append(xtable)
+            else:
+                print(label)
             #print(xtable)
         for prototable in xtables:
             yboxes = prototable[:,[1,3]]
             ydist = avrgeuc(yboxes)
             if ydist:
-                clustering = DBSCAN(eps=(epsprefactor)*ydist, min_samples=2, metric=eucsimilarity).fit(yboxes.numpy())
+                clustering = DBSCAN(eps=(epsprefactor2)*ydist, min_samples=5, metric=eucsimilarity).fit(yboxes.numpy())
                 for label in set(clustering.labels_):
                     table = prototable[(clustering.labels_ == label)]
                     # print(label, clustering.labels_)
-                    tables.append(table)
+                    if includeoutlier or (int(label) != -1):
+                        tables.append(table)
+                    else:
+                        print(label)
 #                    print("y")
             elif len(prototable)==1:
                 tables.append(prototable)
@@ -269,18 +277,20 @@ if __name__ == '__main__':
        # print(f"{savepath}/{identifier}.jpg")
        res.save(f"{Path(__file__).parent.absolute()}/../../../images/test/test_rcnn_{i}.jpg")
 
-    #with open(f"{Path(__file__).parent.absolute()}/../../../results/kosmos25/BonnData/Tabellen/test/I_HA_Rep_89_Nr_16160_0170/I_HA_Rep_89_Nr_16160_0170.jpg.json") as p:
-    #    boxes = extractboxes(json.load(p))
+    """
+    with open(f"{Path(__file__).parent.absolute()}/../../../results/kosmos25/BonnData/Tabellen/test/I_HA_Rep_89_Nr_16160_0170/I_HA_Rep_89_Nr_16160_0170.jpg.json") as p:
+        boxes = extractboxes(json.load(p))
     #tables = clustertables(boxes)
-    #img = read_image(f"{Path(__file__).parent.absolute()}/../../../data/BonnData/test/I_HA_Rep_89_Nr_16160_0170/I_HA_Rep_89_Nr_16160_0170.jpg")
-    #for i,t in enumerate(tables):
-    #    res = draw_bounding_boxes(image=img, boxes=t)
-    #    res = Image.fromarray(res.permute(1, 2, 0).numpy())
-    #    # print(f"{savepath}/{identifier}.jpg")
-    #    res.save(f"{Path(__file__).parent.absolute()}/../../../images/test/test_{i}.jpg")
+    tables = clustertablesseperately(boxes, includeoutlier=False)
+    img = read_image(f"{Path(__file__).parent.absolute()}/../../../data/BonnData/test/I_HA_Rep_89_Nr_16160_0170/I_HA_Rep_89_Nr_16160_0170.jpg")
+    for i,t in enumerate(tables):
+        res = draw_bounding_boxes(image=img, boxes=t)
+        res = Image.fromarray(res.permute(1, 2, 0).numpy())
+        # print(f"{savepath}/{identifier}.jpg")
+        res.save(f"{Path(__file__).parent.absolute()}/../../../images/test/test_{i}.jpg")
 
 
-    
+    """"
     BonnTablebyCat()
     BonnTablebyCat(resultfile=f"{Path(__file__).parent.absolute()}/../../../results/kosmos25/testevaltotal/BonnData_Tables/fullimageiou.csv", resultmetric="iou")
     BonnTablebyCat(

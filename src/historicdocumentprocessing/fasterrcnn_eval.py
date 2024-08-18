@@ -51,14 +51,14 @@ def inference_fullimg(targetloc: str = f"{Path(__file__).parent.absolute()}/../.
         print("Cuda not available")
         return
     modelname = modelpath.split(os.sep)[-1]
-    saveloc = f"{Path(__file__).parent.absolute()}/../../results/fasterrcnn/testevalfinal/fullimg/{datasetname}/{modelname}/iou_{'_'.join([str(iou_thresholds[0]), str(iou_thresholds[-1])])}"
+    saveloc = f"{Path(__file__).parent.absolute()}/../../results/fasterrcnn/testevalchange/fullimg/{datasetname}/{modelname}/iou_{'_'.join([str(iou_thresholds[0]), str(iou_thresholds[-1])])}"
+    #boxsaveloc = f"{Path(__file__).parent.absolute()}/../../results/fasterrcnn/{datasetname}/{modelname}"
     if tableareaonly and not filtering:
-        saveloc = f"{Path(__file__).parent.absolute()}/../../results/fasterrcnn/testevalfinal/fullimg/{datasetname}/{modelname}/tableareaonly/iou_{'_'.join([str(iou_thresholds[0]), str(iou_thresholds[-1])])}"
-    #boxsaveloc = f"{Path(__file__).parent.absolute()}/../../results/fasterrcnn/{datasetname}"
+        saveloc = f"{Path(__file__).parent.absolute()}/../../results/fasterrcnn/testevalchange/fullimg/{datasetname}/{modelname}/tableareaonly/iou_{'_'.join([str(iou_thresholds[0]), str(iou_thresholds[-1])])}"
     elif filtering and not tableareaonly:
-        saveloc = f"{Path(__file__).parent.absolute()}/../../results/fasterrcnn/testevalfinal/fullimg/{datasetname}/{modelname}/filtering_iou{'_'.join([str(iou_thresholds[0]), str(iou_thresholds[-1])])}"
+        saveloc = f"{Path(__file__).parent.absolute()}/../../results/fasterrcnn/testevalchange/fullimg/{datasetname}/{modelname}/filtering_iou{'_'.join([str(iou_thresholds[0]), str(iou_thresholds[-1])])}"
     elif filtering and tableareaonly:
-        saveloc = f"{Path(__file__).parent.absolute()}/../../results/fasterrcnn/testevalfinal/fullimg/{datasetname}/{modelname}/tableareaonly/filtering_iou{'_'.join([str(iou_thresholds[0]), str(iou_thresholds[-1])])}"
+        saveloc = f"{Path(__file__).parent.absolute()}/../../results/fasterrcnn/testevalchange/fullimg/{datasetname}/{modelname}/tableareaonly/filtering_iou{'_'.join([str(iou_thresholds[0]), str(iou_thresholds[-1])])}"
     os.makedirs(saveloc, exist_ok=True)
 
     ### initializing variables ###
@@ -191,9 +191,9 @@ def inference_fullimg(targetloc: str = f"{Path(__file__).parent.absolute()}/../.
         # print(fullfp, fullimagemetrics)
         fullimagedf = pandas.concat([fullimagedf, pandas.DataFrame(fullimagemetrics, index=[n])])
         # print(fullimagedf.loc[n])
-    totalfullmetrics = get_dataframe(fullfnsum, fullfpsum, fulltpsum, nopredcount=fullimagedf.shape[0] - predcount,
+    totalfullmetrics = get_dataframe(fnsum=fullfnsum, fpsum=fullfpsum, tpsum=fulltpsum, nopredcount=fullimagedf.shape[0] - predcount,
                                      imnum=fullimagedf.shape[0], iou_thresholds=iou_thresholds)
-    partialfullmetrics = get_dataframe(fullfnsum_predonly, fullfpsum_predonly, fulltpsum_predonly,
+    partialfullmetrics = get_dataframe(fnsum=fullfnsum_predonly, fpsum=fullfpsum_predonly, tpsum=fulltpsum_predonly,
                                        iou_thresholds=iou_thresholds)
     # print(totalfullmetrics)
     overlapprec, overlaprec, overlapf1 = calcmetric_overlap(tp=tpsum_overlap, fp=fpsum_overlap, fn=fnsum_overlap)
@@ -253,10 +253,10 @@ def inference_tablecutout(datapath: str = f"{Path(__file__).parent.absolute()}/.
         return
     model.eval()
     modelname = modelpath.split(os.sep)[-1]
-    saveloc = f"{Path(__file__).parent.absolute()}/../../results/fasterrcnn/testevalfinal/tableareacutout/{datasetname}/{modelname}"
+    saveloc = f"{Path(__file__).parent.absolute()}/../../results/fasterrcnn/testevalfinal1/tableareacutout/{datasetname}/{modelname}"
     boxsaveloc = f"{Path(__file__).parent.absolute()}/../../results/fasterrcnn/tableareacutout/{datasetname}/{modelname}"
     if filtering:
-        saveloc = f"{Path(__file__).parent.absolute()}/../../results/fasterrcnn/testevalfinal/tableareacutout/{datasetname}/{modelname}/filtering"
+        saveloc = f"{Path(__file__).parent.absolute()}/../../results/fasterrcnn/testevalfinal1/tableareacutout/{datasetname}/{modelname}/filtering"
     os.makedirs(saveloc, exist_ok=True)
     if saveboxes:
         os.makedirs(boxsaveloc, exist_ok=True)
@@ -321,7 +321,7 @@ def inference_tablecutout(datapath: str = f"{Path(__file__).parent.absolute()}/.
             ioumetrics.update({f"fp@{iou_thresholds[i]}": fp[i].item() for i in range(len(iou_thresholds))})
             ioumetrics.update({f"fn@{iou_thresholds[i]}": fn[i].item() for i in range(len(iou_thresholds))})
             ioudf = pandas.concat([ioudf, pandas.DataFrame(ioumetrics, index=[f"{n}.{num}"])])
-            print(ioudf)
+            #print(ioudf)
             #...........................
             #....................IoDt
             prediodt, targetiodt, tp_iodt, fp_iodt, fn_iodt = calcstats_IoDT(predbox=output['boxes'], targetbox=target,
@@ -357,6 +357,7 @@ def inference_tablecutout(datapath: str = f"{Path(__file__).parent.absolute()}/.
     ioudf.to_csv(f"{saveloc}/iou.csv")
     iodtdf.to_csv(f"{saveloc}/iodt.csv")
     conclusiondf.to_csv(f"{saveloc}/overview.csv")
+    print("done")
 
 
 if __name__ == '__main__':
@@ -407,6 +408,13 @@ if __name__ == '__main__':
                       modelpath=f"{Path(__file__).parent.absolute()}/../../checkpoints/fasterrcnn/GloSatFullImage1_GloSat_fullimage_e250_es.pt",
                       tablerelative=True, tableareaonly=True)
     inference_fullimg(targetloc=f"{Path(__file__).parent.absolute()}/../../data/BonnData/test", datasetname="BonnData",
+                      modelpath=f"{Path(__file__).parent.absolute()}/../../checkpoints/fasterrcnn/BonnDataFullImage1_BonnData_fullimage_e250_es.pt",
+                      tablerelative=True, tableareaonly=False)
+    inference_fullimg(targetloc=f"{Path(__file__).parent.absolute()}/../../data/GloSat/test",
+                      datasetname="GloSat",
+                      modelpath=f"{Path(__file__).parent.absolute()}/../../checkpoints/fasterrcnn/GloSatFullImage1_GloSat_fullimage_e250_es.pt",
+                      tablerelative=True, tableareaonly=False)
+    inference_fullimg(targetloc=f"{Path(__file__).parent.absolute()}/../../data/BonnData/test", datasetname="BonnData",
                       modelpath=f"{Path(__file__).parent.absolute()}/../../checkpoints/fasterrcnn/BonnDataFullImage_pretrain_GloSatFullImage1_GloSat_fullimage_e250_es_BonnData_fullimage_e250_es.pt",
                       tablerelative=True, tableareaonly=True)
     inference_fullimg(targetloc=f"{Path(__file__).parent.absolute()}/../../data/BonnData/test", datasetname="BonnData",
@@ -419,19 +427,19 @@ if __name__ == '__main__':
                       modelpath=f"{Path(__file__).parent.absolute()}/../../checkpoints/fasterrcnn/BonnDataFullImage_pretrain_GloSatFullImage1_GloSat_fullimage_e250_es_BonnData_fullimage_e250_end.pt",
                       tablerelative=True, tableareaonly=False)
 
-    inference_fullimg(targetloc=f"{Path(__file__).parent.absolute()}/../../data/Tablesinthewild/preprocessed/simple", datasetname='simple')
-    #inference_tablecutout()
+    #inference_fullimg(targetloc=f"{Path(__file__).parent.absolute()}/../../data/Tablesinthewild/preprocessed/simple", datasetname='simple')
+    inference_tablecutout()
     #inference_tablecutout(filtering=True)
-    #inference_tablecutout(datapath = f"{Path(__file__).parent.absolute()}/../../data/GloSat/test",
-    #          modelpath = f"{Path(__file__).parent.absolute()}/../../checkpoints/fasterrcnn"
-    #                           f"/run_GloSAT_cell_aug_e250_es.pt",
-    #          datasetname = "GloSat")
-    #inference_tablecutout(modelpath=f"{Path(__file__).parent.absolute()}/../../checkpoints/fasterrcnn/run_BonnData_cell_e250_es.pt")
-    #inference_tablecutout(modelpath=f"{Path(__file__).parent.absolute()}/../../checkpoints/fasterrcnn/run3_BonnData_cell_loadrun_GloSAT_cell_e250_es_e250_es.pt")
-    #inference_tablecutout(datapath = f"{Path(__file__).parent.absolute()}/../../data/GloSat/test",
-    #          modelpath = f"{Path(__file__).parent.absolute()}/../../checkpoints/fasterrcnn"
-    #                           f"/run_GloSAT_cell_e250_es.pt",
-    #          datasetname = "GloSat")
+    inference_tablecutout(datapath = f"{Path(__file__).parent.absolute()}/../../data/GloSat/test",
+              modelpath = f"{Path(__file__).parent.absolute()}/../../checkpoints/fasterrcnn"
+                               f"/run_GloSAT_cell_aug_e250_es.pt",
+              datasetname = "GloSat")
+    inference_tablecutout(modelpath=f"{Path(__file__).parent.absolute()}/../../checkpoints/fasterrcnn/run_BonnData_cell_e250_es.pt")
+    inference_tablecutout(modelpath=f"{Path(__file__).parent.absolute()}/../../checkpoints/fasterrcnn/run3_BonnData_cell_loadrun_GloSAT_cell_e250_es_e250_es.pt")
+    inference_tablecutout(datapath = f"{Path(__file__).parent.absolute()}/../../data/GloSat/test",
+              modelpath = f"{Path(__file__).parent.absolute()}/../../checkpoints/fasterrcnn"
+                               f"/run_GloSAT_cell_e250_es.pt",
+              datasetname = "GloSat")
     #inference_tablecutout(datapath=f"{Path(__file__).parent.absolute()}/../../data/GloSat/test",
     #                      modelpath=f"{Path(__file__).parent.absolute()}/../../checkpoints/fasterrcnn"
     #                                f"/run_GloSAT_cell_aug_e250_es.pt",
