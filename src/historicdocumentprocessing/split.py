@@ -5,17 +5,19 @@ import random
 import shutil
 import warnings
 from pathlib import Path
-from typing import List, Dict
+from typing import Dict, List
 
 import pandas as pd
 import torch
+from dataprocessing import (
+    processdata_wildtable_inner,
+    processdata_wildtable_tablerelative,
+)
 from PIL import Image
-from tqdm import tqdm
-from dataprocessing import processdata_wildtable_inner, processdata_wildtable_tablerelative
-
 from torchvision.io import read_image
-from torchvision.utils import draw_bounding_boxes
 from torchvision.transforms.functional import pil_to_tensor
+from torchvision.utils import draw_bounding_boxes
+from tqdm import tqdm
 
 
 def validsplit(path: str = f"{Path(__file__).parent.absolute()}/../../data/BonnData"):
@@ -23,12 +25,12 @@ def validsplit(path: str = f"{Path(__file__).parent.absolute()}/../../data/BonnD
     test = glob.glob(f"{path}/test/*")
     validlen = len(test)
     newtotal = [t for t in total if f"{path}/test/{t.split('/')[-1]}" not in test]
-    #print(len(newtotal), len(test), len(total))
+    # print(len(newtotal), len(test), len(total))
     assert len(newtotal) + len(test) == len(total)
     random.shuffle(newtotal)
     valid = newtotal[:validlen]
     train = newtotal[validlen:]
-    #print(train)
+    # print(train)
     assert len(valid) + len(train) == len(newtotal)
     for cats, names in ((train, "train"), (valid, "valid")):
         os.makedirs(f"{path}/{names}")
@@ -36,8 +38,11 @@ def validsplit(path: str = f"{Path(__file__).parent.absolute()}/../../data/BonnD
             shutil.copytree(src=im, dst=f"{path}/{names}/{im.split('/')[-1]}")
 
 
-def wildtablesvalidsplit(path: str = f"{Path(__file__).parent.absolute()}/../../data/Tablesinthewild/train",
-                         ratio: List[float] = [0.7, 0.3], validfile: str = None):
+def wildtablesvalidsplit(
+    path: str = f"{Path(__file__).parent.absolute()}/../../data/Tablesinthewild/train",
+    ratio: List[float] = [0.7, 0.3],
+    validfile: str = None,
+):
     """
     create train/valid split for tables in the wild dataset
     Args:
@@ -54,21 +59,28 @@ def wildtablesvalidsplit(path: str = f"{Path(__file__).parent.absolute()}/../../
     trainlist = glob.glob(f"{path}/*")
     if not validfile:
         random.shuffle(trainlist)
-        train = trainlist[:round(len(trainlist) * ratio[0])]
-        valid = trainlist[round(len(trainlist) * ratio[0]):round(len(trainlist) * (ratio[1] + ratio[0]))]
+        train = trainlist[: round(len(trainlist) * ratio[0])]
+        valid = trainlist[
+            round(len(trainlist) * ratio[0]) : round(
+                len(trainlist) * (ratio[1] + ratio[0])
+            )
+        ]
         assert len(train) + len(valid) == len(trainlist)
     else:
         imnames = pd.read_json(validfile)["validation"]
         valid = []
         pass
-    #print(len(valid))
+    # print(len(valid))
     os.makedirs(dst, exist_ok=True)
-    #print(dst)
+    # print(dst)
     for v in valid:
         shutil.move(v, f"{dst}/{v.split('/')[-1]}")
-        #print(f"{dst}/{v.split('/')[-1]}")
+        # print(f"{dst}/{v.split('/')[-1]}")
 
-def reversewildtablesvalidsplit(path: str = f"{Path(__file__).parent.absolute()}/../../data/Tablesinthewild"):
+
+def reversewildtablesvalidsplit(
+    path: str = f"{Path(__file__).parent.absolute()}/../../data/Tablesinthewild",
+):
     """
     reverse train/valid split for tables in the wild dataset
     Args:
@@ -77,70 +89,87 @@ def reversewildtablesvalidsplit(path: str = f"{Path(__file__).parent.absolute()}
 
     """
     validpath = glob.glob(f"{path}/valid/*")
-    trainpath= f"{path}/train"
+    trainpath = f"{path}/train"
     dict = {"validation": [v.split("/")[-1] for v in validpath]}
     with open(f"{path}/split.json", "w") as file:
         json.dump(dict, file, indent=2)
-    #print(len(validpath))
+    # print(len(validpath))
     for v in validpath:
-        #print(f"{trainpath}/{v.split('/')[-1]}")
+        # print(f"{trainpath}/{v.split('/')[-1]}")
         shutil.copytree(v, f"{trainpath}/{v.split('/')[-1]}")
 
 
-def subclassjoinwildtables(path: str = f"{Path(__file__).parent.absolute()}/../../data/Tablesinthewild/preprocessed",
-                           dst: str = f"{Path(__file__).parent.absolute()}/../../data/Tablesinthewild/test"):
+def subclassjoinwildtables(
+    path: str = f"{Path(__file__).parent.absolute()}/../../data/Tablesinthewild/preprocessed",
+    dst: str = f"{Path(__file__).parent.absolute()}/../../data/Tablesinthewild/test",
+):
     for folder in glob.glob(f"{path}/*"):
-        #print(folder, dst)
+        # print(folder, dst)
         shutil.copytree(src=folder, dst=dst, dirs_exist_ok=True)
 
 
 def subclasssplitwildtables(
-        impath: str = f"{Path(__file__).parent.absolute()}/../../data/Tablesinthewild/rawdata/test/images",
-        xmlpath: str = f"{Path(__file__).parent.absolute()}/../../data/Tablesinthewild/rawdata/test/test-xml-revise/test-xml-revise",
-        txtfolder: str = f"{Path(__file__).parent.absolute()}/../../data/Tablesinthewild/rawdata/test/sub_classes", tablerelative = False):
+    impath: str = f"{Path(__file__).parent.absolute()}/../../data/Tablesinthewild/rawdata/test/images",
+    xmlpath: str = f"{Path(__file__).parent.absolute()}/../../data/Tablesinthewild/rawdata/test/test-xml-revise/test-xml-revise",
+    txtfolder: str = f"{Path(__file__).parent.absolute()}/../../data/Tablesinthewild/rawdata/test/sub_classes",
+    tablerelative=False,
+):
     """split wildtables test into subclasses and do preprocessing"""
     txts = glob.glob(f"{txtfolder}/*txt")
     for txt in txts:
         with open(txt) as f:
             foldername = txt.split("/")[-1].split(".")[-2]
-            #print(foldername)
-            destfolder = f"{'/'.join(impath.split('/')[:-2])}/../preprocessed/{foldername}"
-            #print(destfolder)
+            # print(foldername)
+            destfolder = (
+                f"{'/'.join(impath.split('/')[:-2])}/../preprocessed/{foldername}"
+            )
+            # print(destfolder)
             for line in tqdm(f):
-                #print(line)
-                #print(f"{impath}/{line}")
+                # print(line)
+                # print(f"{impath}/{line}")
 
                 im = glob.glob(f"{impath}/{line.rstrip()}")[0]
-                #print(f"{impath}/{line.rstrip()}")
+                # print(f"{impath}/{line.rstrip()}")
                 xml = glob.glob(f"{xmlpath}/{line.split('.')[-2]}.xml")[0]
                 processedpt = processdata_wildtable_inner(xml)
                 imfolder = f"{destfolder}/{line.split('.')[-2]}"
                 if processedpt.numel():
                     if read_image(im).shape[0] == 3:
                         os.makedirs(imfolder, exist_ok=True)
-                        #print(f"{imfolder}/{line.split('.')[-2]}.pt",  f"{imfolder}/{line.rstrip()}")
+                        # print(f"{imfolder}/{line.split('.')[-2]}.pt",  f"{imfolder}/{line.rstrip()}")
                         shutil.copy(im, f"{imfolder}/{line.rstrip()}")
-                        #print(f"{imfolder}/{line.split('.')[-2]}.pt")
+                        # print(f"{imfolder}/{line.split('.')[-2]}.pt")
                         torch.save(processedpt, f"{imfolder}/{line.split('.')[-2]}.pt")
                     else:
                         print(f"Wrong image dim at {im}")
                 else:
-                    warnings.warn("empty bbox, image not added to preprocessed test data")
-                if tablerelative and read_image(im).shape[0]== 3:
+                    warnings.warn(
+                        "empty bbox, image not added to preprocessed test data"
+                    )
+                if tablerelative and read_image(im).shape[0] == 3:
                     tablelist, celllist = processdata_wildtable_tablerelative(xml)
                     if tablelist and celllist:
                         assert len(tablelist) == len(celllist)
                         for idx in range(0, len(tablelist)):
-                            #print(f"{imfolder}/{line.split('.')[-2]}_cell_{idx}.pt")
-                            torch.save(celllist[idx], f"{imfolder}/{line.split('.')[-2]}_cell_{idx}.pt")
+                            # print(f"{imfolder}/{line.split('.')[-2]}_cell_{idx}.pt")
+                            torch.save(
+                                celllist[idx],
+                                f"{imfolder}/{line.split('.')[-2]}_cell_{idx}.pt",
+                            )
                             img = Image.open(im)
-                            tableimg = img.crop((tuple(tablelist[idx].to(int).tolist())))
-                            tableimg.save(f"{imfolder}/{line.split('.')[-2]}_table_{idx}.jpg")
-                        torch.save(torch.vstack(tablelist),
-                                   f"{imfolder}/{line.split('.')[-2]}_tables.pt")
-                        #print(f"{imfolder}/{line.split('.')[-2]}_tables.pt")
+                            tableimg = img.crop(
+                                (tuple(tablelist[idx].to(int).tolist()))
+                            )
+                            tableimg.save(
+                                f"{imfolder}/{line.split('.')[-2]}_table_{idx}.jpg"
+                            )
+                        torch.save(
+                            torch.vstack(tablelist),
+                            f"{imfolder}/{line.split('.')[-2]}_tables.pt",
+                        )
+                        # print(f"{imfolder}/{line.split('.')[-2]}_tables.pt")
 
-                        #if len(tablelist)==1:
+                        # if len(tablelist)==1:
                         #    for i in range(0,len(tablelist)):
                         #        img = Image.open(im)
                         #        tableimg = img.crop((tuple(tablelist[i].to(int).tolist())))
@@ -150,10 +179,10 @@ def subclasssplitwildtables(
                         #    return
 
 
-
-
-def recreatetablesplit(datapath: str = f"{Path(__file__).parent.absolute()}/../../data/BonnData/preprocessed",
-                       csvpath: str = f"{Path(__file__).parent.absolute()}/../../data/BonnData/Tabellen/run3_BonnData_cell_aug_loadrun_GloSAT_cell_aug_e250_es_e250_es.csv"):
+def recreatetablesplit(
+    datapath: str = f"{Path(__file__).parent.absolute()}/../../data/BonnData/preprocessed",
+    csvpath: str = f"{Path(__file__).parent.absolute()}/../../data/BonnData/Tabellen/run3_BonnData_cell_aug_loadrun_GloSAT_cell_aug_e250_es_e250_es.csv",
+):
     """
     Recreate the Test Split of the Bonn Table Dataset from the csv result file
     Args:
@@ -165,8 +194,8 @@ def recreatetablesplit(datapath: str = f"{Path(__file__).parent.absolute()}/../.
     imnames = pd.read_csv(csvpath)["image_number"][1:-1]
     savelocs = "/".join(datapath.split("/")[:-1]) + "/test"
     os.makedirs(savelocs, exist_ok=True)
-    #print(len(imnames))
-    #print(imnames)
+    # print(len(imnames))
+    # print(imnames)
     for i, imname in tqdm(enumerate(imnames)):
         if isinstance(imname, float):
             imname = int(imname)
@@ -175,8 +204,10 @@ def recreatetablesplit(datapath: str = f"{Path(__file__).parent.absolute()}/../.
         dest = shutil.copytree(src=imfolder[0], dst=saveloc, dirs_exist_ok=True)
 
 
-def recreatenewspapersplit(datapath: str = f"{Path(__file__).parent.absolute()}/../../data/BonnData/Zeitungen",
-                           jsonpath: str = f"{Path(__file__).parent.absolute()}/../../data/BonnData/Zeitungen/split.json"):
+def recreatenewspapersplit(
+    datapath: str = f"{Path(__file__).parent.absolute()}/../../data/BonnData/Zeitungen",
+    jsonpath: str = f"{Path(__file__).parent.absolute()}/../../data/BonnData/Zeitungen/split.json",
+):
     """
     Recreate the Split of the Bonn Chronicling Germany Newspaper Dataset from the json file
     Args:
@@ -187,27 +218,29 @@ def recreatenewspapersplit(datapath: str = f"{Path(__file__).parent.absolute()}/
     """
     with open(jsonpath) as file:
         imnames = json.load(file)
-    #imnames = pd.read_csv(csvpath)["image_number"][1:-1]
+    # imnames = pd.read_csv(csvpath)["image_number"][1:-1]
     for category in imnames.keys():
         saveloc = f"{datapath}/{category}"
         annotsavefolder = f"{datapath}/annotations/{category}"
         os.makedirs(annotsavefolder, exist_ok=True)
         os.makedirs(saveloc, exist_ok=True)
-        #print(len(imnames))
+        # print(len(imnames))
         for imname in tqdm(imnames[category]):
             impath = glob.glob(f"{datapath}/images/{str(imname)}*")
             annotpath = glob.glob(f"{datapath}/annotations/{str(imname)}*")
             imsaveloc = f"{saveloc}/{imname}.jpg"
             annotsaveloc = f"{annotsavefolder}/{imname}.xml"
-            #print(imsaveloc, annotsaveloc)
+            # print(imsaveloc, annotsaveloc)
             dest = shutil.copy(src=impath[0], dst=imsaveloc)
             annotdest = shutil.copy(src=annotpath[0], dst=annotsaveloc)
-        #print(i)
+        # print(i)
 
 
-def newsplit(datapath: str = f"{Path(__file__).parent.absolute()}/../../data/EngNewspaper/unsorted",
-             savepath: str = f"{Path(__file__).parent.absolute()}/../../data/EngNewspaper/donut",
-             dataratio: List[float] = [0.8, 0.1, 0.1]):
+def newsplit(
+    datapath: str = f"{Path(__file__).parent.absolute()}/../../data/EngNewspaper/unsorted",
+    savepath: str = f"{Path(__file__).parent.absolute()}/../../data/EngNewspaper/donut",
+    dataratio: List[float] = [0.8, 0.1, 0.1],
+):
     """
     Create New Data Split for Data in Folder
             Args:
@@ -216,19 +249,24 @@ def newsplit(datapath: str = f"{Path(__file__).parent.absolute()}/../../data/Eng
             datapath: Path to Data
 
         Returns:
-        """
-    #print(len(dataratio) == 3)
+    """
+    # print(len(dataratio) == 3)
     assert (len(dataratio) == 3) and (dataratio[0] + dataratio[1] + dataratio[2] == 1)
     imnames = glob.glob(f"{datapath}/*jpg")
     imnum = len(imnames)
     random.shuffle(imnames)
-    train = imnames[:round(imnum * dataratio[0])]
-    test = imnames[round(imnum * dataratio[0]):round(imnum * (dataratio[1] + dataratio[0]))]
-    valid = imnames[round(imnum * (dataratio[1] + dataratio[0])):]
-    #print(len(train), len(test), len(valid), imnum)
+    train = imnames[: round(imnum * dataratio[0])]
+    test = imnames[
+        round(imnum * dataratio[0]) : round(imnum * (dataratio[1] + dataratio[0]))
+    ]
+    valid = imnames[round(imnum * (dataratio[1] + dataratio[0])) :]
+    # print(len(train), len(test), len(valid), imnum)
     assert len(train) + len(test) + len(valid) == imnum
-    dict = {"train": [t.split("/")[-1] for t in train], "test": [t.split("/")[-1] for t in test],
-            "validation": [v.split("/")[-1] for v in valid]}
+    dict = {
+        "train": [t.split("/")[-1] for t in train],
+        "test": [t.split("/")[-1] for t in test],
+        "validation": [v.split("/")[-1] for v in valid],
+    }
     os.makedirs(savepath, exist_ok=True)
     with open(f"{savepath}/split.json", "w") as file:
         json.dump(dict, file, indent=2)
@@ -239,15 +277,15 @@ def newsplit(datapath: str = f"{Path(__file__).parent.absolute()}/../../data/Eng
             dest = shutil.copy(src=im, dst=f"{saveloc}/{im.split('/')[-1]}")
 
 
-if __name__ == '__main__':
-    #recreatetablesplit(datapath=f"{Path(__file__).parent.absolute()}/../../data/GloSat/preprocessed",
+if __name__ == "__main__":
+    # recreatetablesplit(datapath=f"{Path(__file__).parent.absolute()}/../../data/GloSat/preprocessed",
     #                   csvpath=f"{Path(__file__).parent.absolute()}/../../data/GloSat/run_GloSAT_cell_aug_e250_es.csv")
-    #recreatetablesplit()
-    #recreatenewspapersplit()
-    #newsplit()
-    subclasssplitwildtables(tablerelative=True)
-    #subclassjoinwildtables()
-    #wildtablesvalidsplit()
-    #validsplit(f"{Path(__file__).parent.absolute()}/../../data/GloSat")
-    #reversewildtablesvalidsplit()
-
+    # recreatetablesplit()
+    # recreatenewspapersplit()
+    # newsplit()
+    # subclasssplitwildtables(tablerelative=True)
+    # subclassjoinwildtables()
+    # wildtablesvalidsplit()
+    # validsplit(f"{Path(__file__).parent.absolute()}/../../data/GloSat")
+    # reversewildtablesvalidsplit()
+    pass

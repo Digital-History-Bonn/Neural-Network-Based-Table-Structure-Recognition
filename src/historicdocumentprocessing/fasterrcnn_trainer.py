@@ -2,11 +2,11 @@
 https://github.com/Digital-History-Bonn/HistorischeTabellenSemanticExtraction/blob/main/src/TableExtraction/trainer
 .py"""
 
+import argparse
 import os
 import sys
 import traceback
 from pathlib import Path
-import argparse
 from typing import Optional, Union
 
 import numpy as np
@@ -19,11 +19,11 @@ from torchvision.models.detection import (
     FasterRCNN_ResNet50_FPN_Weights,
     fasterrcnn_resnet50_fpn,
 )
+from torchvision.utils import draw_bounding_boxes
 from tqdm import tqdm
 from triton.language import dtype
 
 from src.historicdocumentprocessing.fasterrcnn_dataset import CustomDataset
-from torchvision.utils import draw_bounding_boxes
 
 LR = 0.00001
 
@@ -32,14 +32,14 @@ class Trainer:
     """Class to train models."""
 
     def __init__(
-            self,
-            model: FasterRCNN,
-            traindataset: CustomDataset,
-            testdataset: CustomDataset,
-            optimizer: Optimizer,
-            name: str,
-            cuda: int = 0,
-            startepoch: int = 1
+        self,
+        model: FasterRCNN,
+        traindataset: CustomDataset,
+        testdataset: CustomDataset,
+        optimizer: Optimizer,
+        name: str,
+        cuda: int = 0,
+        startepoch: int = 1,
     ) -> None:
         """
         Trainer class to train models.
@@ -78,12 +78,14 @@ class Trainer:
         self.startepoch = startepoch
 
         # setup tensor board
-        train_log_dir = f"{Path(__file__).parent.absolute()}/../../logs/runs/{self.name}"
+        train_log_dir = (
+            f"{Path(__file__).parent.absolute()}/../../logs/runs/{self.name}"
+        )
         print(f"{train_log_dir=}")
         self.writer = SummaryWriter(train_log_dir)  # type: ignore
 
-        #self.example_image, self.example_target = testdataset[testdataset.getidx("mit_google_image_search-10918758-be4b5fa7bf3fea80823dabbe1e17e4136f0da811")]
-        #self.train_example_image, self.train_example_target = traindataset[traindataset.getidx("mit_google_image_search-10918758-cdcd82db9ce0b61da60155c5c822b0be3884a2cf")]
+        # self.example_image, self.example_target = testdataset[testdataset.getidx("mit_google_image_search-10918758-be4b5fa7bf3fea80823dabbe1e17e4136f0da811")]
+        # self.train_example_image, self.train_example_target = traindataset[traindataset.getidx("mit_google_image_search-10918758-cdcd82db9ce0b61da60155c5c822b0be3884a2cf")]
         self.example_image, self.example_target = testdataset[0]
         self.train_example_image, self.train_example_target = traindataset[0]
         self.example_image = (self.example_image * 255).to(torch.uint8)
@@ -96,7 +98,10 @@ class Trainer:
         Args:
             name: name of the model
         """
-        os.makedirs(f"{Path(__file__).parent.absolute()}/../../checkpoints/fasterrcnn/", exist_ok=True)
+        os.makedirs(
+            f"{Path(__file__).parent.absolute()}/../../checkpoints/fasterrcnn/",
+            exist_ok=True,
+        )
         torch.save(
             self.model.state_dict(),
             f"{Path(__file__).parent.absolute()}/../../checkpoints/fasterrcnn/{name}",
@@ -147,7 +152,7 @@ class Trainer:
             target["boxes"] = target["boxes"][0].to(self.device)
             target["labels"] = target["labels"][0].to(self.device)
 
-            #print(img.shape)
+            # print(img.shape)
 
             self.optimizer.zero_grad()
             output = self.model([img[0]], [target])
@@ -167,9 +172,7 @@ class Trainer:
 
         # logging
         self.writer.add_scalar(
-            "Training/loss",
-            np.mean(loss_lst),
-            global_step=self.epoch
+            "Training/loss", np.mean(loss_lst), global_step=self.epoch
         )  # type: ignore
         self.writer.add_scalar(
             "Training/loss_classifier",
@@ -177,9 +180,7 @@ class Trainer:
             global_step=self.epoch,
         )  # type: ignore
         self.writer.add_scalar(
-            "Training/loss_box_reg",
-            np.mean(loss_box_reg_lst),
-            global_step=self.epoch
+            "Training/loss_box_reg", np.mean(loss_box_reg_lst), global_step=self.epoch
         )  # type: ignore
         self.writer.add_scalar(
             "Training/loss_objectness",
@@ -226,7 +227,7 @@ class Trainer:
                 traceback.print_tb(tb)  # Fixed format
                 tb_info = traceback.extract_tb(tb)
                 filename, line, func, text = tb_info[-1]
-                print('An error occurred on line {} in statement {}'.format(line, text))
+                print("An error occurred on line {} in statement {}".format(line, text))
                 print(target["img_number"])
                 exit(1)
 
@@ -242,29 +243,19 @@ class Trainer:
 
         # logging
         self.writer.add_scalar(
-            "Valid/loss",
-            meanloss,
-            global_step=self.epoch
+            "Valid/loss", meanloss, global_step=self.epoch
         )  # type: ignore
         self.writer.add_scalar(
-            "Valid/loss_classifier",
-            np.mean(loss_classifier),
-            global_step=self.epoch
+            "Valid/loss_classifier", np.mean(loss_classifier), global_step=self.epoch
         )  # type: ignore
         self.writer.add_scalar(
-            "Valid/loss_box_reg",
-            np.mean(loss_box_reg),
-            global_step=self.epoch
+            "Valid/loss_box_reg", np.mean(loss_box_reg), global_step=self.epoch
         )  # type: ignore
         self.writer.add_scalar(
-            "Valid/loss_objectness",
-            np.mean(loss_objectness),
-            global_step=self.epoch
+            "Valid/loss_objectness", np.mean(loss_objectness), global_step=self.epoch
         )  # type: ignore
         self.writer.add_scalar(
-            "Valid/loss_rpn_box_reg",
-            np.mean(loss_rpn_box_reg),
-            global_step=self.epoch
+            "Valid/loss_rpn_box_reg", np.mean(loss_rpn_box_reg), global_step=self.epoch
         )  # type: ignore
         self.writer.flush()  # type: ignore
 
@@ -276,13 +267,18 @@ class Trainer:
             "ground truth": self.train_example_target["boxes"],
             "prediction": pred[0]["boxes"].detach().cpu(),
         }
-        colors = ["green" for i in range(boxes['prediction'].shape[0])] + ["red" for i in
-                                                                           range(boxes['ground truth'].shape[0])]
-        labels = ["Pred" for i in range(boxes['prediction'].shape[0])] + ["Ground" for i in
-                                                                          range(boxes['ground truth'].shape[0])]
-        result = draw_bounding_boxes(image=self.train_example_image,
-                                     boxes=torch.vstack((boxes['prediction'], boxes['ground truth'])), colors=colors,
-                                     labels=labels)
+        colors = ["green" for i in range(boxes["prediction"].shape[0])] + [
+            "red" for i in range(boxes["ground truth"].shape[0])
+        ]
+        labels = ["Pred" for i in range(boxes["prediction"].shape[0])] + [
+            "Ground" for i in range(boxes["ground truth"].shape[0])
+        ]
+        result = draw_bounding_boxes(
+            image=self.train_example_image,
+            boxes=torch.vstack((boxes["prediction"], boxes["ground truth"])),
+            colors=colors,
+            labels=labels,
+        )
 
         self.writer.add_image(
             "Training/example", result[:, ::2, ::2], global_step=self.epoch
@@ -294,13 +290,18 @@ class Trainer:
             "ground truth": self.example_target["boxes"],
             "prediction": pred[0]["boxes"].detach().cpu(),
         }
-        colors = ["green" for i in range(boxes['prediction'].shape[0])] + ["red" for i in
-                                                                           range(boxes['ground truth'].shape[0])]
-        labels = ["Pred" for i in range(boxes['prediction'].shape[0])] + ["Ground" for i in
-                                                                          range(boxes['ground truth'].shape[0])]
-        result = draw_bounding_boxes(image=self.example_image,
-                                     boxes=torch.vstack((boxes['prediction'], boxes['ground truth'])), colors=colors,
-                                     labels=labels)
+        colors = ["green" for i in range(boxes["prediction"].shape[0])] + [
+            "red" for i in range(boxes["ground truth"].shape[0])
+        ]
+        labels = ["Pred" for i in range(boxes["prediction"].shape[0])] + [
+            "Ground" for i in range(boxes["ground truth"].shape[0])
+        ]
+        result = draw_bounding_boxes(
+            image=self.example_image,
+            boxes=torch.vstack((boxes["prediction"], boxes["ground truth"])),
+            colors=colors,
+            labels=labels,
+        )
         self.writer.add_image(
             "Valid/example", result[:, ::2, ::2], global_step=self.epoch
         )  # type: ignore
@@ -332,7 +333,8 @@ def get_model(objective: str, load_weights: Optional[str] = None) -> FasterRCNN:
     if load_weights:
         model.load_state_dict(
             torch.load(
-                f"{Path(__file__).parent.absolute()}/../../checkpoints/fasterrcnn/" f"{load_weights}.pt"
+                f"{Path(__file__).parent.absolute()}/../../checkpoints/fasterrcnn/"
+                f"{load_weights}.pt"
             )
         )
 
@@ -383,15 +385,19 @@ def get_args() -> argparse.Namespace:
         help="name of a model to load",
     )
 
-    parser.add_argument("--startepoch", "-se", type=int, default=1, help="number of starting epoch")
+    parser.add_argument(
+        "--startepoch", "-se", type=int, default=1, help="number of starting epoch"
+    )
 
-    #parser.add_argument('--augmentations', "-a", action=argparse.BooleanOptionalAction)
-    parser.add_argument('--augmentations', action='store_true')
-    parser.add_argument('--no-augmentations', dest='augmentations', action='store_false')
+    # parser.add_argument('--augmentations', "-a", action=argparse.BooleanOptionalAction)
+    parser.add_argument("--augmentations", action="store_true")
+    parser.add_argument(
+        "--no-augmentations", dest="augmentations", action="store_false"
+    )
     parser.set_defaults(augmentations=False)
 
-    parser.add_argument('--valid', action='store_true')
-    parser.add_argument('--no-valid', dest='valid', action='store_false')
+    parser.add_argument("--valid", action="store_true")
+    parser.add_argument("--no-valid", dest="valid", action="store_false")
     parser.set_defaults(valid=True)
 
     return parser.parse_args()
@@ -403,27 +409,31 @@ if __name__ == "__main__":
     args = get_args()
 
     # check args
-    if args.name == 'model':
+    if args.name == "model":
         raise ValueError("Please enter a valid model name!")
 
-    if args.objective not in ['fullimage']:
+    if args.objective not in ["fullimage"]:
         raise ValueError("Please enter a valid objective must be 'fullimage'!")
 
-    if args.dataset not in ['BonnData', 'GloSat', 'Tablesinthewild', 'GloSAT']:
-        raise ValueError("Please enter a valid dataset must be 'BonnData' or 'GloSAT' or 'Tablesinthewild'!")
+    if args.dataset not in ["BonnData", "GloSat", "Tablesinthewild", "GloSAT"]:
+        raise ValueError(
+            "Please enter a valid dataset must be 'BonnData' or 'GloSAT' or 'Tablesinthewild'!"
+        )
 
     if args.epochs <= 0:
         raise ValueError("Please enter a valid number of epochs must be >= 0!")
 
-    print('start training:')
+    print("start training:")
     print(f"\tname: {args.name}")
     print(f"\tobjective: {args.objective}")
     print(f"\tdataset: {args.dataset}")
     print(f"\tepochs: {args.epochs}")
     print(f"\tload: {args.load}\n")
 
-    name = (f"{args.name}_{args.dataset}_{args.objective}"
-            f"{'_aug' if args.augmentations else ''}_e{args.epochs}")
+    name = (
+        f"{args.name}_{args.dataset}_{args.objective}"
+        f"{'_aug' if args.augmentations else ''}_e{args.epochs}"
+    )
     model = get_model(args.objective, load_weights=args.load)
 
     transform = None
@@ -442,7 +452,8 @@ if __name__ == "__main__":
                 p=0.1,
             ),
             transforms.RandomAdjustSharpness(sharpness_factor=1.5, p=0.1),
-            transforms.RandomGrayscale(p=0.1))
+            transforms.RandomGrayscale(p=0.1),
+        )
 
     traindataset = CustomDataset(
         f"{Path(__file__).parent.absolute()}/../../data/{args.dataset}/train",
@@ -454,11 +465,13 @@ if __name__ == "__main__":
 
     if args.valid:
         validdataset = CustomDataset(
-            f"{Path(__file__).parent.absolute()}/../../data/{args.dataset}/valid", args.objective
+            f"{Path(__file__).parent.absolute()}/../../data/{args.dataset}/valid",
+            args.objective,
         )
     else:
         validdataset = CustomDataset(
-            f"{Path(__file__).parent.absolute()}/../../data/{args.dataset}/test", args.objective
+            f"{Path(__file__).parent.absolute()}/../../data/{args.dataset}/test",
+            args.objective,
         )
 
     print(f"{len(traindataset)=}")
@@ -466,5 +479,7 @@ if __name__ == "__main__":
 
     optimizer = AdamW(model.parameters(), lr=LR)
 
-    trainer = Trainer(model, traindataset, validdataset, optimizer, name, startepoch=args.startepoch)
+    trainer = Trainer(
+        model, traindataset, validdataset, optimizer, name, startepoch=args.startepoch
+    )
     trainer.train(args.epochs)

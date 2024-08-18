@@ -11,6 +11,7 @@ def run_test(session):
     session.install("torchvision")
     session.run("pytest")
 
+
 @nox.session(name="limited-test")
 def run_small_test(session):
     session.install(".")
@@ -26,8 +27,9 @@ def run_small_test(session):
     if session.posargs:
         test_files = session.posargs
     else:
-        test_files = ['tests/ioucalc_test.py']
-    session.run('pytest', *test_files)
+        test_files = ["tests/ioucalc_test.py"]
+    session.run("pytest", *test_files)
+
 
 @nox.session(name="fast-test")
 def run_test_fast(session):
