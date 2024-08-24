@@ -16,9 +16,15 @@ conda activate kosmos2
 epoch=$1
 startepoch=$2
 model=$3
+randominit=$4
 
 echo "$epoch"
 echo "$startepoch"
 echo "$model"
 
-python -m src.historicdocumentprocessing.fasterrcnn_trainer --name "testseveralcalls_4_with_valid_split" --epochs "$epoch" --startepoch "$startepoch" --load "$model"
+if [ "$randominit" = true ]
+then
+  python -m src.historicdocumentprocessing.fasterrcnn_trainer --name "testseveralcalls_valid_random_init_e_250" --epochs "$epoch" --startepoch "$startepoch" --randominit --valid --identicalname
+else
+  python -m src.historicdocumentprocessing.fasterrcnn_trainer --name "testseveralcalls_valid_random_init_e_250" --epochs "$epoch" --startepoch "$startepoch" --load "$model" --valid --identicalname
+fi

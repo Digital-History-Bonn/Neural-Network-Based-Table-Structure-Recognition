@@ -1,12 +1,12 @@
 #!/bin/bash
 
-jid1=$(sbatch bashscripts/rcnntrain_wild 50 1 | awk '{print $NF}')
+jid1=$(sbatch bashscripts/rcnntrain_wild 50 1 None true | awk '{print $NF}')
 echo "$jid1"
-jid2=$(sbatch -d afterok:"$jid1" bashscripts/rcnntrain_wild 50 51 testseveralcalls_4_with_valid_split_Tablesinthewild_fullimage_e50_end | awk '{print $NF}')
+jid2=$(sbatch -d afterok:"$jid1" bashscripts/rcnntrain_wild 50 51 testseveralcalls_valid_random_init_e_250_end | awk '{print $NF}')
 echo "$jid2"
-jid3=$(sbatch -d afterok:"$jid2" bashscripts/rcnntrain_wild 50 101 testseveralcalls_4_with_valid_split_Tablesinthewild_fullimage_e50_end | awk '{print $NF}')
+jid3=$(sbatch -d afterok:"$jid2" bashscripts/rcnntrain_wild 50 101 testseveralcalls_valid_random_init_e_250_end | awk '{print $NF}')
 echo "$jid3"
-jid4=$(sbatch -d afterok:"$jid3" bashscripts/rcnntrain_wild 50 151 testseveralcalls_4_with_valid_split_Tablesinthewild_fullimage_e50_end | awk '{print $NF}')
+jid4=$(sbatch -d afterok:"$jid3" bashscripts/rcnntrain_wild 50 151 testseveralcalls_valid_random_init_e_250_end | awk '{print $NF}')
 echo "$jid4"
-jid5=$(sbatch -d afterok:"$jid4" bashscripts/rcnntrain_wild 50 201 testseveralcalls_4_with_valid_split_Tablesinthewild_fullimage_e50_end | awk '{print $NF}')
+jid5=$(sbatch -d afterok:"$jid4" bashscripts/rcnntrain_wild 50 201 testseveralcalls_valid_random_init_e_250_end | awk '{print $NF}')
 echo "$jid5"

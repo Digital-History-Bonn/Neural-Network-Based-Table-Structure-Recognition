@@ -11,6 +11,7 @@ from typing import Optional, Union
 
 import numpy as np
 import torch
+from sympy.physics.units import action
 from torch.optim import AdamW, Optimizer
 from torch.utils.data import DataLoader
 from torch.utils.tensorboard import SummaryWriter  # type: ignore
@@ -84,12 +85,12 @@ class Trainer:
         print(f"{train_log_dir=}")
         self.writer = SummaryWriter(train_log_dir)  # type: ignore
 
-        # self.example_image, self.example_target = testdataset[testdataset.getidx("mit_google_image_search-10918758-be4b5fa7bf3fea80823dabbe1e17e4136f0da811")]
-        # self.train_example_image, self.train_example_target = traindataset[traindataset.getidx("mit_google_image_search-10918758-cdcd82db9ce0b61da60155c5c822b0be3884a2cf")]
-        self.example_image, self.example_target = testdataset[0]
-        self.train_example_image, self.train_example_target = traindataset[0]
-        self.example_image = (self.example_image * 255).to(torch.uint8)
-        self.train_example_image = (self.train_example_image * 255).to(torch.uint8)
+        self.example_image, self.example_target = testdataset[testdataset.getidx("mit_google_image_search-10918758-be4b5fa7bf3fea80823dabbe1e17e4136f0da811")]
+        self.train_example_image, self.train_example_target = traindataset[traindataset.getidx("mit_google_image_search-10918758-cdcd82db9ce0b61da60155c5c822b0be3884a2cf")]
+        #self.example_image, self.example_target = testdataset[0]
+        #self.train_example_image, self.train_example_target = traindataset[0]
+        #self.example_image = (self.example_image * 255).to(torch.uint8)
+        #self.train_example_image = (self.train_example_image * 255).to(torch.uint8)
 
     def save(self, name: str = "") -> None:
         """
@@ -311,7 +312,7 @@ class Trainer:
         return meanloss
 
 
-def get_model(objective: str, load_weights: Optional[str] = None) -> FasterRCNN:
+def get_model(objective: str, load_weights: Optional[str] = None, randominit: bool=False) -> FasterRCNN:
     """
     Creates a FasterRCNN model for training, using the specified objective parameter.
 
@@ -326,9 +327,14 @@ def get_model(objective: str, load_weights: Optional[str] = None) -> FasterRCNN:
         "fullimage": {"box_detections_per_img": 200},
     }
 
-    model = fasterrcnn_resnet50_fpn(
-        weights=FasterRCNN_ResNet50_FPN_Weights.DEFAULT, **params[objective]
+    if randominit:
+        model = fasterrcnn_resnet50_fpn(
+        weights=None, weights_backbone=None, **params[objective]
     )
+    else:
+        model = fasterrcnn_resnet50_fpn(
+            weights=FasterRCNN_ResNet50_FPN_Weights.DEFAULT, **params[objective]
+        )
 
     if load_weights:
         model.load_state_dict(
@@ -400,6 +406,12 @@ def get_args() -> argparse.Namespace:
     parser.add_argument("--no-valid", dest="valid", action="store_false")
     parser.set_defaults(valid=True)
 
+    parser.add_argument("--randominit", action="store_true")
+    parser.set_defaults(randominit=False)
+
+    parser.add_argument("--identicalname", action="store_true")
+    parser.set_defaults(identicalname=False)
+
     return parser.parse_args()
 
 
@@ -429,12 +441,16 @@ if __name__ == "__main__":
     print(f"\tdataset: {args.dataset}")
     print(f"\tepochs: {args.epochs}")
     print(f"\tload: {args.load}\n")
+    print(f"\trandom initialization: {args.randominit}\n")
 
     name = (
         f"{args.name}_{args.dataset}_{args.objective}"
         f"{'_aug' if args.augmentations else ''}_e{args.epochs}"
+        f"{f'_init_{args.load_}'if args.load else ''}"
+        f"{'_random_init' if args.randominit else ''}"
     )
-    model = get_model(args.objective, load_weights=args.load)
+    if args.identicalname: name= args.name
+    model = get_model(args.objective, load_weights=args.load, randominit=args.randominit)
 
     transform = None
     if args.augmentations:
