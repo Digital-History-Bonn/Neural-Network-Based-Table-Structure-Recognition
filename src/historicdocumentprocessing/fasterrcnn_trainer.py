@@ -447,7 +447,7 @@ if __name__ == "__main__":
     print(f"\trandom initialization: {args.randominit}\n")
 
     name = (
-        f"{args.name}_{args.dataset}_{args.objective}"
+        f"rcnn_{args.name}_{args.dataset}_{args.objective}"
         f"{'_aug' if args.augmentations else ''}_e{args.epochs}"
         f"{f'_init_{args.load_}'if args.load else ''}"
         f"{'_random_init' if args.randominit else ''}"

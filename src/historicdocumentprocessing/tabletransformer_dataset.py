@@ -42,6 +42,7 @@ from torchvision.utils import draw_bounding_boxes
 import torchvision.ops as ops
 from transformers import DetrImageProcessor, BatchFeature
 from tqdm import tqdm
+from lightning.pytorch.core.hooks import move_data_to_device
 
 
 from src.historicdocumentprocessing.kosmos_eval import reversetablerelativebboxes_outer
@@ -85,7 +86,7 @@ class CustomDataset(Dataset):  # type: ignore
         self, index: int
     ) -> BatchFeature:
         """
-        Returns image and target (boxes, labels, img_number) from dataset.
+        Returns image encoding from dataset.
 
         Args:
             index: index of datapoint
@@ -120,7 +121,7 @@ class CustomDataset(Dataset):  # type: ignore
         assert area.shape[0]==target.shape[0]
         annotations = {'image_id':index, 'annotations': [{'image_id':index, 'category_id':0, "iscrowd":0, "area": area[i], "bbox": target[i].tolist()} for i in range(target.shape[0])]}
         #if self.dataset=="BonnData" and include_textregions
-        encoding = self.ImageProcessor(images=img, annotations=annotations, no_pad=True)
+        encoding = self.ImageProcessor(images=img, annotations=annotations, no_pad=True, return_tensors="pt")
         # if img.shape[0]!=3:
         #    print(self.data[index])
         #print(encoding.keys())
@@ -150,12 +151,33 @@ class CustomDataset(Dataset):  # type: ignore
         encoding = self.ImageProcessor.pad(pixelvalues, return_tensors="pt")
         return {"pixel_values": encoding["pixel_values"], "pixel_mask": encoding["pixel_mask"], "labels": [b["labels"][0] for b in batch]}
 
+    def getimgtarget(self, index):
+        """get image and target at index"""
+        # load image and targets depending on objective
+        imgnum = self.data[index].split(os.sep)[-1]
+        #if index == 0:
+        #    print(imgnum)
+        if self.objective == "fullimage":
+            img = Image.open(f"{self.data[index]}/{imgnum}.jpg").convert("RGB")
+            if self.dataset in ["BonnData", "GloSat"]:
+                target = reversetablerelativebboxes_outer(self.data[index])
+            else:
+                target = torch.load(f"{self.data[index]}/{imgnum}.pt")
+            # print(img.dtype)
+        else:
+            "not yet implemented since there is no need, left in so it can be added in future"
+            target = None
+            img = None
+            pass
+        return img, target
+
+
 
 
 if __name__ == "__main__":
 
     dataset = CustomDataset(
-        f"{Path(__file__).parent.absolute()}/../../data/BonnData/train",
+        f"{Path(__file__).parent.absolute()}/../../data/BonnData/valid",
         "fullimage",
         transforms=None,
     )
@@ -163,7 +185,15 @@ if __name__ == "__main__":
     print(encoding.keys())
     #print([encoding[key] for key in encoding.keys()])
     print(encoding["pixel_values"][0].shape)
+    #print(encoding["labels"])
     dataloader = DataLoader(dataset=dataset, batch_size=4, collate_fn=dataset.collate_fn)
     batch = next(iter(dataloader))
     print(batch.keys())
-    print(batch)
+    #print(batch)
+    device = (
+        torch.device(f"cuda:{0}")
+        if torch.cuda.is_available()
+        else torch.device("cpu")
+    )
+    newbatch = move_data_to_device(batch, device)
+    print(newbatch, device)
