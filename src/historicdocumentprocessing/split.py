@@ -68,14 +68,16 @@ def wildtablesvalidsplit(
         assert len(train) + len(valid) == len(trainlist)
     else:
         imnames = pd.read_json(validfile)["validation"]
-        valid = []
+        valid = [f"{path}/{im}" for im in imnames]
+        print(valid)
         pass
     # print(len(valid))
     os.makedirs(dst, exist_ok=True)
     # print(dst)
     for v in valid:
         shutil.move(v, f"{dst}/{v.split('/')[-1]}")
-        # print(f"{dst}/{v.split('/')[-1]}")
+        print(v, f"{dst}/{v.split('/')[-1]}")
+        pass
 
 
 def reversewildtablesvalidsplit(
@@ -91,12 +93,12 @@ def reversewildtablesvalidsplit(
     validpath = glob.glob(f"{path}/valid/*")
     trainpath = f"{path}/train"
     dict = {"validation": [v.split("/")[-1] for v in validpath]}
-    with open(f"{path}/split.json", "w") as file:
+    with open(f"{path}/split1.json", "w") as file:
         json.dump(dict, file, indent=2)
     # print(len(validpath))
     for v in validpath:
         # print(f"{trainpath}/{v.split('/')[-1]}")
-        shutil.copytree(v, f"{trainpath}/{v.split('/')[-1]}")
+        shutil.move(v, f"{trainpath}/{v.split('/')[-1]}")
 
 
 def subclassjoinwildtables(
@@ -285,7 +287,7 @@ if __name__ == "__main__":
     # newsplit()
     # subclasssplitwildtables(tablerelative=True)
     # subclassjoinwildtables()
-    # wildtablesvalidsplit()
+    wildtablesvalidsplit(validfile=f"{Path(__file__).parent.absolute()}/../../data/Tablesinthewild/split1.json")
     # validsplit(f"{Path(__file__).parent.absolute()}/../../data/GloSat")
-    # reversewildtablesvalidsplit()
+    #reversewildtablesvalidsplit()
     pass

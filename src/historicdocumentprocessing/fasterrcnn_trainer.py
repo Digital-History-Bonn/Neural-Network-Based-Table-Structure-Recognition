@@ -41,6 +41,7 @@ class Trainer:
         name: str,
         cuda: int = 0,
         startepoch: int = 1,
+        datasetname :str = "BonnData"
     ) -> None:
         """
         Trainer class to train models.
@@ -85,12 +86,14 @@ class Trainer:
         print(f"{train_log_dir=}")
         self.writer = SummaryWriter(train_log_dir)  # type: ignore
 
-        self.example_image, self.example_target = testdataset[testdataset.getidx("mit_google_image_search-10918758-be4b5fa7bf3fea80823dabbe1e17e4136f0da811")]
-        self.train_example_image, self.train_example_target = traindataset[traindataset.getidx("mit_google_image_search-10918758-cdcd82db9ce0b61da60155c5c822b0be3884a2cf")]
-        #self.example_image, self.example_target = testdataset[0]
-        #self.train_example_image, self.train_example_target = traindataset[0]
-        #self.example_image = (self.example_image * 255).to(torch.uint8)
-        #self.train_example_image = (self.train_example_image * 255).to(torch.uint8)
+        if datasetname=="Tablesinthewild":
+            #self.example_image, self.example_target = testdataset[testdataset.getidx("mit_google_image_search-10918758-be4b5fa7bf3fea80823dabbe1e17e4136f0da811")]
+            self.train_example_image, self.train_example_target = traindataset[traindataset.getidx("mit_google_image_search-10918758-cdcd82db9ce0b61da60155c5c822b0be3884a2cf")]
+        else:
+            self.train_example_image, self.train_example_target = traindataset[0]
+        self.example_image, self.example_target = testdataset[0]
+        self.example_image = (self.example_image * 255).to(torch.uint8)
+        self.train_example_image = (self.train_example_image * 255).to(torch.uint8)
 
     def save(self, name: str = "") -> None:
         """
@@ -496,6 +499,6 @@ if __name__ == "__main__":
     optimizer = AdamW(model.parameters(), lr=LR)
 
     trainer = Trainer(
-        model, traindataset, validdataset, optimizer, name, startepoch=args.startepoch
+        model, traindataset, validdataset, optimizer, name, startepoch=args.startepoch, datasetname=args.dataset
     )
     trainer.train(args.epochs)
