@@ -88,6 +88,7 @@ def postprocess(
     imname: str,
     saveloc: str,
     includeoutlier: bool = False,
+    includeoutliers_cellsearch:bool = False
 ):
     # for epsprefactor in [tuple([3.0,1.5]), tuple([4.0,1.5])]:
     epsprefactor = tuple([3.0, 1.5])
@@ -106,12 +107,13 @@ def postprocess(
         saveloc = f"{saveloc}/withoutoutlier"
     else:
         saveloc = f"{saveloc}/withoutlier"
+    saveloc = f"{f'{saveloc}/includeoutliers_glosat' if includeoutliers_cellsearch else f'{saveloc}/excludeoutliers_glosat'}"
     saveloc = f"{saveloc}/{imname}"
     print(saveloc)
     # img = read_image(glob.glob(f"{targets}/*jpg")[0])
     for i, t in enumerate(clusteredtables):
         tablecoord = getsurroundingtable(t).tolist()
-        rows, colls = reconstruct_table(t.tolist(), tablecoord, eps=4)
+        rows, colls = reconstruct_table(t.tolist(), tablecoord, eps=4, include_outliers=includeoutliers_cellsearch)
         # print(imname, rows, colls)
         tbboxes = reconstruct_bboxes(rows, colls, tablecoord)
         boxes.append(tbboxes)
@@ -193,8 +195,9 @@ def postprocess_eval(
     tablerelative=True,
     iou_thresholds: List[float] = [0.5, 0.6, 0.7, 0.8, 0.9],
     tableareaonly=False,
+    includeoutliers_cellsearch=False
 ):
-    predloc = f"{Path(__file__).parent.absolute()}/../../results/{modeltype}/postprocessed/fullimg/{datasetname}/eps_3.0_1.5/withoutoutlier"
+    predloc = f"{Path(__file__).parent.absolute()}/../../results/{modeltype}/postprocessed/fullimg/{datasetname}"
     saveloc = f"{Path(__file__).parent.absolute()}/../../results/{modeltype}/testevalfinal1/fullimg/{datasetname}"
     if modelpath:
         modelname = modelpath.split(os.sep)[-1]
@@ -202,6 +205,9 @@ def postprocess_eval(
         saveloc = f"{saveloc}/{modelname}/iou_{'_'.join([str(iou_thresholds[0]), str(iou_thresholds[-1])])}/postprocessed/eps_3.0_1.5/withoutoutlier"
     else:
         saveloc = f"{saveloc}/iou_{'_'.join([str(iou_thresholds[0]), str(iou_thresholds[-1])])}/postprocessed/eps_3.0_1.5/withoutoutlier"
+    saveloc = f"{f'{saveloc}/includeoutliers_glosat' if includeoutliers_cellsearch else f'{saveloc}/excludeoutliers_glosat'}"
+    predloc = f"{predloc}/eps_3.0_1.5/withoutoutlier"
+    predloc = f"{f'{predloc}' if includeoutliers_cellsearch else f'{predloc}/excludeoutliers_glosat'}"
     print(saveloc)
     print(predloc)
     # saveloc = f"{Path(__file__).parent.absolute()}/../../results/{modeltype}/testevalfinal1/fullimg/{datasetname}/{modelname}/iou_{'_'.join([str(iou_thresholds[0]), str(iou_thresholds[-1])])}/postprocessed"
@@ -504,7 +510,58 @@ def postprocess_eval(
 
 
 if __name__ == "__main__":
+    postprocess_kosmos(targetloc=f"{Path(__file__).parent.absolute()}/../../data/Tablesinthewild/preprocessed/simple",
+                       predloc=f"{Path(__file__).parent.absolute()}/../../results/kosmos25/Tablesinthewild/simple",
+                       datasetname="Tablesinthewild/simple")
+    postprocess_kosmos(targetloc=f"{Path(__file__).parent.absolute()}/../../data/Tablesinthewild/preprocessed/curved",
+                       predloc=f"{Path(__file__).parent.absolute()}/../../results/kosmos25/Tablesinthewild/curved",
+                       datasetname="Tablesinthewild/curved")
+    postprocess_kosmos(targetloc=f"{Path(__file__).parent.absolute()}/../../data/Tablesinthewild/preprocessed/occblu",
+                       predloc=f"{Path(__file__).parent.absolute()}/../../results/kosmos25/Tablesinthewild/occblu",
+                       datasetname="Tablesinthewild/occblu")
+    postprocess_kosmos(targetloc=f"{Path(__file__).parent.absolute()}/../../data/Tablesinthewild/preprocessed/overlaid",
+                       predloc=f"{Path(__file__).parent.absolute()}/../../results/kosmos25/Tablesinthewild/overlaid",
+                       datasetname="Tablesinthewild/overlaid")
+    postprocess_kosmos(targetloc=f"{Path(__file__).parent.absolute()}/../../data/Tablesinthewild/preprocessed/Inclined",
+                       predloc=f"{Path(__file__).parent.absolute()}/../../results/kosmos25/Tablesinthewild/Inclined1",
+                       datasetname="Tablesinthewild/Inclined")
+    postprocess_kosmos(
+        targetloc=f"{Path(__file__).parent.absolute()}/../../data/Tablesinthewild/preprocessed/extremeratio",
+        predloc=f"{Path(__file__).parent.absolute()}/../../results/kosmos25/Tablesinthewild/extremeratio1",
+        datasetname="Tablesinthewild/extremeratio")
+    postprocess_kosmos(
+        targetloc=f"{Path(__file__).parent.absolute()}/../../data/Tablesinthewild/preprocessed/muticolorandgrid",
+        predloc=f"{Path(__file__).parent.absolute()}/../../results/kosmos25/Tablesinthewild/muticolorandgrid1",
+        datasetname="Tablesinthewild/muticolorandgrid")
 
+    postprocess_kosmos()
+
+    postprocess_kosmos(targetloc=f"{Path(__file__).parent.absolute()}/../../data/GloSat/test",
+                       predloc=f"{Path(__file__).parent.absolute()}/../../results/kosmos25/GloSat/test1",
+                       datasetname="GloSat")
+    # for cat in glob.glob(f"{Path(__file__).parent.absolute()}/../../data/Tablesinthewild/preprocessed/*"):
+    #    print(cat)
+    #    postprocess_kosmos(targetloc=cat, predloc=f"{Path(__file__).parent.absolute()}/../../results/kosmos25/Tablesinthewild/{cat.split('/')[-1]}", datasetname=f"Tablesinthewild/{cat.split('/')[-1]}")
+
+    postprocess_rcnn(
+        modelpath=f"{Path(__file__).parent.absolute()}/../../checkpoints/fasterrcnn/BonnDataFullImage1_BonnData_fullimage_e250_es.pt",
+        targetloc=f"{Path(__file__).parent.absolute()}/../../data/BonnData/test", datasetname="BonnData")
+    postprocess_rcnn(
+        modelpath=f"{Path(__file__).parent.absolute()}/../../checkpoints/fasterrcnn/BonnDataFullImage_pretrain_GloSatFullImage1_GloSat_fullimage_e250_es_BonnData_fullimage_e250_end.pt",
+        targetloc=f"{Path(__file__).parent.absolute()}/../../data/BonnData/test", datasetname="BonnData")
+    postprocess_rcnn(
+        modelpath=f"{Path(__file__).parent.absolute()}/../../checkpoints/fasterrcnn/BonnDataFullImage_pretrain_GloSatFullImage1_GloSat_fullimage_e250_es_BonnData_fullimage_e250_es.pt",
+        targetloc=f"{Path(__file__).parent.absolute()}/../../data/BonnData/test", datasetname="BonnData")
+    postprocess_rcnn(
+        modelpath=f"{Path(__file__).parent.absolute()}/../../checkpoints/fasterrcnn/GloSatFullImage1_GloSat_fullimage_e250_es.pt",
+        targetloc=f"{Path(__file__).parent.absolute()}/../../data/GloSat/test", datasetname="GloSat")
+    for cat in glob.glob(f"{Path(__file__).parent.absolute()}/../../data/Tablesinthewild/preprocessed/*"):
+        print(cat)
+        postprocess_rcnn(targetloc=cat, datasetname=f"Tablesinthewild/{cat.split('/')[-1]}",
+                         modelpath=f"{Path(__file__).parent.absolute()}/../../checkpoints/fasterrcnn/testseveralcalls_4_with_valid_split_Tablesinthewild_fullimage_e50_es.pt")
+        postprocess_rcnn(targetloc=cat, datasetname=f"Tablesinthewild/{cat.split('/')[-1]}",
+                         modelpath=f"{Path(__file__).parent.absolute()}/../../checkpoints/fasterrcnn/testseveralcalls_5_without_valid_split_Tablesinthewild_fullimage_e50_end.pt")
+    """
     postprocess_eval(
         datasetname="BonnData",
         modeltype="kosmos25",
@@ -592,6 +649,7 @@ if __name__ == "__main__":
             modelpath=f"{Path(__file__).parent.absolute()}/../../checkpoints/fasterrcnn/testseveralcalls_5_without_valid_split_Tablesinthewild_fullimage_e50_end.pt",
         )
 
+    """
     """
     postprocess_kosmos(targetloc=f"{Path(__file__).parent.absolute()}/../../data/Tablesinthewild/preprocessed/simple",
                        predloc=f"{Path(__file__).parent.absolute()}/../../results/kosmos25/Tablesinthewild/simple",

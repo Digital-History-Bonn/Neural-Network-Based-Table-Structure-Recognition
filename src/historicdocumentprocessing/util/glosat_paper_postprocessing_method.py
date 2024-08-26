@@ -91,7 +91,7 @@ def run_dbs_1D(cells: list, eps: int, include_outliers=True, min_samples=2) -> l
     )
 
 
-def reconstruct_table(cells: list, table: list, eps: int) -> (list, list):
+def reconstruct_table(cells: list, table: list, eps: int, include_outliers = False) -> (list, list):
     """
     Reconstructs the cells, given the table region using DBScan with hyperparmeter eps.
 
@@ -118,8 +118,8 @@ def reconstruct_table(cells: list, table: list, eps: int) -> (list, list):
 
     eps_x, eps_y = check_hyperparams(cells, eps)
 
-    rows = run_dbs_1D(cells_y, eps_y)
-    cols = run_dbs_1D(cells_x, eps_x)
+    rows = run_dbs_1D(cells_y, eps_y, include_outliers=include_outliers)
+    cols = run_dbs_1D(cells_x, eps_x, include_outliers=include_outliers)
 
     rows = [(int)(row * table_height) + table[1] for row in rows]
     cols = [(int)(col * table_width) + table[0] for col in cols]
