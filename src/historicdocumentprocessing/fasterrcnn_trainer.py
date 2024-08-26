@@ -449,7 +449,7 @@ if __name__ == "__main__":
     name = (
         f"rcnn_{args.name}_{args.dataset}_{args.objective}"
         f"{'_aug' if args.augmentations else ''}_e{args.epochs}"
-        f"{f'_init_{args.load_}'if args.load else ''}"
+        f"{f'_init_{args.load}_'if args.load else ''}"
         f"{'_random_init' if args.randominit else ''}"
     )
     if args.identicalname: name= args.name
