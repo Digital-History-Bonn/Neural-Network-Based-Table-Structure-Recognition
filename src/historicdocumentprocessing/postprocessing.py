@@ -107,7 +107,7 @@ def postprocess(
         saveloc = f"{saveloc}/withoutoutlier"
     else:
         saveloc = f"{saveloc}/withoutlier"
-    saveloc = f"{f'{saveloc}/includeoutliers_glosat' if includeoutliers_cellsearch else f'{saveloc}/excludeoutliers_glosat'}"
+    saveloc = f"{f'{saveloc}_includeoutliers_glosat' if includeoutliers_cellsearch else f'{saveloc}_excludeoutliers_glosat'}"
     saveloc = f"{saveloc}/{imname}"
     print(saveloc)
     # img = read_image(glob.glob(f"{targets}/*jpg")[0])
@@ -207,7 +207,7 @@ def postprocess_eval(
         saveloc = f"{saveloc}/iou_{'_'.join([str(iou_thresholds[0]), str(iou_thresholds[-1])])}/postprocessed/eps_3.0_1.5/withoutoutlier"
     saveloc = f"{f'{saveloc}/includeoutliers_glosat' if includeoutliers_cellsearch else f'{saveloc}/excludeoutliers_glosat'}"
     predloc = f"{predloc}/eps_3.0_1.5/withoutoutlier"
-    predloc = f"{f'{predloc}' if includeoutliers_cellsearch else f'{predloc}/excludeoutliers_glosat'}"
+    predloc = f"{f'{predloc}' if includeoutliers_cellsearch else f'{predloc}_excludeoutliers_glosat'}"
     print(saveloc)
     print(predloc)
     # saveloc = f"{Path(__file__).parent.absolute()}/../../results/{modeltype}/testevalfinal1/fullimg/{datasetname}/{modelname}/iou_{'_'.join([str(iou_thresholds[0]), str(iou_thresholds[-1])])}/postprocessed"
@@ -510,6 +510,7 @@ def postprocess_eval(
 
 
 if __name__ == "__main__":
+    """
     postprocess_kosmos(targetloc=f"{Path(__file__).parent.absolute()}/../../data/Tablesinthewild/preprocessed/simple",
                        predloc=f"{Path(__file__).parent.absolute()}/../../results/kosmos25/Tablesinthewild/simple",
                        datasetname="Tablesinthewild/simple")
@@ -561,6 +562,7 @@ if __name__ == "__main__":
                          modelpath=f"{Path(__file__).parent.absolute()}/../../checkpoints/fasterrcnn/testseveralcalls_4_with_valid_split_Tablesinthewild_fullimage_e50_es.pt")
         postprocess_rcnn(targetloc=cat, datasetname=f"Tablesinthewild/{cat.split('/')[-1]}",
                          modelpath=f"{Path(__file__).parent.absolute()}/../../checkpoints/fasterrcnn/testseveralcalls_5_without_valid_split_Tablesinthewild_fullimage_e50_end.pt")
+
     """
     postprocess_eval(
         datasetname="BonnData",
@@ -596,6 +598,7 @@ if __name__ == "__main__":
         datasetname="GloSat",
         modeltype="fasterrcnn",
     )
+
 
     postprocess_eval(
         targetloc=f"{Path(__file__).parent.absolute()}/../../data/Tablesinthewild/preprocessed/simple",
@@ -649,7 +652,6 @@ if __name__ == "__main__":
             modelpath=f"{Path(__file__).parent.absolute()}/../../checkpoints/fasterrcnn/testseveralcalls_5_without_valid_split_Tablesinthewild_fullimage_e50_end.pt",
         )
 
-    """
     """
     postprocess_kosmos(targetloc=f"{Path(__file__).parent.absolute()}/../../data/Tablesinthewild/preprocessed/simple",
                        predloc=f"{Path(__file__).parent.absolute()}/../../results/kosmos25/Tablesinthewild/simple",
