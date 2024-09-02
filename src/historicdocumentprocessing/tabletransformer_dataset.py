@@ -30,7 +30,7 @@ SOFTWARE.
 import glob
 import os
 from pathlib import Path
-from typing import Dict, Optional, Tuple, Union, List
+from typing import Dict, Optional, Tuple, Union, List, Literal
 from unicodedata import category
 
 import torch
@@ -38,14 +38,27 @@ from PIL import Image
 from torch.nn import Module
 from torch.utils.data import Dataset, DataLoader
 from torchvision.io import read_image
+from torchvision.transforms.functional import pil_to_tensor
 from torchvision.utils import draw_bounding_boxes
 import torchvision.ops as ops
-from transformers import DetrImageProcessor, BatchFeature
+from transformers import DetrImageProcessor, BatchFeature, AutoImageProcessor
 from tqdm import tqdm
 from lightning.pytorch.core.hooks import move_data_to_device
 
 
-from src.historicdocumentprocessing.kosmos_eval import reversetablerelativebboxes_outer
+from src.historicdocumentprocessing.kosmos_eval import reversetablerelativebboxes_outer, \
+    reversetablerelativebboxes_inner
+
+
+def reversetablerelativebboxes_outer_rowcoll(fpath: str, category: Literal["row", "col"]) -> torch.Tensor:
+    tablebboxes = torch.load(glob.glob(f"{fpath}/*tables.pt")[0])
+    # print(tablebboxes)
+    newcoords = torch.zeros((0, 4))
+    for table in glob.glob(f"{fpath}/*_{category}_*.pt"):
+        n = int(table.split(".")[-2].split("_")[-1])
+        newcell = reversetablerelativebboxes_inner(tablebboxes[n], torch.load(table))
+        newcoords = torch.vstack((newcoords, newcell))
+    return newcoords
 
 
 class CustomDataset(Dataset):  # type: ignore
@@ -69,7 +82,14 @@ class CustomDataset(Dataset):  # type: ignore
         else:
             "not yet implemented since there is no need, left in so it can be added in future"
             pass
-        self.ImageProcessor = DetrImageProcessor.from_pretrained("facebook/detr-resnet-50")
+        #self.ImageProcessor = DetrImageProcessor.from_pretrained("facebook/detr-resnet-50")
+        #see https://github.com/microsoft/table-transformer/blob/16d124f616109746b7785f03085100f1f6247575/src/inference.py#L45 for table transformer size and img mean,std values
+        self.ImageProcessor = AutoImageProcessor.from_pretrained("microsoft/table-transformer-structure-recognition-v1.1-all", size={"shortest_edge":1000, "longest_edge":1000})
+        #print(self.ImageProcessor.size['longest_edge']) #, self.ImageProcessor.size['shortest_edge'])
+        #print(self.ImageProcessor.image_mean, self.ImageProcessor.image_std)
+        assert self.ImageProcessor.size['longest_edge']==self.ImageProcessor.size['shortest_edge']==1000
+        assert self.ImageProcessor.image_mean==[0.485, 0.456, 0.406]
+        assert self.ImageProcessor.image_std==[0.229, 0.224, 0.225]
         self.objective = objective
         self.transforms = transforms
         self.dataset = path.split(os.sep)[-2]
@@ -99,13 +119,31 @@ class CustomDataset(Dataset):  # type: ignore
         imgnum = self.data[index].split(os.sep)[-1]
         if index==0:
             print(imgnum)
+        annotations = {'image_id': index, 'annotations': []}
         if self.objective == "fullimage":
             img = Image.open(f"{self.data[index]}/{imgnum}.jpg").convert("RGB")
             if self.dataset in ["BonnData", "GloSat"]:
-                target = reversetablerelativebboxes_outer(self.data[index])
+                for id, cat in zip([2,1],["row", "col"]):
+                    target = reversetablerelativebboxes_outer_rowcoll(self.data[index], category=cat)
+                    # get bbox area
+                    area = ops.box_area(target)
+                    # convert bboxes to coco format
+                    target = ops.box_convert(target, in_fmt='xyxy', out_fmt='cxcywh')
+                    assert area.shape[0] == target.shape[0]
+                    annotations["annotations"]+=[
+                        {'image_id': index, 'category_id': id, "iscrowd": 0, "area": area[i], "bbox": target[i].tolist()}
+                        for i in range(target.shape[0])]
+                tables = torch.load(glob.glob(f"{self.data[index]}/*tables.pt")[0])
+                area = ops.box_area(tables)
+                # convert bboxes to coco format
+                target = ops.box_convert(tables, in_fmt='xyxy', out_fmt='xywh')
+                assert area.shape[0] == target.shape[0]
+                annotations["annotations"]+=[
+                        {'image_id': index, 'category_id': 0, "iscrowd": 0, "area": area[i], "bbox": target[i].tolist()}
+                        for i in range(tables.shape[0])]
             else:
                 target = torch.load(f"{self.data[index]}/{imgnum}.pt")
-            # print(img.dtype)
+            # print
         else:
             "not yet implemented since there is no need, left in so it can be added in future"
             target=None
@@ -113,15 +151,17 @@ class CustomDataset(Dataset):  # type: ignore
             pass
 
         #get bbox area
-        area = ops.box_area(target)
+        #target = reversetablerelativebboxes_outer(self.data[index])
+        #area = ops.box_area(target)
         #convert bboxes to coco format
-        target = ops.box_convert(target, in_fmt='xyxy', out_fmt='xywh')
+        #target = ops.box_convert(target, in_fmt='xyxy', out_fmt='xywh')
         if self.transforms:
             img = self.transforms(img)
-        assert area.shape[0]==target.shape[0]
-        annotations = {'image_id':index, 'annotations': [{'image_id':index, 'category_id':0, "iscrowd":0, "area": area[i], "bbox": target[i].tolist()} for i in range(target.shape[0])]}
+        #assert area.shape[0]==target.shape[0]
+        #annotations = {'image_id':index, 'annotations': [{'image_id':index, 'category_id':0, "iscrowd":0, "area": area[i], "bbox": target[i].tolist()} for i in range(target.shape[0])]}
         #if self.dataset=="BonnData" and include_textregions
-        encoding = self.ImageProcessor(images=img, annotations=annotations, no_pad=True, return_tensors="pt")
+        #print(annotations)
+        encoding = self.ImageProcessor(images=img, annotations=annotations, do_pad=False, return_tensors="pt")
         # if img.shape[0]!=3:
         #    print(self.data[index])
         #print(encoding.keys())
@@ -152,15 +192,24 @@ class CustomDataset(Dataset):  # type: ignore
         return {"pixel_values": encoding["pixel_values"], "pixel_mask": encoding["pixel_mask"], "labels": [b["labels"][0] for b in batch]}
 
     def getimgtarget(self, index):
-        """get image and target at index"""
+        """get image and target and labels at index"""
         # load image and targets depending on objective
         imgnum = self.data[index].split(os.sep)[-1]
         #if index == 0:
         #    print(imgnum)
         if self.objective == "fullimage":
             img = Image.open(f"{self.data[index]}/{imgnum}.jpg").convert("RGB")
+            bboxes = []
+            labels = []
             if self.dataset in ["BonnData", "GloSat"]:
-                target = reversetablerelativebboxes_outer(self.data[index])
+                for id, cat in zip([2,1],["row", "col"]):
+                    target = reversetablerelativebboxes_outer_rowcoll(self.data[index], category=cat)
+                    bboxes.append(target)
+                    labels+=([f"{cat}" for i in range(target.shape[0])])
+                tables = torch.load(glob.glob(f"{self.data[index]}/*tables.pt")[0])
+                labels+=([f"tables" for i in range(tables.shape[0])])
+                bboxes.append(tables)
+                target= torch.vstack(bboxes)
             else:
                 target = torch.load(f"{self.data[index]}/{imgnum}.pt")
             # print(img.dtype)
@@ -169,7 +218,10 @@ class CustomDataset(Dataset):  # type: ignore
             target = None
             img = None
             pass
-        return img, target
+        return img, target, labels
+
+    def getimfolder(self,index):
+        return self.data[index]
 
 
 
@@ -188,7 +240,7 @@ if __name__ == "__main__":
     #print(encoding["labels"])
     dataloader = DataLoader(dataset=dataset, batch_size=4, collate_fn=dataset.collate_fn)
     batch = next(iter(dataloader))
-    print(batch.keys())
+    #print(batch.keys())
     #print(batch)
     device = (
         torch.device(f"cuda:{0}")
@@ -196,4 +248,14 @@ if __name__ == "__main__":
         else torch.device("cpu")
     )
     newbatch = move_data_to_device(batch, device)
-    print(newbatch, device)
+    #print(newbatch, device)
+    img, target, labels = dataset.getimgtarget(1)
+    result = draw_bounding_boxes(
+        image=pil_to_tensor(img).to(torch.uint8),
+        boxes=target,
+        labels=labels,
+    )
+    img = Image.fromarray(result.permute(1, 2, 0).numpy())
+    print(labels)
+    # print(f"{savepath}/{identifier}.jpg")
+    img.save(f"{Path(__file__).parent.absolute()}/../../images/test/testtabletransformerdataset.jpg")

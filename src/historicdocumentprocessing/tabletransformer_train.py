@@ -34,7 +34,7 @@ from lightning.pytorch.utilities.types import EVAL_DATALOADERS
 from torch.utils.data import DataLoader
 from torchvision.transforms.functional import pil_to_tensor
 from torchvision.utils import draw_bounding_boxes
-from transformers import TableTransformerForObjectDetection
+from transformers import TableTransformerForObjectDetection, AutoModelForObjectDetection
 import torch
 from lightning.pytorch import loggers, Trainer
 from lightning.pytorch.callbacks.early_stopping import EarlyStopping
@@ -44,10 +44,11 @@ from src.historicdocumentprocessing.tabletransformer_dataset import CustomDatase
 
 
 class TableTransformer(pl.LightningModule):
-     def __init__(self, lr, lr_backbone, weight_decay, testdataset: CustomDataset, traindataset:CustomDataset, valdataset:CustomDataset=None, datasetname:str = "BonnData"):
+     def __init__(self, lr, lr_backbone, weight_decay, testdataset: CustomDataset, traindataset:CustomDataset, valdataset:CustomDataset=None, datasetname:str = "BonnData", savepath:str=None):
          super().__init__()
-         self.model = TableTransformerForObjectDetection.from_pretrained("microsoft/table-transformer-structure-recognition").to(self.device)
+         self.model = AutoModelForObjectDetection.from_pretrained("microsoft/table-transformer-structure-recognition-v1.1-all").to(self.device)
          # see https://github.com/PyTorchLightning/pytorch-lightning/pull/1896
+         #print(model.config.id2label)
          self.lr = lr
          self.lr_backbone = lr_backbone
          self.weight_decay = weight_decay
@@ -61,14 +62,15 @@ class TableTransformer(pl.LightningModule):
             self.train_example_image, self.train_example_target = traindataset.getimgtarget(
                  traindataset.getidx("mit_google_image_search-10918758-cdcd82db9ce0b61da60155c5c822b0be3884a2cf"))
          elif datasetname == "Tablesinthewild" and not valdataset:
-             self.example_image, self.example_target = validdataset.getimgtarget(0)
-             self.train_example_image, self.train_example_target = traindataset.getimgtarget(
+             self.example_image, self.example_target, self.example_lable = valdataset.getimgtarget(0)
+             self.train_example_image, self.train_example_target, self.train_example_lable = traindataset.getimgtarget(
                  traindataset.getidx("mit_google_image_search-10918758-cdcd82db9ce0b61da60155c5c822b0be3884a2cf"))
          else:
-             self.example_image, self.example_target = validdataset.getimgtarget(0)
-             self.train_example_image, self.train_example_target = traindataset.getimgtarget(0)
+             self.example_image, self.example_target, self.example_lable = valdataset.getimgtarget(0)
+             self.train_example_image, self.train_example_target, self.train_example_lable = traindataset.getimgtarget(0)
          self.example_image = (self.example_image)
          self.train_example_image = (self.train_example_image)
+         self.savepath=savepath
 
      def forward(self, pixel_values, pixel_mask):
        outputs = self.model(pixel_values=pixel_values, pixel_mask=pixel_mask)
@@ -109,6 +111,7 @@ class TableTransformer(pl.LightningModule):
                  self.writer = logger.experiment
         #trainexampleimg
         self.model.eval()
+        torch.save(self.model.state_dict(), self.savepath+"_end.pt")
         encoding = move_data_to_device(self.train_dataset.ImageProcessor(self.train_example_image, return_tensors="pt"), self.device)
         with torch.no_grad():
             out = self.model(**encoding)
@@ -178,13 +181,14 @@ class TableTransformer(pl.LightningModule):
         return optimizer
 
      def train_dataloader(self):
-        return DataLoader(self.train_dataset, batch_size=1, collate_fn=self.val_dataset.collate_fn)
+        return DataLoader(self.train_dataset, batch_size=1, collate_fn=self.train_dataset.collate_fn)
 
      def val_dataloader(self):
-        return DataLoader(self.val_dataset, batch_size=1, collate_fn=self.val_dataset.collate_fn,num_workers=15)
+        return DataLoader(self.val_dataset, batch_size=1, collate_fn=self.val_dataset.collate_fn,num_workers=8)
 
      def test_dataloader(self) -> EVAL_DATALOADERS:
-         return DataLoader(self.test_dataset, batch_size=1, collate_fn=self.val_dataset.collate_fn)
+         return DataLoader(self.test_dataset, batch_size=1, collate_fn=self.test_dataset.collate_fn)
+
 
 
 def get_args() -> argparse.Namespace:
@@ -262,7 +266,7 @@ def get_args() -> argparse.Namespace:
 if __name__=='__main__':
     args = get_args()
     name = (
-        f"tabletransformer_{args.name}_{args.dataset}_{args.objective}"
+        f"tabletransformer_v1.1-all_{args.name}_{args.dataset}_{args.objective}"
         f"{'_aug' if args.augmentations else ''}_e{args.epochs}"
         f"{f'_init_{args.load_}' if args.load else ''}"
     #    f"{'_random_init' if args.randominit else ''}"
@@ -301,7 +305,7 @@ if __name__=='__main__':
 
     checkpoint_callback = ModelCheckpoint(dirpath=f"{Path(__file__).parent.absolute()}/../../checkpoints/tabletransformer/", filename=f"{f'{name}_es' if args.early_stopping else f'{name}_end'}")
     logger = loggers.TensorBoardLogger(save_dir=train_log_dir, name=name)
-    model = TableTransformer(lr=args.lr, lr_backbone=args.lr_backbone, weight_decay=args.weight_decay, traindataset=traindataset, valdataset=validdataset, testdataset=testdataset, datasetname=args.dataset)
+    model = TableTransformer(lr=args.lr, lr_backbone=args.lr_backbone, weight_decay=args.weight_decay, traindataset=traindataset, valdataset=validdataset, testdataset=testdataset, datasetname=args.dataset, savepath=f"{Path(__file__).parent.absolute()}/../../checkpoints/tabletransformer/{name}")
     if args.valid and not args.early_stopping:
         trainer = Trainer(logger=logger,max_epochs=args.epochs, devices=args.gpus, accelerator="cuda", num_nodes=args.num_nodes, callbacks=[checkpoint_callback])
         trainer.fit(model)
