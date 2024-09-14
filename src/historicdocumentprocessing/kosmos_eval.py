@@ -304,6 +304,10 @@ def calcstats_IoU(
         targetious.unsqueeze(-1).expand(-1, len(threshold_tensor)) < threshold_tensor,
         dim=0,
     )
+    assert torch.equal(fp, torch.sum(
+        predious.unsqueeze(-1).expand(-1, len(threshold_tensor)) < threshold_tensor,
+        dim=0,
+    ))
     # print(tp, fp, fn, ioumat.shape)
 
     # from our project group

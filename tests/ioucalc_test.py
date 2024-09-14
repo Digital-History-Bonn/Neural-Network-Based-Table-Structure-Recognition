@@ -36,6 +36,9 @@ def test_ioumetrics():
         dim=1,
     )
     fpg = len(ioumat) - tpg
+
+    assert torch.equal(fpg,torch.sum(prediousp.expand(len(iou_thresholds), n_pred) < threshold_tensor[:, None],dim=1))
+
     fng = torch.sum(
         targetiousp.expand(len(iou_thresholds), n_target) < threshold_tensor[:, None],
         dim=1,
@@ -150,6 +153,6 @@ def test_inputdata():
 
 
 if __name__ == "__main__":
-    test_inputdata()
-    test_iousum()
+    #test_inputdata()
+    #test_iousum()
     test_ioumetrics()
