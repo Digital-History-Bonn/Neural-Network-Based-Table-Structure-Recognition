@@ -2,7 +2,7 @@ import glob
 import json
 import math
 from pathlib import Path
-from typing import Tuple
+from typing import Tuple, List
 
 import numpy as np
 import pandas as pd
@@ -93,6 +93,7 @@ def clustertablesseperately(
     boxes: torch.Tensor,
     epsprefactor: Tuple[float, float] = tuple([3, 1.5]),
     includeoutlier: bool = True,
+    minsamples: List[int] = [4, 5]
 ):
     tables = []
     xtables = []
@@ -107,7 +108,7 @@ def clustertablesseperately(
     epsprefactor2 = epsprefactor[1]
     if xdist:
         clustering = DBSCAN(
-            eps=(epsprefactor1) * xdist, min_samples=4, metric=eucsimilarity
+            eps=(epsprefactor1) * xdist, min_samples=minsamples[0], metric=eucsimilarity
         ).fit(xboxes.numpy())
         for label in set(clustering.labels_):
             xtable = boxes[clustering.labels_ == label]
@@ -122,7 +123,7 @@ def clustertablesseperately(
             ydist = avrgeuc(yboxes)
             if ydist:
                 clustering = DBSCAN(
-                    eps=(epsprefactor2) * ydist, min_samples=5, metric=eucsimilarity
+                    eps=(epsprefactor2) * ydist, min_samples=minsamples[1], metric=eucsimilarity
                 ).fit(yboxes.numpy())
                 for label in set(clustering.labels_):
                     table = prototable[(clustering.labels_ == label)]
