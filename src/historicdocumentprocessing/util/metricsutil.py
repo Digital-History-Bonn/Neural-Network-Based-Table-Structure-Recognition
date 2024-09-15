@@ -94,6 +94,7 @@ def findoptimalfilterpoint(modelpath:str, testdatasetpath:str, tablerelative:boo
     os.makedirs(f"{Path(__file__).parent.absolute()}/../../../images/fasterrcnn/{modelname}", exist_ok=True)
     plt.savefig(f"{Path(__file__).parent.absolute()}/../../../images/fasterrcnn/{modelname}/threshold_graph.png")
     os.makedirs(f"{Path(__file__).parent.absolute()}/../../../results/fasterrcnn/bestfilterthresholds", exist_ok=True)
+    plt.close()
     with open(f"{Path(__file__).parent.absolute()}/../../../results/fasterrcnn/bestfilterthresholds/{modelname}.txt", 'w') as f:
         f.write(str(bestpred))
     #print(bestpred)
