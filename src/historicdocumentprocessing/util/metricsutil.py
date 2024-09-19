@@ -10,20 +10,20 @@ from tqdm import tqdm
 
 from src.historicdocumentprocessing.kosmos_eval import calcstats_IoU, reversetablerelativebboxes_outer
 
-def findoptimalfilterpoint_outer(modelfolder:str= f"{Path(__file__).parent.absolute()}/../../../checkpoints/fasterrcnn"):
+def findoptimalfilterpoint_outer(modelfolder:str= f"{Path(__file__).parent.absolute()}/../../../checkpoints/fasterrcnn", valid: bool = True):
     for modelpath in glob.glob(f"{modelfolder}/*"):
         if "BonnData" in modelpath and "run" not in modelpath:
-            findoptimalfilterpoint(modelpath, testdatasetpath=f"{Path(__file__).parent.absolute()}/../../../data/BonnData/test")
+            findoptimalfilterpoint(modelpath, testdatasetpath=f"{Path(__file__).parent.absolute()}/../../../data/BonnData/test" if not valid else f"{Path(__file__).parent.absolute()}/../../../data/BonnData/valid", valid=valid)
         elif "GloSat" in modelpath and "BonnData" not in modelpath and "run" not in modelpath:
             findoptimalfilterpoint(modelpath,
-                                   testdatasetpath=f"{Path(__file__).parent.absolute()}/../../../data/GloSat/test")
+                                   testdatasetpath=f"{Path(__file__).parent.absolute()}/../../../data/GloSat/test" if not valid else f"{Path(__file__).parent.absolute()}/../../../data/GloSat/valid", valid=valid)
         elif "Tablesinthewild" in modelpath:
             findoptimalfilterpoint(modelpath,
-                                   testdatasetpath=f"{Path(__file__).parent.absolute()}/../../../data/Tablesinthewild/test", tablerelative=False)
+                                   testdatasetpath=f"{Path(__file__).parent.absolute()}/../../../data/Tablesinthewild/test" if not valid else f"{Path(__file__).parent.absolute()}/../../../data/Tablesinthewild/valid", tablerelative=False, valid=valid)
         else:
             pass
 
-def findoptimalfilterpoint(modelpath:str, testdatasetpath:str, tablerelative:bool= True):
+def findoptimalfilterpoint(modelpath:str, testdatasetpath:str, tablerelative:bool= True, valid:bool=True):
     """
     partially based on threshold graph function from https://github.com/Digital-History-Bonn/HistorischeTabellenSemanticExtraction/blob/main/src/TableExtraction/utils/metrics.py
     Args:
@@ -92,14 +92,14 @@ def findoptimalfilterpoint(modelpath:str, testdatasetpath:str, tablerelative:boo
     plt.ylabel('number of tp/fp')
     plt.legend()
     os.makedirs(f"{Path(__file__).parent.absolute()}/../../../images/fasterrcnn/{modelname}", exist_ok=True)
-    plt.savefig(f"{Path(__file__).parent.absolute()}/../../../images/fasterrcnn/{modelname}/threshold_graph.png")
-    os.makedirs(f"{Path(__file__).parent.absolute()}/../../../results/fasterrcnn/bestfilterthresholds", exist_ok=True)
+    plt.savefig(f"{Path(__file__).parent.absolute()}/../../../images/fasterrcnn/{modelname}/threshold_graph{'_valid' if valid else ''}.png")
+    os.makedirs(f"{Path(__file__).parent.absolute()}/../../../results/fasterrcnn/bestfilterthresholds{'_valid' if valid else ''}", exist_ok=True)
     plt.close()
-    with open(f"{Path(__file__).parent.absolute()}/../../../results/fasterrcnn/bestfilterthresholds/{modelname}.txt", 'w') as f:
+    with open(f"{Path(__file__).parent.absolute()}/../../../results/fasterrcnn/bestfilterthresholds{'_valid' if valid else ''}/{modelname}.txt", 'w') as f:
         f.write(str(bestpred))
     #print(bestpred)
 
 
 if __name__=='__main__':
-    findoptimalfilterpoint_outer()
+    findoptimalfilterpoint_outer(valid=True)
     #findoptimalfilterpoint(modelpath=f"{Path(__file__).parent.absolute()}/../../../checkpoints/fasterrcnn/BonnDataFullImage1_BonnData_fullimage_e250_es.pt", testdatasetpath=f"{Path(__file__).parent.absolute()}/../../../data/BonnData/test")

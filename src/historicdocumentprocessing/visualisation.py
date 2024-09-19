@@ -19,7 +19,7 @@ from src.historicdocumentprocessing.kosmos_eval import (
 from src.historicdocumentprocessing.util.tablesutil import remove_invalid_bbox
 from src.historicdocumentprocessing.postprocessing import postprocess
 
-def drawimg_allmodels(datasetname:str, imgpath:str, rcnnmodels:List[str], datasetaddon_pred:str=None, filter:int=0.7):
+def drawimg_allmodels(datasetname:str, imgpath:str, rcnnmodels:List[str], datasetaddon_pred:str=None, valid:bool = True):
     imname = imgpath.split("/")[-1].split(".")[-2]
     groundpath = f"{Path(__file__).parent.absolute()}/../../data/{datasetname.split('/')[-2]}/preprocessed/{datasetname.split('/')[-1]}" if "/" in datasetname else f"{Path(__file__).parent.absolute()}/../../data/{datasetname}/test"
     groundpath = f"{groundpath}/{imname}"
@@ -37,8 +37,8 @@ def drawimg_allmodels(datasetname:str, imgpath:str, rcnnmodels:List[str], datase
             except FileNotFoundError:
                 print(f"{imname} has no valid predicitons with model {model}")
                 pass
-    for model in rcnnmodels:
-        modelpath = f"{Path(__file__).parent.absolute()}/../../checkpoints/fasterrcnn/{model}"
+    for modelname in rcnnmodels:
+        modelpath = f"{Path(__file__).parent.absolute()}/../../checkpoints/fasterrcnn/{modelname}"
         model = fasterrcnn_resnet50_fpn(
             weights=FasterRCNN_ResNet50_FPN_Weights.DEFAULT,
             **{"box_detections_per_img": 200},
@@ -54,14 +54,19 @@ def drawimg_allmodels(datasetname:str, imgpath:str, rcnnmodels:List[str], datase
         img = (read_image(imgpath) / 255).to(device)
         output = model([img])
         output = {k: v.detach().cpu() for k, v in output[0].items()}
+        try:
+            with open(f"{Path(__file__).parent.absolute()}/../../results/fasterrcnn/bestfilterthresholds{'_valid' if valid else ''}/{modelname}.txt", 'r') as f:
+                filter = float(f.read())
+        except FileNotFoundError:
+            filter = 0.7
         fullimagepredbox_filtered = remove_invalid_bbox(output["boxes"][output["scores"]>filter])
         fullimagepredbox = remove_invalid_bbox(output["boxes"])
         drawimg_varformat_inner(impath=imgpath, box=fullimagepredbox, groundpath=groundpath, savepath=f"{Path(__file__).parent.absolute()}/../../images/fasterrcnn/{modelpath.split('/')[-1]}")
         drawimg_varformat_inner(impath=imgpath, box=fullimagepredbox_filtered, groundpath=groundpath,
-                            savepath=f"{Path(__file__).parent.absolute()}/../../images/fasterrcnn/{modelpath.split('/')[-1]}/filtered_{filter}")
-        filtered_processed = postprocess(fullimagepredbox_filtered, imname=imname, saveloc= "{Path(__file__).parent.absolute()}/../../images/test.pt", minsamples=[2, 3])
+                            savepath=f"{Path(__file__).parent.absolute()}/../../images/fasterrcnn/{modelpath.split('/')[-1]}/filtered_{filter}{'_valid' if valid else ''}")
+        filtered_processed = postprocess(fullimagepredbox_filtered, imname=imname, saveloc= f"{Path(__file__).parent.absolute()}/../../images/test.pt", minsamples=[2, 3])
         drawimg_varformat_inner(impath=imgpath, box=filtered_processed, groundpath=groundpath,
-                            savepath=f"{Path(__file__).parent.absolute()}/../../images/fasterrcnn/{modelpath.split('/')[-1]}/filtered_{filter}_filtertest")
+                            savepath=f"{Path(__file__).parent.absolute()}/../../images/fasterrcnn/{modelpath.split('/')[-1]}/filtered_{filter}{'_valid' if valid else ''}_postprocessed")
 
 def drawimg_varformat(
     impath: str = f"{Path(__file__).parent.absolute()}/../../data/BonnData/test/Konflikttabelle.jpg",
@@ -240,7 +245,20 @@ def main():
 
 
 if __name__ == "__main__":
-    drawimg_allmodels(datasetname="BonnData", imgpath=f"{Path(__file__).parent.absolute()}/../../data/BonnData/preprocessed/I_HA_Rep_89_Nr_16160_0227/I_HA_Rep_89_Nr_16160_0227.jpg", datasetaddon_pred="Tabellen/test", rcnnmodels=['BonnDataFullImage1_BonnData_fullimage_e250_es.pt','BonnDataFullImage_pretrain_GloSatFullImage1_GloSat_fullimage_e250_es_BonnData_fullimage_e250_es.pt', 'BonnDataFullImage_random_BonnData_fullimage_e250_random_init_es.pt'])
+    #drawimg_allmodels(datasetname="BonnData", imgpath=f"{Path(__file__).parent.absolute()}/../../data/BonnData/preprocessed/I_HA_Rep_89_Nr_16160_0227/I_HA_Rep_89_Nr_16160_0227.jpg", datasetaddon_pred="Tabellen/test", rcnnmodels=['BonnDataFullImage1_BonnData_fullimage_e250_es.pt','BonnDataFullImage_pretrain_GloSatFullImage1_GloSat_fullimage_e250_es_BonnData_fullimage_e250_es.pt'])
+    #drawimg_allmodels(datasetname="GloSat",
+    #                  imgpath=f"{Path(__file__).parent.absolute()}/../../data/GloSat/preprocessed/98/98.jpg",
+    #                  datasetaddon_pred="test1", rcnnmodels=['GloSatFullImage1_GloSat_fullimage_e250_es.pt',
+    #                                                                 'GloSatFullImage_random_GloSat_fullimage_e250_random_init_es.pt'])
+    #drawimg_allmodels(datasetname="Tablesinthewild/curved", imgpath=f'{Path(__file__).parent.absolute()}/../../data/Tablesinthewild/preprocessed/curved/mit_google_image_search-10918758-7f5f72bb8440c9caf8b07b28ffdc54d33bd370ab/mit_google_image_search-10918758-7f5f72bb8440c9caf8b07b28ffdc54d33bd370ab.jpg', rcnnmodels=['testseveralcalls_4_with_valid_split_Tablesinthewild_fullimage_e50_es.pt', 'testseveralcalls_valid_random_init_e_250_es.pt'])
+    drawimg_allmodels(datasetname="GloSat",
+                      imgpath=f"{Path(__file__).parent.absolute()}/../../data/GloSat/preprocessed/457/457.jpg",
+                      datasetaddon_pred="test1", rcnnmodels=['GloSatFullImage1_GloSat_fullimage_e250_es.pt',
+                                                             'GloSatFullImage_random_GloSat_fullimage_e250_random_init_es.pt'])
+    drawimg_allmodels(datasetname="GloSat",
+                      imgpath=f"{Path(__file__).parent.absolute()}/../../data/GloSat/preprocessed/471/471.jpg",
+                      datasetaddon_pred="test1", rcnnmodels=['GloSatFullImage1_GloSat_fullimage_e250_es.pt',
+                                                             'GloSatFullImage_random_GloSat_fullimage_e250_random_init_es.pt'])
     # drawimg_varformat(savepath=f"{Path(__file__).parent.absolute()}/../../images/rcnn/BonnTables/test",
     #                  impath=f"{Path(__file__).parent.absolute()}/../../data/BonnData/Tabellen/test/IMG_20190821_132903/IMG_20190821_132903_table_0.jpg",
     #                  groundpath=f"{Path(__file__).parent.absolute()}/../../data/BonnData/Tabellen/test/IMG_20190821_132903/IMG_20190821_132903_cell_0.pt",
