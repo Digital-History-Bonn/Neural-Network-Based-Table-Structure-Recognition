@@ -1,15 +1,11 @@
 import glob
 import json
-import os
 from pathlib import Path
 from typing import List
 
 import torch
-from matplotlib import pyplot as plt
-from PIL import Image
 from torchvision.io import read_image
 from torchvision.models.detection import fasterrcnn_resnet50_fpn, FasterRCNN_ResNet50_FPN_Weights
-from torchvision.utils import draw_bounding_boxes
 from tqdm import tqdm
 
 from src.historicdocumentprocessing.kosmos_eval import (
@@ -18,12 +14,14 @@ from src.historicdocumentprocessing.kosmos_eval import (
 )
 from src.historicdocumentprocessing.util.tablesutil import remove_invalid_bbox
 from src.historicdocumentprocessing.postprocessing import postprocess
+from src.historicdocumentprocessing.util.visualisationutil import drawimg_varformat_inner
 
-def drawimg_allmodels(datasetname:str, imgpath:str, rcnnmodels:List[str], datasetaddon_pred:str=None, valid:bool = True):
+
+def drawimg_allmodels(datasetname:str, imgpath:str, rcnnmodels:List[str], datasetaddon_pred:str=None, datasetaddon_additional:str="", valid:bool = True):
     imname = imgpath.split("/")[-1].split(".")[-2]
     groundpath = f"{Path(__file__).parent.absolute()}/../../data/{datasetname.split('/')[-2]}/preprocessed/{datasetname.split('/')[-1]}" if "/" in datasetname else f"{Path(__file__).parent.absolute()}/../../data/{datasetname}/test"
     groundpath = f"{groundpath}/{imname}"
-    predpath_kosmos = f'{f"{Path(__file__).parent.absolute()}/../../results/kosmos25/{datasetname}/{imname}/{imname}" if not datasetaddon_pred else f"{Path(__file__).parent.absolute()}/../../results/kosmos25/{datasetname}/{datasetaddon_pred}/{imname}/{imname}"}.jpg.json'
+    predpath_kosmos = f'{f"{Path(__file__).parent.absolute()}/../../results/kosmos25/{datasetname}{datasetaddon_additional}/{imname}/{imname}" if not datasetaddon_pred else f"{Path(__file__).parent.absolute()}/../../results/kosmos25/{datasetname}/{datasetaddon_pred}/{imname}/{imname}"}.jpg.json'
     predpath_kosmos_postprocessed = f"{Path(__file__).parent.absolute()}/../../results/kosmos25/postprocessed/fullimg/{datasetname}/eps_3.0_1.5/withoutoutlier_excludeoutliers_glosat/{imname}/{imname}.pt"
     predpath_rcnn_postprocessed = f"{Path(__file__).parent.absolute()}/../../results/fasterrcnn/postprocessed/fullimg/{datasetname}"
     for name, path in zip(['not_postprocessed', 'postprocessed'], [predpath_kosmos, predpath_kosmos_postprocessed]):
@@ -61,12 +59,13 @@ def drawimg_allmodels(datasetname:str, imgpath:str, rcnnmodels:List[str], datase
             filter = 0.7
         fullimagepredbox_filtered = remove_invalid_bbox(output["boxes"][output["scores"]>filter])
         fullimagepredbox = remove_invalid_bbox(output["boxes"])
+        #print("imgpath", imgpath)
         drawimg_varformat_inner(impath=imgpath, box=fullimagepredbox, groundpath=groundpath, savepath=f"{Path(__file__).parent.absolute()}/../../images/fasterrcnn/{modelpath.split('/')[-1]}")
         drawimg_varformat_inner(impath=imgpath, box=fullimagepredbox_filtered, groundpath=groundpath,
-                            savepath=f"{Path(__file__).parent.absolute()}/../../images/fasterrcnn/{modelpath.split('/')[-1]}/filtered_{filter}{'_valid' if valid else ''}")
+                                savepath=f"{Path(__file__).parent.absolute()}/../../images/fasterrcnn/{modelpath.split('/')[-1]}/filtered_{filter}{'_valid' if valid else ''}")
         filtered_processed = postprocess(fullimagepredbox_filtered, imname=imname, saveloc= f"{Path(__file__).parent.absolute()}/../../images/test.pt", minsamples=[2, 3])
         drawimg_varformat_inner(impath=imgpath, box=filtered_processed, groundpath=groundpath,
-                            savepath=f"{Path(__file__).parent.absolute()}/../../images/fasterrcnn/{modelpath.split('/')[-1]}/filtered_{filter}{'_valid' if valid else ''}_postprocessed")
+                                savepath=f"{Path(__file__).parent.absolute()}/../../images/fasterrcnn/{modelpath.split('/')[-1]}/filtered_{filter}{'_valid' if valid else ''}_postprocessed")
 
 def drawimg_varformat(
     impath: str = f"{Path(__file__).parent.absolute()}/../../data/BonnData/test/Konflikttabelle.jpg",
@@ -99,76 +98,8 @@ def drawimg_varformat(
     if not box.numel():
         print(predpath.split("/")[-1])
 
-    drawimg_varformat_inner(box, groundpath, impath, savepath)
+    drawimg_varformat_inner(box=box, groundpath=groundpath, impath=impath, savepath=savepath)
     # plt.show()
-
-
-def drawimg_varformat_inner(box, groundpath, impath, savepath):
-    img = read_image(impath)
-    labels = ["Pred" for i in range(box.shape[0])]
-    colors = ["green" for i in range(box.shape[0])]
-    if groundpath:
-        if "json" in groundpath:
-            with open(groundpath) as s:
-                gbox = extractboxes(json.load(s))
-        elif "pt" in groundpath:
-            gbox = torch.load(groundpath)
-        else:
-            gbox = reversetablerelativebboxes_outer(groundpath)
-        labels.extend(["Ground"] * gbox.shape[0])
-        colors.extend(["red"] * gbox.shape[0])
-        # print(gbox)
-        box = torch.vstack((box, gbox))
-    # print(labels, colors, box)
-    # print(gbox.shape, box.shape)
-    # print(img.shape)
-    # print(predpath)
-    # print(gbox)
-    # newbox = remove_invalid_bbox(box, impath)
-    try:
-        image = draw_bounding_boxes(image=img, boxes=box, labels=labels, colors=colors)
-    except ValueError:
-        # print(predpath)
-        # print(box)
-        newbox = remove_invalid_bbox(box, impath)
-        labels = ["Pred" for i in range(newbox.shape[0])]
-        image = draw_bounding_boxes(
-            image=img, boxes=newbox, labels=labels, colors=colors
-        )
-    # plt.imshow(image.permute(1, 2, 0))
-    if savepath:
-        os.makedirs(savepath, exist_ok=True)
-        identifier = impath.split("/")[-1].split(".")[-2]
-        # plt.savefig(f"{savepath}/{identifier}")
-        # cv2.imwrite(img=image.numpy(), filename=f"{savepath}/{identifier}.jpg")
-        img = Image.fromarray(image.permute(1, 2, 0).numpy())
-        # print(f"{savepath}/{identifier}.jpg")
-        img.save(f"{savepath}/{identifier}.jpg")
-
-
-def drawimg(
-    impath: str = f"{Path(__file__).parent.absolute()}/../../data/BonnData/test/Konflikttabelle.jpg",
-    jsonpath: str = f"{Path(__file__).parent.absolute()}/../../results/kosmos25/Konflikttabelle.jpg.json",
-    savepath: str = None,
-):
-    # img = plt.imread(impath)
-    # img.setflags(write=1)
-    # img = img.copy()
-    # print(img.flags)
-    img = read_image(impath)
-    with open(jsonpath) as s:
-        box = extractboxes(json.load(s))
-    # print(img.shape)
-    image = draw_bounding_boxes(image=img, boxes=box)
-    plt.imshow(image.permute(1, 2, 0))
-    if savepath:
-        os.makedirs(savepath, exist_ok=True)
-        identifier = impath.split("/")[-1].split(".")[-2]
-        # plt.savefig(f"{savepath}/{identifier}")
-        # cv2.imwrite(img=image.numpy(), filename=f"{savepath}/{identifier}.jpg")
-        img = Image.fromarray(image.permute(1, 2, 0).numpy())
-        img.save(f"{savepath}/{identifier}.jpg")
-    plt.show()
 
 
 def drawimages(
@@ -246,11 +177,39 @@ def main():
 
 if __name__ == "__main__":
     #drawimg_allmodels(datasetname="BonnData", imgpath=f"{Path(__file__).parent.absolute()}/../../data/BonnData/preprocessed/I_HA_Rep_89_Nr_16160_0227/I_HA_Rep_89_Nr_16160_0227.jpg", datasetaddon_pred="Tabellen/test", rcnnmodels=['BonnDataFullImage1_BonnData_fullimage_e250_es.pt','BonnDataFullImage_pretrain_GloSatFullImage1_GloSat_fullimage_e250_es_BonnData_fullimage_e250_es.pt'])
+    #drawimg_allmodels(datasetname="BonnData",
+    #                  imgpath=f"{Path(__file__).parent.absolute()}/../../data/BonnData/preprocessed/I_HA_Rep_89_Nr_16160_0170/I_HA_Rep_89_Nr_16160_0170.jpg",
+    #                  datasetaddon_pred="Tabellen/test", rcnnmodels=['BonnDataFullImage1_BonnData_fullimage_e250_es.pt',
+    #                                                                 'BonnDataFullImage_pretrain_GloSatFullImage1_GloSat_fullimage_e250_es_BonnData_fullimage_e250_es.pt'])
     #drawimg_allmodels(datasetname="GloSat",
     #                  imgpath=f"{Path(__file__).parent.absolute()}/../../data/GloSat/preprocessed/98/98.jpg",
     #                  datasetaddon_pred="test1", rcnnmodels=['GloSatFullImage1_GloSat_fullimage_e250_es.pt',
     #                                                                 'GloSatFullImage_random_GloSat_fullimage_e250_random_init_es.pt'])
     #drawimg_allmodels(datasetname="Tablesinthewild/curved", imgpath=f'{Path(__file__).parent.absolute()}/../../data/Tablesinthewild/preprocessed/curved/mit_google_image_search-10918758-7f5f72bb8440c9caf8b07b28ffdc54d33bd370ab/mit_google_image_search-10918758-7f5f72bb8440c9caf8b07b28ffdc54d33bd370ab.jpg', rcnnmodels=['testseveralcalls_4_with_valid_split_Tablesinthewild_fullimage_e50_es.pt', 'testseveralcalls_valid_random_init_e_250_es.pt'])
+    drawimg_allmodels(datasetname="Tablesinthewild/extremeratio",
+                      imgpath=f'{Path(__file__).parent.absolute()}/../../data/Tablesinthewild/preprocessed/extremeratio/customs-declaration-12039/customs-declaration-12039.jpg',
+                      rcnnmodels=['testseveralcalls_4_with_valid_split_Tablesinthewild_fullimage_e50_es.pt',
+                                  'testseveralcalls_valid_random_init_e_250_es.pt'], datasetaddon_additional="1")
+    drawimg_allmodels(datasetname="Tablesinthewild/Inclined",
+                      imgpath=f'{Path(__file__).parent.absolute()}/../../data/Tablesinthewild/preprocessed/Inclined/car-invoice-img03807/car-invoice-img03807.jpg',
+                      rcnnmodels=['testseveralcalls_4_with_valid_split_Tablesinthewild_fullimage_e50_es.pt',
+                                  'testseveralcalls_valid_random_init_e_250_es.pt'], datasetaddon_additional="1")
+    drawimg_allmodels(datasetname="Tablesinthewild/muticolorandgrid",
+                      imgpath=f'{Path(__file__).parent.absolute()}/../../data/Tablesinthewild/preprocessed/muticolorandgrid/1023c6c68d37ed3366fe808dc0d4ab56ba98114f/1023c6c68d37ed3366fe808dc0d4ab56ba98114f.jpg',
+                      rcnnmodels=['testseveralcalls_4_with_valid_split_Tablesinthewild_fullimage_e50_es.pt',
+                                  'testseveralcalls_valid_random_init_e_250_es.pt'], datasetaddon_additional="1")
+    drawimg_allmodels(datasetname="Tablesinthewild/occblu",
+                      imgpath=f'{Path(__file__).parent.absolute()}/../../data/Tablesinthewild/preprocessed/occblu/Commodity_lst_Medical_SciTSRO1CN01bXt1zh20dshY2Fc3f_!!6000000006873-0-lxb/Commodity_lst_Medical_SciTSRO1CN01bXt1zh20dshY2Fc3f_!!6000000006873-0-lxb.jpg',
+                      rcnnmodels=['testseveralcalls_4_with_valid_split_Tablesinthewild_fullimage_e50_es.pt',
+                                  'testseveralcalls_valid_random_init_e_250_es.pt'])
+    drawimg_allmodels(datasetname="Tablesinthewild/overlaid",
+                      imgpath=f'{Path(__file__).parent.absolute()}/../../data/Tablesinthewild/preprocessed/overlaid/IMG_0437/IMG_0437.jpg',
+                      rcnnmodels=['testseveralcalls_4_with_valid_split_Tablesinthewild_fullimage_e50_es.pt',
+                                  'testseveralcalls_valid_random_init_e_250_es.pt'])
+    drawimg_allmodels(datasetname="Tablesinthewild/simple",
+                      imgpath=f'{Path(__file__).parent.absolute()}/../../data/Tablesinthewild/preprocessed/simple/dkl-10-4/dkl-10-4.jpg',
+                      rcnnmodels=['testseveralcalls_4_with_valid_split_Tablesinthewild_fullimage_e50_es.pt',
+                                  'testseveralcalls_valid_random_init_e_250_es.pt'])
     drawimg_allmodels(datasetname="GloSat",
                       imgpath=f"{Path(__file__).parent.absolute()}/../../data/GloSat/preprocessed/457/457.jpg",
                       datasetaddon_pred="test1", rcnnmodels=['GloSatFullImage1_GloSat_fullimage_e250_es.pt',
