@@ -6,7 +6,7 @@ import shutil
 import warnings
 from logging import warning
 from pathlib import Path
-from typing import List
+from typing import List, Dict
 
 import torch
 from bs4 import BeautifulSoup
@@ -15,7 +15,9 @@ from torchvision.io import read_image
 from torchvision.transforms.functional import pil_to_tensor
 from torchvision.utils import draw_bounding_boxes
 from tqdm import tqdm
+from scipy.cluster.hierarchy import DisjointSet
 
+from src.historicdocumentprocessing.kosmos_eval import reversetablerelativebboxes_inner
 from src.historicdocumentprocessing.util.tablesutil import (
     getsurroundingtable,
     gettablerelativebboxes,
@@ -300,6 +302,83 @@ def processdata_wildtable_tablerelative(
     # print(tablelist, celllist)
     return tablelist, celllist
 
+def processdata_wildtable_rowcoll( datapath: str,
+) -> (List[torch.Tensor], List[torch.Tensor]):
+    with open(datapath) as d:
+        xml = BeautifulSoup(d, "xml")
+    #columns: Dict[int, torch.Tensor] = {}  # dictionary of columns and their points
+    #rows: Dict[int, torch.Tensor] = {}  # dictionary of rows and their points
+    #col_joins = []  # list of join operations for columns
+    #row_joins = []  # list of join operations for rows
+    tables : Dict[int, List[Dict]] = {}
+    for box in xml.find_all("bndbox"):
+        new = torch.tensor(
+            [
+                int(float(box.xmin.get_text())),
+                int(float(box.ymin.get_text())),
+                int(float(box.xmax.get_text())),
+                int(float(box.ymax.get_text())),
+            ],
+            dtype=torch.float,
+        )
+        if new[0] < new[2] and new[1] < new[3]:
+            if int(box.tableid.get_text()) in tables.keys():
+                tables[int(box.tableid.get_text())]+=[{"bbox":new, "startcol": int(box.startcol.get_text()), "endcol" : int(box.endcol.get_text()),
+                                                                "startrow" : int(box.startrow.get_text()), "endrow" : int(box.endrow.get_text())}]
+            else:
+                #tables.update({int(box.tableid.get_text()):[new]})
+                tables.update({int(box.tableid.get_text()): [{"bbox":new, "startcol": int(box.startcol.get_text()), "endcol" : int(box.endcol.get_text()),
+                                                                "startrow" : int(box.startrow.get_text()), "endrow" : int(box.endrow.get_text())}]})
+
+    finaltables : List[Dict] = []
+    for t in tables.keys():
+        columns: Dict[int, torch.Tensor] = {}  # dictionary of columns and their points
+        rows: Dict[int, torch.Tensor] = {}  # dictionary of rows and their points
+        col_joins = []  # list of join operations for columns
+        row_joins = []  # list of join operations for rows
+        cells = []
+        for box in tables[t]:
+            # print(new)
+            new = box["bbox"]
+            if new[0] < new[2] and new[1] < new[3]:
+                #startcol = int(box.startcol.get_text())
+                cells+=[new]
+                startcol = box["startcol"]
+                endcol = box["endcol"]
+                startrow = box["startrow"]
+                endrow = box["endrow"]
+                #endcol = int(box.endcol.get_text())
+                #startrow = int(box.startrow.get_text())
+                #endrow = int(box.endrow.get_text())
+                for i in range(startcol, endcol + 1):
+                    if i in columns.keys():
+                        columns[i] = torch.vstack((columns[i], new))
+                        col_joins += [[startcol, i]]
+                    else:
+                        columns.update({i: new})
+                        col_joins += [[startcol, i]]
+                for i in range(startrow, endrow+1):
+                    if i in rows.keys():
+                        rows[i] = torch.vstack((rows[i], new))
+                        row_joins += [[startrow, i]]
+                    else:
+                        rows.update({i:new})
+                        row_joins += [[startrow, i]]
+        col_set = DisjointSet(columns.keys())
+        for joinop in col_joins:
+            col_set.merge(joinop[0], joinop[1])
+        finalcols = []
+        for subset in col_set.subsets():
+            finalcols+=[getsurroundingtable(torch.vstack(([columns[t] for t in subset])))]
+
+        row_set = DisjointSet(rows.keys())
+        for joinop in row_joins:
+            row_set.merge(joinop[0], joinop[1])
+        finalrows = []
+        for subset in row_set.subsets():
+            finalrows+=[getsurroundingtable(torch.vstack([rows[t] for t in subset]))]
+        finaltables+= [{"rows":gettablerelativebboxes(torch.vstack(finalrows)), "cols":gettablerelativebboxes(torch.vstack(finalcols)), "cells": gettablerelativebboxes(torch.vstack(cells)), "table":getsurroundingtable(torch.vstack(cells)), "num": t}]
+    return finaltables
 
 def processdata_wildtable_outer(
     datapath: str = f"{Path(__file__).parent.absolute()}/../../data/Tablesinthewild/rawdata/train",
@@ -362,6 +441,35 @@ def processdata_wildtable_outer(
 
 
 if __name__ == "__main__":
+    tables = processdata_wildtable_rowcoll(f"{Path(__file__).parent.absolute()}/../../data/Tablesinthewild/rawdata/test/test-xml-revise/test-xml-revise/0hZg6EpcTdKXk6j44umj3gAAACMAAQED.xml")
+    print(tables)
+    table = tables[0]["table"]
+    rows = reversetablerelativebboxes_inner(tablebbox=table, cellbboxes=tables[0]["rows"])
+    colls = reversetablerelativebboxes_inner(tablebbox=table, cellbboxes=tables[0]["cols"])
+    cells = reversetablerelativebboxes_inner(tablebbox=table, cellbboxes=tables[0]["cells"])
+    #rows, colls = processdata_wildtable_rowcoll(f"{Path(__file__).parent.absolute()}/../../data/Tablesinthewild/rawdata/test/test-xml-revise/test-xml-revise/0hZg6EpcTdKXk6j44umj3gAAACMAAQED.xml")
+    img = read_image(f"{Path(__file__).parent.absolute()}/../../data/Tablesinthewild/rawdata/test/images/0hZg6EpcTdKXk6j44umj3gAAACMAAQED.jpg")
+    cellimg = draw_bounding_boxes(image=img, boxes=cells, colors=["black" for i in range(len(cells))],
+                                 labels=["cell" for i in range(len(cells))])
+    cellimg = Image.fromarray(cellimg.permute(1, 2, 0).numpy())
+    cellimg.save(f"{Path(__file__).parent.absolute()}/../../images/celltest.jpg")
+    rowimg = draw_bounding_boxes(image=img, boxes=rows, colors=["black" for i in range(len(rows))], labels=["row" for i in range(len(rows))])
+    colimg = draw_bounding_boxes(image=img, boxes=colls, colors=["black" for i in range(len(colls))], labels=["col" for i in range(len(colls))])
+    rowimg= Image.fromarray(rowimg.permute(1, 2, 0).numpy())
+    rowimg.save(f"{Path(__file__).parent.absolute()}/../../images/rowtest1.jpg")
+    colimg= Image.fromarray(colimg.permute(1, 2, 0).numpy())
+    colimg.save(f"{Path(__file__).parent.absolute()}/../../images/coltest1.jpg")
+
+    #rows, colls = processdata_wildtable_rowcoll(
+    #    f"{Path(__file__).parent.absolute()}/../../data/Tablesinthewild/rawdata/test/test-xml-revise/test-xml-revise/0hZg6EpcTdKXk6j44umj3gAAACMAAQED.xml")
+    #img = read_image(
+    #    f"{Path(__file__).parent.absolute()}/../../data/Tablesinthewild/rawdata/test/images/0hZg6EpcTdKXk6j44umj3gAAACMAAQED.jpg")
+    #rowimg = draw_bounding_boxes(image=img, boxes=rows, colors=["black" for i in range(len(rows))])
+    #colimg = draw_bounding_boxes(image=img, boxes=colls, colors=["black" for i in range(len(colls))])
+    #rowimg = Image.fromarray(rowimg.permute(1, 2, 0).numpy())
+    #rowimg.save(f"{Path(__file__).parent.absolute()}/../../images/rowtest.jpg")
+    #colimg = Image.fromarray(colimg.permute(1, 2, 0).numpy())
+    #colimg.save(f"{Path(__file__).parent.absolute()}/../../images/coltest.jpg")
     # processdata_wildtable_outer(tablerelative=True)
     # processdata_wildtable_inner(f"{Path(__file__).parent.absolute()}/../../data/Tablesinthewild/test/test-xml-revise/test-xml-revise/0hZg6EpcTdKXk6j44umj3gAAACMAAQED.xml")
     pass
