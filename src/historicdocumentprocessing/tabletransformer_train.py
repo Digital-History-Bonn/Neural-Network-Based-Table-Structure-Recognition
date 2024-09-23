@@ -46,7 +46,9 @@ from src.historicdocumentprocessing.tabletransformer_dataset import CustomDatase
 class TableTransformer(pl.LightningModule):
      def __init__(self, lr, lr_backbone, weight_decay, testdataset: CustomDataset, traindataset:CustomDataset, valdataset:CustomDataset=None, datasetname:str = "BonnData", savepath:str=None):
          super().__init__()
-         self.model = AutoModelForObjectDetection.from_pretrained("microsoft/table-transformer-structure-recognition-v1.1-all").to(self.device)
+         #self.model = AutoModelForObjectDetection.from_pretrained("microsoft/table-transformer-structure-recognition-v1.1-all").to(self.device)
+         self.model = AutoModelForObjectDetection.from_pretrained(
+             "microsoft/table-transformer-structure-recognition").to(self.device)
          # see https://github.com/PyTorchLightning/pytorch-lightning/pull/1896
          #print(model.config.id2label)
          self.lr = lr
@@ -121,18 +123,21 @@ class TableTransformer(pl.LightningModule):
         boxes = {
             "ground truth": self.train_example_target,
             "prediction": pred["boxes"].detach().cpu(),
+            "labels" : pred["labels"].detach().cpu()
         }
         colors = ["green" for i in range(boxes["prediction"].shape[0])] + [
             "red" for i in range(boxes["ground truth"].shape[0])
         ]
-        labels = ["Pred" for i in range(boxes["prediction"].shape[0])] + [
-            "Ground" for i in range(boxes["ground truth"].shape[0])
-        ]
+        #labels = ["Pred" for i in range(boxes["prediction"].shape[0])] + [
+        #    "Ground" for i in range(boxes["ground truth"].shape[0])
+        #]
+        labels = [str(self.model.config.id2label[label]) for label in boxes["labels"].tolist()] + ["Ground" for i in range(boxes["ground truth"].shape[0])]
+
         result = draw_bounding_boxes(
             image=pil_to_tensor(self.train_example_image).to(torch.uint8),
             boxes=torch.vstack((boxes["prediction"], boxes["ground truth"])),
             colors=colors,
-            labels=labels,
+            labels=labels
         )
         self.writer.add_image(
             "Train/example", result[:, ::2, ::2], global_step=self.global_step
@@ -266,7 +271,7 @@ def get_args() -> argparse.Namespace:
 if __name__=='__main__':
     args = get_args()
     name = (
-        f"tabletransformer_v1.1-all_{args.name}_{args.dataset}_{args.objective}"
+        f"tabletransformer_v0_new_{args.name}_{args.dataset}_{args.objective}"
         f"{'_aug' if args.augmentations else ''}_e{args.epochs}"
         f"{f'_init_{args.load_}' if args.load else ''}"
     #    f"{'_random_init' if args.randominit else ''}"

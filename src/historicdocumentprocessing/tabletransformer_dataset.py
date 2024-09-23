@@ -84,10 +84,13 @@ class CustomDataset(Dataset):  # type: ignore
             pass
         #self.ImageProcessor = DetrImageProcessor.from_pretrained("facebook/detr-resnet-50")
         #see https://github.com/microsoft/table-transformer/blob/16d124f616109746b7785f03085100f1f6247575/src/inference.py#L45 for table transformer size and img mean,std values
-        self.ImageProcessor = AutoImageProcessor.from_pretrained("microsoft/table-transformer-structure-recognition-v1.1-all", size={"shortest_edge":1000, "longest_edge":1000})
-        #print(self.ImageProcessor.size['longest_edge']) #, self.ImageProcessor.size['shortest_edge'])
+        #self.ImageProcessor = AutoImageProcessor.from_pretrained("microsoft/table-transformer-structure-recognition-v1.1-all", size={"shortest_edge":1000, "longest_edge":1000})
+        #self.ImageProcessor = AutoImageProcessor.from_pretrained("microsoft/table-transformer-structure-recognition-v1.1-all", size={"shortest_edge":800, "longest_edge":1000})
+        self.ImageProcessor = AutoImageProcessor.from_pretrained("microsoft/table-transformer-structure-recognition")
+        #print(self.ImageProcessor.size['longest_edge'],self.ImageProcessor.size['shortest_edge'])
         #print(self.ImageProcessor.image_mean, self.ImageProcessor.image_std)
-        assert self.ImageProcessor.size['longest_edge']==self.ImageProcessor.size['shortest_edge']==1000
+        #assert self.ImageProcessor.size['longest_edge']==self.ImageProcessor.size['shortest_edge']==1000
+        #assert self.ImageProcessor.size['longest_edge'] == 1000 and self.ImageProcessor.size['shortest_edge'] == 800
         assert self.ImageProcessor.image_mean==[0.485, 0.456, 0.406]
         assert self.ImageProcessor.image_std==[0.229, 0.224, 0.225]
         self.objective = objective
@@ -128,7 +131,8 @@ class CustomDataset(Dataset):  # type: ignore
                     # get bbox area
                     area = ops.box_area(target)
                     # convert bboxes to coco format
-                    target = ops.box_convert(target, in_fmt='xyxy', out_fmt='cxcywh')
+                    #target = ops.box_convert(target, in_fmt='xyxy', out_fmt='cxcywh')
+                    target = ops.box_convert(target, in_fmt='xyxy', out_fmt='xywh')
                     assert area.shape[0] == target.shape[0]
                     annotations["annotations"]+=[
                         {'image_id': index, 'category_id': id, "iscrowd": 0, "area": area[i], "bbox": target[i].tolist()}
@@ -136,6 +140,7 @@ class CustomDataset(Dataset):  # type: ignore
                 tables = torch.load(glob.glob(f"{self.data[index]}/*tables.pt")[0])
                 area = ops.box_area(tables)
                 # convert bboxes to coco format
+                #target = ops.box_convert(tables, in_fmt='xyxy', out_fmt='cxcywh')
                 target = ops.box_convert(tables, in_fmt='xyxy', out_fmt='xywh')
                 assert area.shape[0] == target.shape[0]
                 annotations["annotations"]+=[
@@ -161,7 +166,7 @@ class CustomDataset(Dataset):  # type: ignore
         #annotations = {'image_id':index, 'annotations': [{'image_id':index, 'category_id':0, "iscrowd":0, "area": area[i], "bbox": target[i].tolist()} for i in range(target.shape[0])]}
         #if self.dataset=="BonnData" and include_textregions
         #print(annotations)
-        encoding = self.ImageProcessor(images=img, annotations=annotations, do_pad=False, return_tensors="pt")
+        encoding = self.ImageProcessor(images=img, annotations=annotations, return_tensors="pt")
         # if img.shape[0]!=3:
         #    print(self.data[index])
         #print(encoding.keys())
