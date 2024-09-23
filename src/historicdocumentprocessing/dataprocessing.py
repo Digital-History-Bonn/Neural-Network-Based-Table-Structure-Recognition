@@ -331,6 +331,7 @@ def processdata_wildtable_rowcoll( datapath: str,
                                                                 "startrow" : int(box.startrow.get_text()), "endrow" : int(box.endrow.get_text())}]})
 
     finaltables : List[Dict] = []
+    print(tables)
     for t in tables.keys():
         columns: Dict[int, torch.Tensor] = {}  # dictionary of columns and their points
         rows: Dict[int, torch.Tensor] = {}  # dictionary of rows and their points
@@ -382,7 +383,7 @@ def processdata_wildtable_rowcoll( datapath: str,
 
 def processdata_wildtable_outer(
     datapath: str = f"{Path(__file__).parent.absolute()}/../../data/Tablesinthewild/rawdata/train",
-    tablerelative=False,
+    tablerelative=False, rowcol=True
 ):
     xmlfolder = f"{datapath}/xml"
     imfolder = f"{datapath}/images"
@@ -409,6 +410,34 @@ def processdata_wildtable_outer(
                 print(impath)
         else:
             warnings.warn("empty bbox, image not added to preprocessed training data")
+        if rowcol:
+            tables = processdata_wildtable_rowcoll(xml)
+            tablelist = []
+            for n, table in enumerate(tables):
+                tab = tables[n]["table"]
+                tablelist += [tab]
+                img = Image.open(impath)
+                tableimg = img.crop(tuple(tab.to(int).tolist()))
+                tableimg.save(
+                    f"{tarfolder}/{xml.split('/')[-1].split('.')[-3]}_table_{n}.jpg"
+                )
+                rows = tables[n]["rows"]
+                colls = tables[n]["cols"]
+                cells = tables[n]["cells"]
+                torch.save(
+                    cells,
+                    f"{tarfolder}/{xml.split('/')[-1].split('.')[-3]}_cell_{n}.pt",
+                )
+                torch.save(
+                    rows,
+                    f"{tarfolder}/{xml.split('/')[-1].split('.')[-3]}_row_{n}.pt",
+                )
+                torch.save(
+                    colls,
+                    f"{tarfolder}/{xml.split('/')[-1].split('.')[-3]}_col_{n}.pt",
+                )
+            tablefile= torch.vstack(tablelist)
+            torch.save(tablefile, f"{tarfolder}/{xml.split('/')[-1].split('.')[-3]}_tables.pt")
 
         if tablerelative:
             tablelist, celllist = processdata_wildtable_tablerelative(xml)
@@ -441,24 +470,29 @@ def processdata_wildtable_outer(
 
 
 if __name__ == "__main__":
-    tables = processdata_wildtable_rowcoll(f"{Path(__file__).parent.absolute()}/../../data/Tablesinthewild/rawdata/test/test-xml-revise/test-xml-revise/0hZg6EpcTdKXk6j44umj3gAAACMAAQED.xml")
+    #tables = processdata_wildtable_rowcoll(f"{Path(__file__).parent.absolute()}/../../data/Tablesinthewild/rawdata/test/test-xml-revise/test-xml-revise/0hZg6EpcTdKXk6j44umj3gAAACMAAQED.xml")
+    #print(tables)
+    img = read_image(
+        f"{Path(__file__).parent.absolute()}/../../data/Tablesinthewild/rawdata/test/images/mit_google_image_search-10918758-7f5f72bb8440c9caf8b07b28ffdc54d33bd370ab.jpg")
+    tables = processdata_wildtable_rowcoll(f"{Path(__file__).parent.absolute()}/../../data/Tablesinthewild/rawdata/test/test-xml-revise/test-xml-revise/mit_google_image_search-10918758-7f5f72bb8440c9caf8b07b28ffdc54d33bd370ab.xml")
     print(tables)
-    table = tables[0]["table"]
-    rows = reversetablerelativebboxes_inner(tablebbox=table, cellbboxes=tables[0]["rows"])
-    colls = reversetablerelativebboxes_inner(tablebbox=table, cellbboxes=tables[0]["cols"])
-    cells = reversetablerelativebboxes_inner(tablebbox=table, cellbboxes=tables[0]["cells"])
-    #rows, colls = processdata_wildtable_rowcoll(f"{Path(__file__).parent.absolute()}/../../data/Tablesinthewild/rawdata/test/test-xml-revise/test-xml-revise/0hZg6EpcTdKXk6j44umj3gAAACMAAQED.xml")
-    img = read_image(f"{Path(__file__).parent.absolute()}/../../data/Tablesinthewild/rawdata/test/images/0hZg6EpcTdKXk6j44umj3gAAACMAAQED.jpg")
-    cellimg = draw_bounding_boxes(image=img, boxes=cells, colors=["black" for i in range(len(cells))],
-                                 labels=["cell" for i in range(len(cells))])
-    cellimg = Image.fromarray(cellimg.permute(1, 2, 0).numpy())
-    cellimg.save(f"{Path(__file__).parent.absolute()}/../../images/celltest.jpg")
-    rowimg = draw_bounding_boxes(image=img, boxes=rows, colors=["black" for i in range(len(rows))], labels=["row" for i in range(len(rows))])
-    colimg = draw_bounding_boxes(image=img, boxes=colls, colors=["black" for i in range(len(colls))], labels=["col" for i in range(len(colls))])
-    rowimg= Image.fromarray(rowimg.permute(1, 2, 0).numpy())
-    rowimg.save(f"{Path(__file__).parent.absolute()}/../../images/rowtest1.jpg")
-    colimg= Image.fromarray(colimg.permute(1, 2, 0).numpy())
-    colimg.save(f"{Path(__file__).parent.absolute()}/../../images/coltest1.jpg")
+    for n,table in enumerate(tables):
+        tab = tables[n]["table"]
+        rows = reversetablerelativebboxes_inner(tablebbox=tab, cellbboxes=tables[n]["rows"])
+        colls = reversetablerelativebboxes_inner(tablebbox=tab, cellbboxes=tables[n]["cols"])
+        cells = reversetablerelativebboxes_inner(tablebbox=tab, cellbboxes=tables[n]["cells"])
+        #rows, colls = processdata_wildtable_rowcoll(f"{Path(__file__).parent.absolute()}/../../data/Tablesinthewild/rawdata/test/test-xml-revise/test-xml-revise/0hZg6EpcTdKXk6j44umj3gAAACMAAQED.xml")
+        #img = read_image(f"{Path(__file__).parent.absolute()}/../../data/Tablesinthewild/rawdata/test/images/0hZg6EpcTdKXk6j44umj3gAAACMAAQED.jpg")
+        cellimg = draw_bounding_boxes(image=img, boxes=cells, colors=["black" for i in range(len(cells))],
+                                     labels=["cell" for i in range(len(cells))])
+        cellimg = Image.fromarray(cellimg.permute(1, 2, 0).numpy())
+        cellimg.save(f"{Path(__file__).parent.absolute()}/../../images/celltest_multi_{n}.jpg")
+        rowimg = draw_bounding_boxes(image=img, boxes=rows, colors=["black" for i in range(len(rows))], labels=["row" for i in range(len(rows))])
+        colimg = draw_bounding_boxes(image=img, boxes=colls, colors=["black" for i in range(len(colls))], labels=["col" for i in range(len(colls))])
+        rowimg= Image.fromarray(rowimg.permute(1, 2, 0).numpy())
+        rowimg.save(f"{Path(__file__).parent.absolute()}/../../images/rowtest_multi_{n}.jpg")
+        colimg= Image.fromarray(colimg.permute(1, 2, 0).numpy())
+        colimg.save(f"{Path(__file__).parent.absolute()}/../../images/coltest_multi_{n}.jpg")
 
     #rows, colls = processdata_wildtable_rowcoll(
     #    f"{Path(__file__).parent.absolute()}/../../data/Tablesinthewild/rawdata/test/test-xml-revise/test-xml-revise/0hZg6EpcTdKXk6j44umj3gAAACMAAQED.xml")
