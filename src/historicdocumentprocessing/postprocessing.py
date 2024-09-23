@@ -25,7 +25,7 @@ from src.historicdocumentprocessing.kosmos_eval import (
     calcstats_overlap,
     extractboxes,
     get_dataframe,
-    reversetablerelativebboxes_outer,
+    reversetablerelativebboxes_outer, boxoverlap,
 )
 from src.historicdocumentprocessing.util.glosat_paper_postprocessing_method import (
     reconstruct_table,
@@ -36,6 +36,462 @@ from src.historicdocumentprocessing.util.tablesutil import (
     getsurroundingtable,
     remove_invalid_bbox,
 )
+from src.historicdocumentprocessing.util.visualisationutil import drawimg_varformat_inner
+
+def postprocess_rcnn_sep(modelpath=None, targetloc=None, datasetname=None, filter:bool=False,
+    iou_thresholds: List[float] = [0.5, 0.6, 0.7, 0.8, 0.9], epsprefactor = tuple([3.0, 1.5]),
+    minsamples: List[int] = [2, 3]):
+    saveloc = f"{Path(__file__).parent.absolute()}/../../results/fasterrcnn/testevalfinal1/fullimg/{datasetname}"
+    tableioulist = []
+    tablef1list = []
+    tablewf1list = []
+    tabletpsum = torch.zeros(len(iou_thresholds))
+    tablefpsum = torch.zeros(len(iou_thresholds))
+    tablefnsum = torch.zeros(len(iou_thresholds))
+    tableimagedf = pandas.DataFrame(
+        columns=["img", "mean pred iou", "mean tar iou", "wf1", "prednum"]
+    )
+    # --------------------------------------------------------------------------
+    cellioulist = []
+    cellf1list = []
+    cellwf1list = []
+    celltpsum = torch.zeros(len(iou_thresholds))
+    cellfpsum = torch.zeros(len(iou_thresholds))
+    cellfnsum = torch.zeros(len(iou_thresholds))
+    cellimagedf = pandas.DataFrame(
+        columns=["img", "mean pred iou", "mean tar iou", "wf1", "prednum"]
+    )
+    model = fasterrcnn_resnet50_fpn(
+        weights=FasterRCNN_ResNet50_FPN_Weights.DEFAULT,
+        **{"box_detections_per_img": 200},
+    )
+    model.load_state_dict(torch.load(modelpath))
+    if torch.cuda.is_available():
+        device = torch.device("cuda")
+        model.to(device)
+        model.eval()
+    else:
+        print("Cuda not available")
+        return
+    modelname = modelpath.split(os.sep)[-1]
+    saveloc = f"{saveloc}/{modelname}/iou_{'_'.join([str(iou_thresholds[0]), str(iou_thresholds[-1])])}/postprocessed"
+    if filter:
+        with open(f"{Path(__file__).parent.absolute()}/../../results/fasterrcnn/bestfilterthresholds/{modelname}.txt",
+                  'r') as f:
+            filtering = float(f.read())
+        saveloc = f"{saveloc}_filtering_{filtering}"
+    saveloc = f"{saveloc}/eps_{epsprefactor[0]}_{epsprefactor[1]}/minsamples_{minsamples[0]}_{minsamples[1]}/seperateeval"
+    for n, folder in tqdm(enumerate(glob.glob(f"{targetloc}/*"))):
+        # print(folder)
+        impath = f"{folder}/{folder.split('/')[-1]}.jpg"
+        imname = folder.split("/")[-1]
+        img = (read_image(impath) / 255).to(device)
+        output = model([img])
+        output = {k: v.detach().cpu() for k, v in output[0].items()}
+        # print(output['boxes'], output['boxes'][output['scores']>0.8])
+        if filter:
+            output["boxes"] = output["boxes"][output["scores"] > filtering]
+        fullimagepredbox = remove_invalid_bbox(output["boxes"])
+        tableprediou, tabletargetiou, tabletp, tablefp, tablefn = postprocess_eval_tablesep(
+            fullimagepredbox=fullimagepredbox, imname=imname, targetloc=targetloc, minsamples=minsamples,
+            epsprefactorchange=epsprefactor)
+        tableprec, tablerec, tablef1, tablewf1 = calcmetric(
+            tp=tabletp, fp=tablefp, fn=tablefn, iou_thresholds=iou_thresholds
+        )
+        tabletpsum += tabletp
+        tablefpsum += tablefp
+        tablefnsum += tablefn
+        tableioulist.append(tableprediou)
+        tablef1list.append(tablef1)
+        tablewf1list.append(tablewf1)
+
+        tableimagemetrics = {
+            "img": imname,
+            "mean pred iou": torch.mean(tableprediou).item(),
+            "mean tar iou": torch.mean(tabletargetiou).item(),
+            "wf1": tablewf1.item(),
+            "prednum": fullimagepredbox.shape[0],
+        }
+        tableimagemetrics.update(
+            {
+                f"prec@{iou_thresholds[i]}": tableprec[i].item()
+                for i in range(len(iou_thresholds))
+            }
+        )
+        tableimagemetrics.update(
+            {
+                f"recall@{iou_thresholds[i]}": tablerec[i].item()
+                for i in range(len(iou_thresholds))
+            }
+        )
+        tableimagemetrics.update(
+            {
+                f"f1@{iou_thresholds[i]}": tablef1[i].item()
+                for i in range(len(iou_thresholds))
+            }
+        )
+        tableimagemetrics.update(
+            {
+                f"tp@{iou_thresholds[i]}": tabletp[i].item()
+                for i in range(len(iou_thresholds))
+            }
+        )
+        tableimagemetrics.update(
+            {
+                f"fp@{iou_thresholds[i]}": tablefp[i].item()
+                for i in range(len(iou_thresholds))
+            }
+        )
+        tableimagemetrics.update(
+            {
+                f"fn@{iou_thresholds[i]}": tablefn[i].item()
+                for i in range(len(iou_thresholds))
+            }
+        )
+        tableimagedf = pandas.concat(
+            [tableimagedf, pandas.DataFrame(tableimagemetrics, index=[n])]
+        )
+
+        # -----------------------------------------------------------------------------------
+        # -----------------------------------------------------------------------------------
+
+        cellprediou, celltargetiou, celltp, cellfp, cellfn = postprocess_eval_cellsep(fullimagepredbox=fullimagepredbox,
+                                                                                      imname=imname,
+                                                                                      targetloc=targetloc,
+                                                                                      iou_thresholds=iou_thresholds)
+        # print(calcstats(fullimagepredbox, fullimagegroundbox,
+        #                                                               iou_thresholds=iou_thresholds, imname=preds.split('/')[-1]), fullfp, targets[0])
+        cellprec, cellrec, cellf1, cellwf1 = calcmetric(
+            celltp, cellfp, cellfn, iou_thresholds=iou_thresholds
+        )
+        celltpsum += celltp
+        cellfpsum += cellfp
+        cellfnsum += cellfn
+        cellioulist.append(cellprediou)
+        cellf1list.append(cellf1)
+        cellwf1list.append(cellwf1)
+
+        cellimagemetrics = {
+            "img": imname,
+            "mean pred iou": torch.mean(cellprediou).item(),
+            "mean tar iou": torch.mean(celltargetiou).item(),
+            "wf1": cellwf1.item(),
+            "prednum": fullimagepredbox.shape[0],
+        }
+        cellimagemetrics.update(
+            {
+                f"prec@{iou_thresholds[i]}": cellprec[i].item()
+                for i in range(len(iou_thresholds))
+            }
+        )
+        cellimagemetrics.update(
+            {
+                f"recall@{iou_thresholds[i]}": cellrec[i].item()
+                for i in range(len(iou_thresholds))
+            }
+        )
+        cellimagemetrics.update(
+            {
+                f"f1@{iou_thresholds[i]}": cellf1[i].item()
+                for i in range(len(iou_thresholds))
+            }
+        )
+        cellimagemetrics.update(
+            {
+                f"tp@{iou_thresholds[i]}": celltp[i].item()
+                for i in range(len(iou_thresholds))
+            }
+        )
+        cellimagemetrics.update(
+            {
+                f"fp@{iou_thresholds[i]}": cellfp[i].item()
+                for i in range(len(iou_thresholds))
+            }
+        )
+        cellimagemetrics.update(
+            {
+                f"fn@{iou_thresholds[i]}": cellfn[i].item()
+                for i in range(len(iou_thresholds))
+            }
+        )
+        cellimagedf = pandas.concat(
+            [cellimagedf, pandas.DataFrame(cellimagemetrics, index=[n])]
+        )
+
+    totaltabledf = get_dataframe(fnsum=tablefnsum, fpsum=tablefpsum, tpsum=tabletpsum)
+    totalcelldf = get_dataframe(fnsum=cellfnsum, tpsum=celltpsum, fpsum=cellfpsum)
+    conclusiondf = pandas.DataFrame(columns=["wf1"])
+    conclusiondf = pandas.concat(
+        [
+            conclusiondf,
+            pandas.DataFrame(totaltabledf, index=["table postprocessing iou"]),
+            pandas.DataFrame(
+                totalcelldf, index=["cell postprocessing iou (tables given)"]
+            ),
+        ]
+    )
+    os.makedirs(saveloc, exist_ok=True)
+    conclusiondf.to_csv(f"{saveloc}/conclusiondf.csv")
+    tableimagedf.to_csv(f"{saveloc}/tableiou.csv")
+    cellimagedf.to_csv(f"{saveloc}/celliou.csv")
+
+
+
+def postprocess_kosmos_sep(
+    targetloc: str = f"{Path(__file__).parent.absolute()}/../../data/BonnData/test",
+    predloc: str = f"{Path(__file__).parent.absolute()}/../../results/kosmos25/BonnData"
+    f"/Tabellen/test",
+    datasetname: str = "BonnData",
+    iou_thresholds: List[float] = [0.5, 0.6, 0.7, 0.8, 0.9],
+    epsprefactorchange = tuple([3.0, 1.5]),
+    minsamples: List[int] = [2, 3],#[4, 5],
+):
+    saveloc = f"{Path(__file__).parent.absolute()}/../../results/kosmos25/testevalfinal1/fullimg/{datasetname}"
+    saveloc = f"{saveloc}/iou_{'_'.join([str(iou_thresholds[0]), str(iou_thresholds[-1])])}/postprocessed/eps_{epsprefactorchange[0]}_{epsprefactorchange[1]}/minsamples_{minsamples[0]}_{minsamples[1]}/seperateeval"
+    tableioulist = []
+    tablef1list = []
+    tablewf1list = []
+    tabletpsum = torch.zeros(len(iou_thresholds))
+    tablefpsum = torch.zeros(len(iou_thresholds))
+    tablefnsum = torch.zeros(len(iou_thresholds))
+    tableimagedf = pandas.DataFrame(
+        columns=["img", "mean pred iou", "mean tar iou", "wf1", "prednum"]
+    )
+    #--------------------------------------------------------------------------
+    cellioulist = []
+    cellf1list = []
+    cellwf1list = []
+    celltpsum = torch.zeros(len(iou_thresholds))
+    cellfpsum = torch.zeros(len(iou_thresholds))
+    cellfnsum = torch.zeros(len(iou_thresholds))
+    cellimagedf = pandas.DataFrame(
+        columns=["img", "mean pred iou", "mean tar iou", "wf1", "prednum"]
+    )
+
+    for n, targets in tqdm(enumerate(glob.glob(f"{targetloc}/*"))):
+        preds = glob.glob(f"{predloc}/{targets.split('/')[-1]}")[0]
+        # imagepred = [file for file in glob.glob(f"{preds}/*.json") if "_table_" not in file][0]
+        # bboxes on full image
+        # fullimagepred = glob.glob(f"{preds}/(?!.*_table_)^.*$")[0]
+        # print(preds, targets)
+        fullimagepred = [
+            file for file in glob.glob(f"{preds}/*") if "_table_" not in file
+        ][0]
+        # print(fullimagepred)
+        imname = preds.split("/")[-1]
+        with open(fullimagepred) as p:
+            fullimagepredbox = remove_invalid_bbox(extractboxes(json.load(p), fpath=None))
+
+        tableprediou, tabletargetiou, tabletp, tablefp, tablefn= postprocess_eval_tablesep(fullimagepredbox=fullimagepredbox, imname=imname, targetloc=targetloc, minsamples=minsamples, epsprefactorchange=epsprefactorchange)
+        tableprec, tablerec, tablef1, tablewf1 = calcmetric(
+            tp=tabletp, fp=tablefp, fn=tablefn, iou_thresholds=iou_thresholds
+        )
+        tabletpsum += tabletp
+        tablefpsum += tablefp
+        tablefnsum += tablefn
+        tableioulist.append(tableprediou)
+        tablef1list.append(tablef1)
+        tablewf1list.append(tablewf1)
+
+        tableimagemetrics = {
+            "img": imname,
+            "mean pred iou": torch.mean(tableprediou).item(),
+            "mean tar iou": torch.mean(tabletargetiou).item(),
+            "wf1": tablewf1.item(),
+            "prednum": fullimagepredbox.shape[0],
+        }
+        tableimagemetrics.update(
+            {
+                f"prec@{iou_thresholds[i]}": tableprec[i].item()
+                for i in range(len(iou_thresholds))
+            }
+        )
+        tableimagemetrics.update(
+            {
+                f"recall@{iou_thresholds[i]}": tablerec[i].item()
+                for i in range(len(iou_thresholds))
+            }
+        )
+        tableimagemetrics.update(
+            {
+                f"f1@{iou_thresholds[i]}": tablef1[i].item()
+                for i in range(len(iou_thresholds))
+            }
+        )
+        tableimagemetrics.update(
+            {
+                f"tp@{iou_thresholds[i]}": tabletp[i].item()
+                for i in range(len(iou_thresholds))
+            }
+        )
+        tableimagemetrics.update(
+            {
+                f"fp@{iou_thresholds[i]}": tablefp[i].item()
+                for i in range(len(iou_thresholds))
+            }
+        )
+        tableimagemetrics.update(
+            {
+                f"fn@{iou_thresholds[i]}": tablefn[i].item()
+                for i in range(len(iou_thresholds))
+            }
+        )
+        tableimagedf = pandas.concat(
+            [tableimagedf, pandas.DataFrame(tableimagemetrics, index=[n])]
+        )
+
+        #-----------------------------------------------------------------------------------
+        #-----------------------------------------------------------------------------------
+
+        cellprediou, celltargetiou, celltp, cellfp, cellfn = postprocess_eval_cellsep(fullimagepredbox=fullimagepredbox, imname=imname, targetloc=targetloc, iou_thresholds=iou_thresholds)
+        # print(calcstats(fullimagepredbox, fullimagegroundbox,
+        #                                                               iou_thresholds=iou_thresholds, imname=preds.split('/')[-1]), fullfp, targets[0])
+        cellprec, cellrec, cellf1, cellwf1 = calcmetric(
+            celltp, cellfp, cellfn, iou_thresholds=iou_thresholds
+        )
+        celltpsum += celltp
+        cellfpsum += cellfp
+        cellfnsum += cellfn
+        cellioulist.append(cellprediou)
+        cellf1list.append(cellf1)
+        cellwf1list.append(cellwf1)
+
+        cellimagemetrics = {
+            "img": imname,
+            "mean pred iou": torch.mean(cellprediou).item(),
+            "mean tar iou": torch.mean(celltargetiou).item(),
+            "wf1": cellwf1.item(),
+            "prednum": fullimagepredbox.shape[0],
+        }
+        cellimagemetrics.update(
+            {
+                f"prec@{iou_thresholds[i]}": cellprec[i].item()
+                for i in range(len(iou_thresholds))
+            }
+        )
+        cellimagemetrics.update(
+            {
+                f"recall@{iou_thresholds[i]}": cellrec[i].item()
+                for i in range(len(iou_thresholds))
+            }
+        )
+        cellimagemetrics.update(
+            {
+                f"f1@{iou_thresholds[i]}": cellf1[i].item()
+                for i in range(len(iou_thresholds))
+            }
+        )
+        cellimagemetrics.update(
+            {
+                f"tp@{iou_thresholds[i]}": celltp[i].item()
+                for i in range(len(iou_thresholds))
+            }
+        )
+        cellimagemetrics.update(
+            {
+                f"fp@{iou_thresholds[i]}": cellfp[i].item()
+                for i in range(len(iou_thresholds))
+            }
+        )
+        cellimagemetrics.update(
+            {
+                f"fn@{iou_thresholds[i]}": cellfn[i].item()
+                for i in range(len(iou_thresholds))
+            }
+        )
+        cellimagedf = pandas.concat(
+            [cellimagedf, pandas.DataFrame(cellimagemetrics, index=[n])]
+        )
+
+    totaltabledf = get_dataframe(fnsum=tablefnsum, fpsum=tablefpsum, tpsum=tabletpsum)
+    totalcelldf = get_dataframe(fnsum=cellfnsum, tpsum=celltpsum, fpsum=cellfpsum)
+    conclusiondf = pandas.DataFrame(columns=["wf1"])
+    conclusiondf = pandas.concat(
+        [
+            conclusiondf,
+            pandas.DataFrame(totaltabledf, index=["table postprocessing iou"]),
+            pandas.DataFrame(
+                totalcelldf, index=["cell postprocessing iou (tables given)"]
+            ),
+        ]
+    )
+    os.makedirs(saveloc, exist_ok=True)
+    conclusiondf.to_csv(f"{saveloc}/conclusiondf.csv")
+    tableimagedf.to_csv(f"{saveloc}/tableiou.csv")
+    cellimagedf.to_csv(f"{saveloc}/celliou.csv")
+        
+        
+
+def postprocess_eval_tablesep(fullimagepredbox: torch.Tensor,
+    imname: str,
+    includeoutlier: bool = False,
+    epsprefactorchange = None,
+    minsamples: List[int] = [2, 3],#[4, 5],
+    targetloc: str = None,
+    iou_thresholds: List[float] = [0.5, 0.6, 0.7, 0.8, 0.9]
+ ):
+    epsprefactor = tuple([3.0, 1.5]) if not epsprefactorchange else epsprefactorchange
+    clusteredtables = clustertablesseperately(
+        fullimagepredbox, epsprefactor=epsprefactor, includeoutlier=includeoutlier, minsamples=minsamples
+    )
+    tablecoords = []
+    for i, t in enumerate(clusteredtables):
+        tablecoord = getsurroundingtable(t).tolist()
+        tablecoords.append(tablecoord)
+    tablecoords = torch.tensor(tablecoords)
+    tablepath= f"{targetloc}/{imname}/{imname}_tables.pt"
+    tablebboxes = torch.load(tablepath)
+    if imname == 'I_HA_Rep_89_Nr_16160_0170':
+        impath = f"{Path(__file__).parent.absolute()}/../../data/BonnData/test/I_HA_Rep_89_Nr_16160_0170/I_HA_Rep_89_Nr_16160_0170.jpg"
+        savepath = f"{Path(__file__).parent.absolute()}/../../images/testseperate/table"
+        drawimg_varformat_inner(box=tablecoords, impath=impath, savepath=savepath)
+    return calcstats_IoU(
+        predbox=tablecoords,
+        targetbox=tablebboxes,
+        iou_thresholds=iou_thresholds,
+        imname=imname,
+    )
+
+def postprocess_eval_cellsep(fullimagepredbox: torch.Tensor,
+    imname: str,
+    targetloc: str = None,
+    iou_thresholds: List[float] = [0.5, 0.6, 0.7, 0.8, 0.9],
+    tablerelative:bool = True
+ ):
+    tablepath = f"{targetloc}/{imname}/{imname}_tables.pt"
+    tablebboxes = torch.load(tablepath)
+    finalcells = []
+    for table in tablebboxes:
+        tablepreds = []
+        for preds in fullimagepredbox:
+            if boxoverlap(preds, table, fuzzy=0):
+                tablepreds.append(preds.tolist())
+        if tablepreds:
+            rows, colls = reconstruct_table(cells=tablepreds, table=table.tolist(), eps=4)
+            cells = reconstruct_bboxes(rows, colls, table.tolist())
+            finalcells+=cells.tolist()
+    #print(finalcells)
+    print(finalcells)
+    finalcells = torch.tensor(finalcells).squeeze() if finalcells else torch.empty((0,4))
+    #print(finalcells.shape)
+    if finalcells.dim()==1:
+        finalcells = torch.unsqueeze(finalcells,0)
+    groundfolder = f"{targetloc}/{imname}"
+    if tablerelative:
+        fullimagegroundbox = reversetablerelativebboxes_outer(groundfolder)
+    else:
+        fullimagegroundbox = torch.load(
+            glob.glob(f"{groundfolder}/{groundfolder.split('/')[-1]}.pt")[0]
+        )
+    if imname == 'I_HA_Rep_89_Nr_16160_0170':
+        impath = f"{Path(__file__).parent.absolute()}/../../data/BonnData/test/I_HA_Rep_89_Nr_16160_0170/I_HA_Rep_89_Nr_16160_0170.jpg"
+        savepath = f"{Path(__file__).parent.absolute()}/../../images/testseperate/cell"
+        drawimg_varformat_inner(box=finalcells, impath=impath, savepath=savepath)
+    print(finalcells)
+    #print(fullimagegroundbox)
+    return calcstats_IoU(predbox=finalcells, targetbox=fullimagegroundbox, iou_thresholds=iou_thresholds, imname=imname)
+
+
 
 
 def reconstruct_bboxes(rows: list, colls: list, tablecoords: list) -> torch.Tensor:
@@ -90,7 +546,7 @@ def postprocess(
     includeoutliers_cellsearch:bool = False,
     saveempty: bool = False,
     epsprefactorchange = None,
-    minsamples: List[int] = [4, 5]
+    minsamples: List[int] = [2, 3]#[4, 5]
 ):
     # for epsprefactor in [tuple([3.0,1.5]), tuple([4.0,1.5])]:
     epsprefactor = tuple([3.0, 1.5]) if not epsprefactorchange else epsprefactorchange
@@ -163,7 +619,7 @@ def postprocess(
     #        glob.glob(f"{targetloc}/{preds.split('/')[-1]}/{preds.split('/')[-1]}.pt")[0])
 
 
-def postprocess_rcnn(modelpath=None, targetloc=None, datasetname=None, filtering:int=None):
+def postprocess_rcnn(modelpath=None, targetloc=None, datasetname=None, filter:bool=False):
     saveloc = f"{Path(__file__).parent.absolute()}/../../results/fasterrcnn/postprocessed/fullimg/{datasetname}"
     model = fasterrcnn_resnet50_fpn(
         weights=FasterRCNN_ResNet50_FPN_Weights.DEFAULT,
@@ -179,7 +635,9 @@ def postprocess_rcnn(modelpath=None, targetloc=None, datasetname=None, filtering
         return
     modelname = modelpath.split(os.sep)[-1]
     saveloc = f"{saveloc}/{modelname}"
-    if filtering:
+    if filter:
+        with open(f"{Path(__file__).parent.absolute()}/../../results/fasterrcnn/bestfilterthresholds/{modelname}.txt", 'r') as f:
+            filtering = float(f.read())
         saveloc = f"{saveloc}_filtering_{filtering}"
     for n, folder in tqdm(enumerate(glob.glob(f"{targetloc}/*"))):
         # print(folder)
@@ -189,7 +647,7 @@ def postprocess_rcnn(modelpath=None, targetloc=None, datasetname=None, filtering
         output = model([img])
         output = {k: v.detach().cpu() for k, v in output[0].items()}
         # print(output['boxes'], output['boxes'][output['scores']>0.8])
-        if filtering:
+        if filter:
             output["boxes"] = output["boxes"][output["scores"] > filtering]
         fullimagepredbox = remove_invalid_bbox(output["boxes"])
         postprocess(fullimagepredbox, imname, saveloc)
@@ -204,23 +662,27 @@ def postprocess_eval(
     iou_thresholds: List[float] = [0.5, 0.6, 0.7, 0.8, 0.9],
     tableareaonly=False,
     includeoutliers_cellsearch=False,
-    filtering:int = None,
+    filter:bool = False,
     epsprefactor = tuple([3.0, 1.5]),
-    minsamples: List[int] = [4, 5]
+    minsamples: List[int] = [2, 3]#[4, 5]
 ):
     predloc = f"{Path(__file__).parent.absolute()}/../../results/{modeltype}/postprocessed/fullimg/{datasetname}"
     saveloc = f"{Path(__file__).parent.absolute()}/../../results/{modeltype}/testevalfinal1/fullimg/{datasetname}"
     if modelpath:
         modelname = modelpath.split(os.sep)[-1]
         predloc = f"{predloc}/{modelname}"
-        if filtering:
+        if filter:
+            with open(
+                    f"{Path(__file__).parent.absolute()}/../../results/fasterrcnn/bestfilterthresholds/{modelname}.txt",
+                    'r') as f:
+                filtering = float(f.read())
             predloc = f"{predloc}_filtering_{filtering}"
         saveloc = f"{saveloc}/{modelname}/iou_{'_'.join([str(iou_thresholds[0]), str(iou_thresholds[-1])])}/postprocessed/eps_{epsprefactor[0]}_{epsprefactor[1]}/minsamples_{minsamples[0]}_{minsamples[1]}/withoutoutlier"
     else:
         saveloc = f"{saveloc}/iou_{'_'.join([str(iou_thresholds[0]), str(iou_thresholds[-1])])}/postprocessed/eps_{epsprefactor[0]}_{epsprefactor[1]}/minsamples_{minsamples[0]}_{minsamples[1]}/withoutoutlier"
     saveloc = f"{f'{saveloc}/includeoutliers_glosat' if includeoutliers_cellsearch else f'{saveloc}/excludeoutliers_glosat'}"
-    if filtering and modelpath:
-        saveloc = f"{saveloc}_filtering_{filtering}"
+    if filter and modelpath:
+        saveloc = f"{saveloc}_filtering_optimal_{filtering}"
     predloc = f"{predloc}/eps_{epsprefactor[0]}_{epsprefactor[1]}/minsamples_{minsamples[0]}_{minsamples[1]}/withoutoutlier"
     predloc = f"{f'{predloc}' if includeoutliers_cellsearch else f'{predloc}_excludeoutliers_glosat'}"
     print(saveloc)
@@ -463,9 +925,9 @@ def postprocess_eval(
     overlapprec, overlaprec, overlapf1 = calcmetric_overlap(
         tp=tpsum_overlap, fp=fpsum_overlap, fn=fnsum_overlap
     )
-    totaloverlapdf = pandas.DataFrame(
-        {"f1": overlapf1, "prec": overlaprec, "recall": overlaprec}, index=["overlap"]
-    )
+    #totaloverlapdf = pandas.DataFrame(
+    #    {"f1": overlapf1, "prec": overlaprec, "recall": overlaprec}, index=["overlap"]
+    #)
     overlapprec_predonly, overlaprec_predonly, overlapf1_predonly = calcmetric_overlap(
         tp=tpsum_overlap_predonly, fp=fpsum_overlap_predonly, fn=fnsum_overlap_predonly
     )
@@ -525,7 +987,58 @@ def postprocess_eval(
 
 
 if __name__ == "__main__":
-    """
+    postprocess_kosmos_sep(targetloc = f"{Path(__file__).parent.absolute()}/../../data/BonnData/test",
+    predloc = f"{Path(__file__).parent.absolute()}/../../results/kosmos25/BonnData"
+    f"/Tabellen/test",
+    datasetname = "BonnData")
+
+    postprocess_kosmos_sep(targetloc=f"{Path(__file__).parent.absolute()}/../../data/Tablesinthewild/preprocessed/simple",
+                       predloc=f"{Path(__file__).parent.absolute()}/../../results/kosmos25/Tablesinthewild/simple",
+                       datasetname="Tablesinthewild/simple")
+    postprocess_kosmos_sep(targetloc=f"{Path(__file__).parent.absolute()}/../../data/Tablesinthewild/preprocessed/curved",
+                       predloc=f"{Path(__file__).parent.absolute()}/../../results/kosmos25/Tablesinthewild/curved",
+                       datasetname="Tablesinthewild/curved")
+    postprocess_kosmos_sep(targetloc=f"{Path(__file__).parent.absolute()}/../../data/Tablesinthewild/preprocessed/occblu",
+                       predloc=f"{Path(__file__).parent.absolute()}/../../results/kosmos25/Tablesinthewild/occblu",
+                       datasetname="Tablesinthewild/occblu")
+    postprocess_kosmos_sep(targetloc=f"{Path(__file__).parent.absolute()}/../../data/Tablesinthewild/preprocessed/overlaid",
+                       predloc=f"{Path(__file__).parent.absolute()}/../../results/kosmos25/Tablesinthewild/overlaid",
+                       datasetname="Tablesinthewild/overlaid")
+    postprocess_kosmos_sep(targetloc=f"{Path(__file__).parent.absolute()}/../../data/Tablesinthewild/preprocessed/Inclined",
+                       predloc=f"{Path(__file__).parent.absolute()}/../../results/kosmos25/Tablesinthewild/Inclined1",
+                       datasetname="Tablesinthewild/Inclined")
+    postprocess_kosmos_sep(
+        targetloc=f"{Path(__file__).parent.absolute()}/../../data/Tablesinthewild/preprocessed/extremeratio",
+        predloc=f"{Path(__file__).parent.absolute()}/../../results/kosmos25/Tablesinthewild/extremeratio1",
+        datasetname="Tablesinthewild/extremeratio")
+    postprocess_kosmos_sep(
+        targetloc=f"{Path(__file__).parent.absolute()}/../../data/Tablesinthewild/preprocessed/muticolorandgrid",
+        predloc=f"{Path(__file__).parent.absolute()}/../../results/kosmos25/Tablesinthewild/muticolorandgrid1",
+        datasetname="Tablesinthewild/muticolorandgrid")
+
+    postprocess_kosmos_sep(targetloc=f"{Path(__file__).parent.absolute()}/../../data/GloSat/test",
+                       predloc=f"{Path(__file__).parent.absolute()}/../../results/kosmos25/GloSat/test1",
+                       datasetname="GloSat")
+    postprocess_rcnn_sep(
+        modelpath=f"{Path(__file__).parent.absolute()}/../../checkpoints/fasterrcnn/BonnDataFullImage1_BonnData_fullimage_e250_es.pt",
+        targetloc=f"{Path(__file__).parent.absolute()}/../../data/BonnData/test", datasetname="BonnData")
+    postprocess_rcnn_sep(
+        modelpath=f"{Path(__file__).parent.absolute()}/../../checkpoints/fasterrcnn/BonnDataFullImage_pretrain_GloSatFullImage1_GloSat_fullimage_e250_es_BonnData_fullimage_e250_end.pt",
+        targetloc=f"{Path(__file__).parent.absolute()}/../../data/BonnData/test", datasetname="BonnData")
+    postprocess_rcnn_sep(
+        modelpath=f"{Path(__file__).parent.absolute()}/../../checkpoints/fasterrcnn/BonnDataFullImage_pretrain_GloSatFullImage1_GloSat_fullimage_e250_es_BonnData_fullimage_e250_es.pt",
+        targetloc=f"{Path(__file__).parent.absolute()}/../../data/BonnData/test", datasetname="BonnData")
+    postprocess_rcnn_sep(
+        modelpath=f"{Path(__file__).parent.absolute()}/../../checkpoints/fasterrcnn/GloSatFullImage1_GloSat_fullimage_e250_es.pt",
+        targetloc=f"{Path(__file__).parent.absolute()}/../../data/GloSat/test", datasetname="GloSat")
+    for cat in glob.glob(f"{Path(__file__).parent.absolute()}/../../data/Tablesinthewild/preprocessed/*"):
+        print(cat)
+        postprocess_rcnn_sep(targetloc=cat, datasetname=f"Tablesinthewild/{cat.split('/')[-1]}",
+                         modelpath=f"{Path(__file__).parent.absolute()}/../../checkpoints/fasterrcnn/testseveralcalls_4_with_valid_split_Tablesinthewild_fullimage_e50_es.pt")
+        postprocess_rcnn_sep(targetloc=cat, datasetname=f"Tablesinthewild/{cat.split('/')[-1]}",
+                         modelpath=f"{Path(__file__).parent.absolute()}/../../checkpoints/fasterrcnn/testseveralcalls_5_without_valid_split_Tablesinthewild_fullimage_e50_end.pt")
+
+
     postprocess_kosmos(targetloc=f"{Path(__file__).parent.absolute()}/../../data/Tablesinthewild/preprocessed/simple",
                        predloc=f"{Path(__file__).parent.absolute()}/../../results/kosmos25/Tablesinthewild/simple",
                        datasetname="Tablesinthewild/simple")
@@ -579,12 +1092,14 @@ if __name__ == "__main__":
         postprocess_rcnn(targetloc=cat, datasetname=f"Tablesinthewild/{cat.split('/')[-1]}",
                          modelpath=f"{Path(__file__).parent.absolute()}/../../checkpoints/fasterrcnn/testseveralcalls_5_without_valid_split_Tablesinthewild_fullimage_e50_end.pt")
     """
+    """
     postprocess_eval(
         datasetname="BonnData",
         modeltype="kosmos25",
         targetloc=f"{Path(__file__).parent.absolute()}/../../data/BonnData/test",
     )
     """
+    """ 
     postprocess_eval(
         modelpath=f"{Path(__file__).parent.absolute()}/../../checkpoints/fasterrcnn/BonnDataFullImage1_BonnData_fullimage_e250_es.pt",
         targetloc=f"{Path(__file__).parent.absolute()}/../../data/BonnData/test",
@@ -604,12 +1119,13 @@ if __name__ == "__main__":
         modeltype="fasterrcnn",
     )
     """
+    """
     postprocess_eval(
         datasetname="GloSat",
         modeltype="kosmos25",
         targetloc=f"{Path(__file__).parent.absolute()}/../../data/GloSat/test",
     )
-    """
+    
     postprocess_eval(
         modelpath=f"{Path(__file__).parent.absolute()}/../../checkpoints/fasterrcnn/GloSatFullImage1_GloSat_fullimage_e250_es.pt",
         targetloc=f"{Path(__file__).parent.absolute()}/../../data/GloSat/test",
@@ -617,7 +1133,7 @@ if __name__ == "__main__":
         modeltype="fasterrcnn",
     )
 
-    """
+    
     postprocess_eval(
         targetloc=f"{Path(__file__).parent.absolute()}/../../data/Tablesinthewild/preprocessed/simple",
         modeltype="kosmos25",
@@ -654,6 +1170,7 @@ if __name__ == "__main__":
         datasetname="Tablesinthewild/muticolorandgrid",
     )
     """
+    """
     for cat in glob.glob(
         f"{Path(__file__).parent.absolute()}/../../data/Tablesinthewild/preprocessed/*"
     ):
@@ -671,7 +1188,7 @@ if __name__ == "__main__":
             modelpath=f"{Path(__file__).parent.absolute()}/../../checkpoints/fasterrcnn/testseveralcalls_5_without_valid_split_Tablesinthewild_fullimage_e50_end.pt",
         )
 
-    """
+
     postprocess_kosmos(targetloc=f"{Path(__file__).parent.absolute()}/../../data/Tablesinthewild/preprocessed/simple",
                        predloc=f"{Path(__file__).parent.absolute()}/../../results/kosmos25/Tablesinthewild/simple",
                        datasetname="Tablesinthewild/simple")
@@ -704,7 +1221,8 @@ if __name__ == "__main__":
     #    print(cat)
     #    postprocess_kosmos(targetloc=cat, predloc=f"{Path(__file__).parent.absolute()}/../../results/kosmos25/Tablesinthewild/{cat.split('/')[-1]}", datasetname=f"Tablesinthewild/{cat.split('/')[-1]}")
 
-    
+    """
+    """
     postprocess_rcnn(modelpath=f"{Path(__file__).parent.absolute()}/../../checkpoints/fasterrcnn/BonnDataFullImage1_BonnData_fullimage_e250_es.pt", targetloc = f"{Path(__file__).parent.absolute()}/../../data/BonnData/test", datasetname="BonnData")
     postprocess_rcnn(
         modelpath=f"{Path(__file__).parent.absolute()}/../../checkpoints/fasterrcnn/BonnDataFullImage_pretrain_GloSatFullImage1_GloSat_fullimage_e250_es_BonnData_fullimage_e250_end.pt",
