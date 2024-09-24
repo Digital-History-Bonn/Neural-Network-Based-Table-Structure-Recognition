@@ -1,0 +1,25 @@
+#!/bin/bash
+#SBATCH --partition=A40short
+#SBATCH --nodes=1
+#SBATCH --tasks-per-node=1
+#SBATCH --job-name=inference
+#SBATCH --output=outputs/kosmos_table_inference-extremeratio-%j.out
+#SBATCH --error=outputs/kosmos_table_inference-extremeratio-%j.err
+#SBATCH --gres gpu:1
+#SBATCH --cpus-per-task=1
+#SBATCH --time=8:00:00
+#SBATCH --mem=10gb
+source /home/s6anthel/.bashrc
+module load CUDA
+conda activate kosmos2
+cd unilm || exit
+cd kosmos-2_5 || exit
+
+for directory in ../../data/Tablesinthewild/preprocessed/extremeratioround2/*
+do
+  currentd=$( echo "$directory" |awk -F'/' '{print $NF}' )
+  for file in "$directory"/*.jpg
+  do
+    python -m inference --do_ocr --image "$file" --ckpt ../../checkpoints/kosmos2.5/ckpt.pt --out_dir ../../results/kosmos25/Tablesinthewild/extremeratio1/"$currentd"
+  done
+done

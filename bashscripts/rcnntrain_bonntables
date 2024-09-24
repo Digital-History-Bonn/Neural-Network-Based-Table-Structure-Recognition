@@ -1,0 +1,16 @@
+#!/bin/bash
+#SBATCH --partition=A100short
+#SBATCH --nodes=1
+#SBATCH --tasks-per-node=1
+#SBATCH --job-name=train
+#SBATCH --output=outputs/rcnn-bonntrain-train-%j.out
+#SBATCH --error=outputs/rcnn-bonntrain-train_%j.err
+#SBATCH --gres gpu:1
+#SBATCH --cpus-per-task=1
+#SBATCH --time=8:00:00
+#SBATCH --mem=10gb
+source /home/s6anthel/.bashrc
+module load CUDA
+conda activate kosmos2
+
+python -m src.historicdocumentprocessing.fasterrcnn_trainer --name "BonnDataFullImage_random" --dataset "BonnData" --randominit
