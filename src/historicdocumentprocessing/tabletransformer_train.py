@@ -293,6 +293,7 @@ if __name__=='__main__':
     print(f"\tload: {args.load}\n")
     #print(f"\trandom initialization: {args.randominit}\n")
     print(f"Use Valid Set: {args.valid}")
+    print(f"Cuda Available:", torch.cuda.is_available())
 
     if args.valid:
         validdataset = CustomDataset(

@@ -331,7 +331,7 @@ def processdata_wildtable_rowcoll( datapath: str,
                                                                 "startrow" : int(box.startrow.get_text()), "endrow" : int(box.endrow.get_text())}]})
 
     finaltables : List[Dict] = []
-    print(tables)
+    #print(tables)
     for t in tables.keys():
         columns: Dict[int, torch.Tensor] = {}  # dictionary of columns and their points
         rows: Dict[int, torch.Tensor] = {}  # dictionary of rows and their points
@@ -388,6 +388,7 @@ def processdata_wildtable_outer(
     xmlfolder = f"{datapath}/xml"
     imfolder = f"{datapath}/images"
     target = f"{datapath}/../../{datapath.split('/')[-1]}"
+    #i=0
     for xml in tqdm(glob.glob(f"{xmlfolder}/*xml")):
         bboxfile = processdata_wildtable_inner(xml)
         impath = glob.glob(f"{imfolder}/{xml.split('/')[-1].split('.')[-3]}.jpg")[0]
@@ -397,6 +398,9 @@ def processdata_wildtable_outer(
         # print(f"{tarfolder}/{xml.split('/')[-1].split('.')[-3]}.pt")
 
         if bboxfile.numel():
+            #i+=1
+            #if i > 1: return
+            #print(impath)
             if (read_image(impath) / 255).shape[0] == 3:
                 os.makedirs(tarfolder, exist_ok=True)
                 shutil.copy(impath, dst=f"{tarfolder}/{impath.split('/')[-1]}")
@@ -410,7 +414,7 @@ def processdata_wildtable_outer(
                 print(impath)
         else:
             warnings.warn("empty bbox, image not added to preprocessed training data")
-        if rowcol:
+        if rowcol and bboxfile.numel() and (read_image(impath) / 255).shape[0] == 3:
             tables = processdata_wildtable_rowcoll(xml)
             tablelist = []
             for n, table in enumerate(tables):
@@ -437,9 +441,11 @@ def processdata_wildtable_outer(
                     f"{tarfolder}/{xml.split('/')[-1].split('.')[-3]}_col_{n}.pt",
                 )
             tablefile= torch.vstack(tablelist)
+            #if len(tablelist) > 1: print(impath)
+            #print(tablefile)
             torch.save(tablefile, f"{tarfolder}/{xml.split('/')[-1].split('.')[-3]}_tables.pt")
 
-        if tablerelative:
+        if tablerelative and (read_image(impath) / 255).shape[0] == 3:
             tablelist, celllist = processdata_wildtable_tablerelative(xml)
             if tablelist and celllist:
                 assert len(tablelist) == len(celllist)
@@ -470,12 +476,29 @@ def processdata_wildtable_outer(
 
 
 if __name__ == "__main__":
+    processdata_wildtable_outer(rowcol=True)
     #tables = processdata_wildtable_rowcoll(f"{Path(__file__).parent.absolute()}/../../data/Tablesinthewild/rawdata/test/test-xml-revise/test-xml-revise/0hZg6EpcTdKXk6j44umj3gAAACMAAQED.xml")
     #print(tables)
-    img = read_image(
-        f"{Path(__file__).parent.absolute()}/../../data/Tablesinthewild/rawdata/test/images/mit_google_image_search-10918758-7f5f72bb8440c9caf8b07b28ffdc54d33bd370ab.jpg")
-    tables = processdata_wildtable_rowcoll(f"{Path(__file__).parent.absolute()}/../../data/Tablesinthewild/rawdata/test/test-xml-revise/test-xml-revise/mit_google_image_search-10918758-7f5f72bb8440c9caf8b07b28ffdc54d33bd370ab.xml")
-    print(tables)
+    #img = read_image(
+    #    f"{Path(__file__).parent.absolute()}/../../data/Tablesinthewild/rawdata/test/images/mit_google_image_search-10918758-7f5f72bb8440c9caf8b07b28ffdc54d33bd370ab.jpg")
+    #tables = processdata_wildtable_rowcoll(f"{Path(__file__).parent.absolute()}/../../data/Tablesinthewild/rawdata/test/test-xml-revise/test-xml-revise/mit_google_image_search-10918758-7f5f72bb8440c9caf8b07b28ffdc54d33bd370ab.xml")
+    #print(tables)
+    #
+    #img = read_image(f"{Path(__file__).parent.absolute()}/../../data/Tablesinthewild/rawdata/train/images/008ae846c799f80b34252eb58358d166aa3a82d2.jpg")
+    #tables = torch.load(f"{Path(__file__).parent.absolute()}/../../data/Tablesinthewild/train/008ae846c799f80b34252eb58358d166aa3a82d2/008ae846c799f80b34252eb58358d166aa3a82d2_tables.pt")
+    #print(tables)
+    #for n, table in enumerate(tables):
+    #    row = reversetablerelativebboxes_inner(tablebbox=table, cellbboxes=torch.load(f"{Path(__file__).parent.absolute()}/../../data/Tablesinthewild/train/008ae846c799f80b34252eb58358d166aa3a82d2/008ae846c799f80b34252eb58358d166aa3a82d2_col_{n}.pt"))
+    #    rowimg = draw_bounding_boxes(image=img, boxes=row, colors=["black" for i in range(len(row))],
+    #                                                              labels=["row" for i in range(len(row))])
+    #    rowimg = Image.fromarray(rowimg.permute(1, 2, 0).numpy())
+    #    rowimg.save(f"{Path(__file__).parent.absolute()}/../../images/coltest_saved_{n}.jpg")
+    #row = reversetablerelativebboxes_inner(tablebbox=table[0], cellbboxes=torch.load(f"{Path(__file__).parent.absolute()}/../../data/Tablesinthewild/train/000e84efe82c0f7c17c77334704e93bc/000e84efe82c0f7c17c77334704e93bc_row_0.pt"))
+    #rowimg = draw_bounding_boxes(image=img, boxes=row, colors=["black" for i in range(len(row))],
+    #                             labels=["row" for i in range(len(row))])
+    #rowimg = Image.fromarray(rowimg.permute(1, 2, 0).numpy())
+    #rowimg.save(f"{Path(__file__).parent.absolute()}/../../images/rowtest_saved.jpg")
+    """
     for n,table in enumerate(tables):
         tab = tables[n]["table"]
         rows = reversetablerelativebboxes_inner(tablebbox=tab, cellbboxes=tables[n]["rows"])
@@ -493,7 +516,7 @@ if __name__ == "__main__":
         rowimg.save(f"{Path(__file__).parent.absolute()}/../../images/rowtest_multi_{n}.jpg")
         colimg= Image.fromarray(colimg.permute(1, 2, 0).numpy())
         colimg.save(f"{Path(__file__).parent.absolute()}/../../images/coltest_multi_{n}.jpg")
-
+    """
     #rows, colls = processdata_wildtable_rowcoll(
     #    f"{Path(__file__).parent.absolute()}/../../data/Tablesinthewild/rawdata/test/test-xml-revise/test-xml-revise/0hZg6EpcTdKXk6j44umj3gAAACMAAQED.xml")
     #img = read_image(
