@@ -125,7 +125,7 @@ class CustomDataset(Dataset):  # type: ignore
         annotations = {'image_id': index, 'annotations': []}
         if self.objective == "fullimage":
             img = Image.open(f"{self.data[index]}/{imgnum}.jpg").convert("RGB")
-            if self.dataset in ["BonnData", "GloSat"]:
+            if self.dataset in ["BonnData", "GloSat", "Tablesinthewild"]:
                 for id, cat in zip([2,1],["row", "col"]):
                     target = reversetablerelativebboxes_outer_rowcoll(self.data[index], category=cat)
                     # get bbox area
@@ -206,7 +206,7 @@ class CustomDataset(Dataset):  # type: ignore
             img = Image.open(f"{self.data[index]}/{imgnum}.jpg").convert("RGB")
             bboxes = []
             labels = []
-            if self.dataset in ["BonnData", "GloSat"]:
+            if self.dataset in ["BonnData", "GloSat", "Tablesinthewild"]:
                 for id, cat in zip([2,1],["row", "col"]):
                     target = reversetablerelativebboxes_outer_rowcoll(self.data[index], category=cat)
                     bboxes.append(target)
@@ -225,7 +225,7 @@ class CustomDataset(Dataset):  # type: ignore
             pass
         return img, target, labels
 
-    def getimfolder(self,index):
+    def getfolder(self,index):
         return self.data[index]
 
 
@@ -233,8 +233,13 @@ class CustomDataset(Dataset):  # type: ignore
 
 if __name__ == "__main__":
 
+    #dataset = CustomDataset(
+    #    f"{Path(__file__).parent.absolute()}/../../data/BonnData/valid",
+    #    "fullimage",
+    #    transforms=None,
+    #)
     dataset = CustomDataset(
-        f"{Path(__file__).parent.absolute()}/../../data/BonnData/valid",
+        f"{Path(__file__).parent.absolute()}/../../data/Tablesinthewild/valid",
         "fullimage",
         transforms=None,
     )
@@ -263,4 +268,4 @@ if __name__ == "__main__":
     img = Image.fromarray(result.permute(1, 2, 0).numpy())
     print(labels)
     # print(f"{savepath}/{identifier}.jpg")
-    img.save(f"{Path(__file__).parent.absolute()}/../../images/test/testtabletransformerdataset.jpg")
+    img.save(f"{Path(__file__).parent.absolute()}/../../images/test/testtabletransformerdatasettablesinthewild.jpg")
