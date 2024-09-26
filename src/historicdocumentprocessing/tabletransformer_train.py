@@ -25,6 +25,7 @@ SOFTWARE.
 """
 import argparse
 import os
+import statistics
 from pathlib import Path
 
 import lightning.pytorch as pl
@@ -44,13 +45,15 @@ from src.historicdocumentprocessing.tabletransformer_dataset import CustomDatase
 
 
 class TableTransformer(pl.LightningModule):
-     def __init__(self, lr, lr_backbone, weight_decay, testdataset: CustomDataset, traindataset:CustomDataset, valdataset:CustomDataset=None, datasetname:str = "BonnData", savepath:str=None):
+     def __init__(self, lr, lr_backbone, weight_decay, testdataset: CustomDataset, traindataset:CustomDataset, valdataset:CustomDataset=None, datasetname:str = "BonnData", savepath:str=None, loadmodelcheckpoint:str=None):
          super().__init__()
          #self.model = AutoModelForObjectDetection.from_pretrained("microsoft/table-transformer-structure-recognition-v1.1-all").to(self.device)
          self.model = AutoModelForObjectDetection.from_pretrained(
              "microsoft/table-transformer-structure-recognition").to(self.device)
          # see https://github.com/PyTorchLightning/pytorch-lightning/pull/1896
          #print(model.config.id2label)
+         if loadmodelcheckpoint:
+             self.model.load_state_dict(torch.load(loadmodelcheckpoint))
          self.lr = lr
          self.lr_backbone = lr_backbone
          self.weight_decay = weight_decay
@@ -73,6 +76,8 @@ class TableTransformer(pl.LightningModule):
          self.example_image = (self.example_image)
          self.train_example_image = (self.train_example_image)
          self.savepath=savepath
+         self.val_losses = []
+         self.mean_val_loss = None
 
      def forward(self, pixel_values, pixel_mask):
        outputs = self.model(pixel_values=pixel_values, pixel_mask=pixel_mask)
@@ -106,8 +111,15 @@ class TableTransformer(pl.LightningModule):
         self.log("validation_loss", loss, on_epoch=True)
         for k,v in loss_dict.items():
           self.log("validation_" + k, v.item(), on_epoch=True)
+        self.val_losses.append(loss.detach().item())
+        return loss
 
      def on_validation_epoch_end(self) -> None:
+        mean_val_loss = statistics.mean(self.val_losses)
+        if not self.mean_val_loss or self.mean_val_loss>mean_val_loss:
+            self.mean_val_loss = mean_val_loss
+            torch.save(self.model.state_dict(), self.savepath+"_es.pt")
+        self.val_losses.clear()
         for logger in self.trainer.loggers:
              if isinstance(logger, loggers.TensorBoardLogger):
                  self.writer = logger.experiment
@@ -189,7 +201,7 @@ class TableTransformer(pl.LightningModule):
         return DataLoader(self.train_dataset, batch_size=1, collate_fn=self.train_dataset.collate_fn)
 
      def val_dataloader(self):
-        return DataLoader(self.val_dataset, batch_size=1, collate_fn=self.val_dataset.collate_fn,num_workers=8)
+        return DataLoader(self.val_dataset, batch_size=1, collate_fn=self.val_dataset.collate_fn,num_workers=2)
 
      def test_dataloader(self) -> EVAL_DATALOADERS:
          return DataLoader(self.test_dataset, batch_size=1, collate_fn=self.test_dataset.collate_fn)
@@ -294,6 +306,7 @@ if __name__=='__main__':
     #print(f"\trandom initialization: {args.randominit}\n")
     print(f"Use Valid Set: {args.valid}")
     print(f"Cuda Available:", torch.cuda.is_available())
+    print(f"torch lightning early_stopping:", args.early_stopping)
 
     if args.valid:
         validdataset = CustomDataset(
