@@ -62,9 +62,9 @@ class TableTransformer(pl.LightningModule):
          self.test_dataset=testdataset
          self.writer = None
          if datasetname == "Tablesinthewild" and valdataset:
-            self.example_image, self.example_target = valdataset.getimgtarget(
-                 valdataset.getidx("mit_google_image_search-10918758-be4b5fa7bf3fea80823dabbe1e17e4136f0da811"))
-            self.train_example_image, self.train_example_target = traindataset.getimgtarget(
+            self.example_image, self.example_target, self.example_lable = valdataset.getimgtarget(
+                 valdataset.getidx("mit_google_image_search-10918758-bf3a1b339a99b2d38e05fb70dfb8afa3e4db9e3c"))
+            self.train_example_image, self.train_example_target, self.train_example_lable = traindataset.getimgtarget(
                  traindataset.getidx("mit_google_image_search-10918758-cdcd82db9ce0b61da60155c5c822b0be3884a2cf"))
          elif datasetname == "Tablesinthewild" and not valdataset:
              self.example_image, self.example_target, self.example_lable = valdataset.getimgtarget(0)
