@@ -6,6 +6,7 @@ from typing import List
 import pandas
 import torch
 from PIL import Image
+from lightning.fabric.utilities import move_data_to_device
 from tqdm import tqdm
 from  transformers import AutoModelForObjectDetection, DetrImageProcessor, TableTransformerForObjectDetection
 
@@ -13,14 +14,19 @@ from src.historicdocumentprocessing.fasterrcnn_eval import tableareabboxes
 from src.historicdocumentprocessing.kosmos_eval import reversetablerelativebboxes_outer, calcstats_IoDT, calcmetric, \
     calcstats_IoU, calcstats_overlap, calcmetric_overlap, get_dataframe
 from src.historicdocumentprocessing.tabletransformer_dataset import CustomDataset
+from src.historicdocumentprocessing.util.tablesutil import getcells
 
 
-def inference(modelpath:str=None, targetloc=None, iou_thresholds: List[float] = [0.5, 0.6, 0.7, 0.8, 0.9], tableareaonly=None,
+def inference(modelpath:str=None, targetloc=None, iou_thresholds: List[float] = [0.5, 0.6, 0.7, 0.8, 0.9], tableareaonly=True,
               filtering:bool = False, valid:bool = True, datasetname:str="BonnData"):
+    modelname="base_table-transformer-structure-recognition"
     model = TableTransformerForObjectDetection.from_pretrained("microsoft/table-transformer-structure-recognition")
     if modelpath:
         model.load_state_dict(torch.load(modelpath))
-    modelname = modelpath.split('/')[-1]
+        modelname = modelpath.split('/')[-1]
+        print("loaded_model:", modelname)
+    assert model.config.id2label[1]=="table column"
+    assert model.config.id2label[2]=="table row"
     #image_processor = DetrImageProcessor.from_pretrained("facebook/detr-resnet-50")
     #image_processor = AutoImageProcessor.from_pretrained("microsoft/table-transformer-structure-recognition")
     if torch.cuda.is_available():
@@ -82,9 +88,9 @@ def inference(modelpath:str=None, targetloc=None, iou_thresholds: List[float] = 
         "fullimage",
         transforms=None,
     )
-    for i in range(len(dataset)):
+    for i in tqdm(range(len(dataset))):
         img, fullimagegroundbox, labels = dataset.getimgtarget(i)
-        encoding = dataset.ImageProcessor(img, return_tensors="pt")
+        encoding = move_data_to_device(dataset.ImageProcessor(img, return_tensors="pt"), device=device)
         folder = dataset.getfolder(i)
         imname = folder.split("/")[-1]
 
@@ -95,9 +101,13 @@ def inference(modelpath:str=None, targetloc=None, iou_thresholds: List[float] = 
             output = dataset.ImageProcessor.post_process_object_detection(results, threshold=filterthreshold, target_sizes=[(height, width)])[0]
         else:
             output = dataset.ImageProcessor.post_process_object_detection(results, target_sizes=[(height, width)])[0]
+        #labels = torch.Tensor([str(model.config.id2label[label]) for label in output["labels"].tolist()])
+        boxes = getcells(rows=output["boxes"][output["labels"]==2], cols=output["boxes"][output["labels"]==1])
+        print(boxes.shape)
         if tableareaonly:
-            output["boxes"] = tableareabboxes(output["boxes"], folder)
-        fullimagepredbox = output["boxes"]
+            boxes = tableareabboxes(boxes, folder)
+        fullimagepredbox = boxes.to(device="cpu")
+        print(boxes.shape)
 
         # .......................................
         # fullimagemetrics with IoDT
@@ -352,5 +362,11 @@ def inference(modelpath:str=None, targetloc=None, iou_thresholds: List[float] = 
     conclusiondf.to_csv(f"{saveloc}/overview.csv")
 
 if __name__=='__main__':
-    inference(modelpath=f"{Path(__file__).parent.absolute()}/../checkpoints/tabletransformer/tabletransformer_v0_new_BonnDataFullImage_tabletransformer_v0_bbox_xywh_BonnData_fullimage_e250_valid_end.pt",
+    inference(modelpath=f"{Path(__file__).parent.absolute()}/../../checkpoints/tabletransformer/tabletransformer_v0_new_BonnDataFullImage_tabletransformer_v0_bbox_xywh_BonnData_fullimage_e250_valid_end.pt",
               targetloc=f"{Path(__file__).parent.absolute()}/../../data/BonnData/test")
+    inference(
+        modelpath=f"{Path(__file__).parent.absolute()}/../../checkpoints/tabletransformer/tabletransformer_v0_new_BonnDataFullImage_tabletransformer_estest_BonnData_fullimage_e250_valid_es.pt",
+        targetloc=f"{Path(__file__).parent.absolute()}/../../data/BonnData/test")
+    inference(
+        modelpath=f"{Path(__file__).parent.absolute()}/../../checkpoints/tabletransformer/tabletransformer_v0_new_BonnDataFullImage_tabletransformer_estest_BonnData_fullimage_e250_valid_end.pt",
+        targetloc=f"{Path(__file__).parent.absolute()}/../../data/BonnData/test")

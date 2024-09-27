@@ -15,9 +15,37 @@ from torchvision.models.detection import (
     fasterrcnn_resnet50_fpn,
 )
 from torchvision.ops import box_iou
+from torchvision.ops.boxes import _box_inter_union
 from torchvision.utils import draw_bounding_boxes
 
 from src.historicdocumentprocessing.kosmos_eval import calcmetric, extractboxes
+
+def getcells(rows: torch.Tensor, cols: torch.Tensor, keepnonoverlap:bool=True)->torch.Tensor:
+    """get cell bboxes by intersecting row and column bboxes (for tabletransformer)"""
+    print("rows:",rows.shape)
+    print("cols:",cols.shape)
+    inter, _ = _box_inter_union(rows, cols)
+    newcells = []
+    for rowidx, colidx in inter.nonzero():
+        minxmaxymax = torch.min(rows[rowidx, 2:], cols[colidx, 2:])
+        maxxminymin = torch.max(rows[rowidx, :2], cols[colidx, :2])
+        newcell = torch.hstack([maxxminymin,minxmaxymax])
+        print(newcell.shape)
+        newcells.append(newcell)
+    if keepnonoverlap:
+        if cols.shape[0]>0:
+            for rowidx in torch.where(inter.amax(dim=1)<=0, 1, 0).nonzero():
+                newcells.append(rows[rowidx])
+        else:
+            for row in rows:
+                newcells.append(row)
+        if rows.shape[0]>0:
+            for colidx in torch.where(inter.amax(dim=0)<=0, 1, 0).nonzero():
+                newcells.append(cols[colidx])
+        else:
+            for col in cols:
+                newcells.append(col)
+    return torch.vstack(newcells) if newcells else torch.empty(0,4)
 
 
 def avrgeuc(boxes: torch.Tensor) -> float:
