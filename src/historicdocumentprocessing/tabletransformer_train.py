@@ -53,7 +53,8 @@ class TableTransformer(pl.LightningModule):
          # see https://github.com/PyTorchLightning/pytorch-lightning/pull/1896
          #print(model.config.id2label)
          if loadmodelcheckpoint:
-             self.model.load_state_dict(torch.load(loadmodelcheckpoint))
+             self.model.load_state_dict(torch.load(f"{Path(__file__).parent.absolute()}/../../checkpoints/tabletransformer/{loadmodelcheckpoint}"))
+             print("loaded: ", loadmodelcheckpoint)
          self.lr = lr
          self.lr_backbone = lr_backbone
          self.weight_decay = weight_decay
@@ -198,7 +199,7 @@ class TableTransformer(pl.LightningModule):
         return optimizer
 
      def train_dataloader(self):
-        return DataLoader(self.train_dataset, batch_size=1, collate_fn=self.train_dataset.collate_fn)
+        return DataLoader(self.train_dataset, batch_size=1, collate_fn=self.train_dataset.collate_fn, num_workers=2)
 
      def val_dataloader(self):
         return DataLoader(self.val_dataset, batch_size=1, collate_fn=self.val_dataset.collate_fn,num_workers=2)
@@ -285,10 +286,13 @@ if __name__=='__main__':
     name = (
         f"tabletransformer_v0_new_{args.name}_{args.dataset}_{args.objective}"
         f"{'_aug' if args.augmentations else ''}_e{args.epochs}"
-        f"{f'_init_{args.load_}' if args.load else ''}"
+        f"{f'_init_{args.load}' if args.load else ''}"
     #    f"{'_random_init' if args.randominit else ''}"
         f"{'_valid' if args.valid else '_no_valid'}"
     )
+    # if args.load:
+    #     modelname = args.load.split("/")[-1]
+    #     name = f"{name}_loaded_{modelname}"
     train_log_dir = (
         f"{Path(__file__).parent.absolute()}/../../logs/runs/"
     )
@@ -324,7 +328,7 @@ if __name__=='__main__':
 
     checkpoint_callback = ModelCheckpoint(dirpath=f"{Path(__file__).parent.absolute()}/../../checkpoints/tabletransformer/", filename=f"{f'{name}_es' if args.early_stopping else f'{name}_end'}")
     logger = loggers.TensorBoardLogger(save_dir=train_log_dir, name=name)
-    model = TableTransformer(lr=args.lr, lr_backbone=args.lr_backbone, weight_decay=args.weight_decay, traindataset=traindataset, valdataset=validdataset, testdataset=testdataset, datasetname=args.dataset, savepath=f"{Path(__file__).parent.absolute()}/../../checkpoints/tabletransformer/{name}")
+    model = TableTransformer(lr=args.lr, lr_backbone=args.lr_backbone, weight_decay=args.weight_decay, traindataset=traindataset, valdataset=validdataset, testdataset=testdataset, datasetname=args.dataset, savepath=f"{Path(__file__).parent.absolute()}/../../checkpoints/tabletransformer/{name}", loadmodelcheckpoint=args.load)
     if args.valid and not args.early_stopping:
         trainer = Trainer(logger=logger,max_epochs=args.epochs, devices=args.gpus, accelerator="cuda", num_nodes=args.num_nodes, callbacks=[checkpoint_callback])
         trainer.fit(model)

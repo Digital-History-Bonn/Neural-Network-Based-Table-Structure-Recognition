@@ -1,5 +1,5 @@
 #!/bin/bash
-#SBATCH --partition=A40short
+#SBATCH --partition=A40medium
 #SBATCH --nodes=1
 #SBATCH --tasks-per-node=1
 #SBATCH --job-name=train
@@ -7,10 +7,10 @@
 #SBATCH --error=outputs/tabletransformer-bonntrain%j.err
 #SBATCH --gres gpu:1
 #SBATCH --cpus-per-task=1
-#SBATCH --time=8:00:00
+#SBATCH --time=24:00:00
 #SBATCH --mem=10gb
 source /home/s6anthel/.bashrc
 module load CUDA
 conda activate newkosmos2
 
-python -m src.historicdocumentprocessing.tabletransformer_train --name "BonnDataFullImage_tabletransformer_loadtest" --dataset "BonnData" --valid --no-early_stopping --load "tabletransformer_v0_new_GloSatFullImage_tabletransformer_newenv_fixed_GloSat_fullimage_e250_valid_es.pt"
+python -m src.historicdocumentprocessing.tabletransformer_train --name "titw_test" --dataset "Tablesinthewild" --valid --no-early_stopping

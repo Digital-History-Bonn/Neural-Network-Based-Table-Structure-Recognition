@@ -11,6 +11,6 @@
 #SBATCH --mem=10gb
 source /home/s6anthel/.bashrc
 module load CUDA
-conda activate kosmos2
+conda activate newkosmos2
 
-python -m src.historicdocumentprocessing.tabletransformer_train --name "GloSatFullImage_tabletransformer" --dataset "GloSat" --valid --no-early_stopping
+python -m src.historicdocumentprocessing.tabletransformer_train --name "GloSatFullImage_tabletransformer_newenv_fixed" --dataset "GloSat" --valid --no-early_stopping
