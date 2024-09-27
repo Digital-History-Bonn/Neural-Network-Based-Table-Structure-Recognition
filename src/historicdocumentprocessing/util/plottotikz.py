@@ -2,6 +2,7 @@
 script to create tikz plots from tensorboard
 from https://github.com/Digital-History-Bonn/HistorischeTabellenSemanticExtraction/blob/main/scripts/tensorboard2tikz.py
 """
+"""since tikzplotlib is not maintained anymore, this will only work with webcolors<=1.13"""
 
 from pathlib import Path
 from typing import List
@@ -11,6 +12,7 @@ from csv import reader
 
 import tikzplotlib
 from matplotlib import pyplot as plt
+import matplotlib.figure
 
 
 def tikzplotlib_fix_ncols(obj):
@@ -61,9 +63,15 @@ def plot(runs: List[str], tag: str, metric: str):
     plt.xlabel('epoch')
     plt.ylabel(metric)
     plt.title(f"{tag}-{metric}")
-    tikzplotlib_fix_ncols(fig)
-    tikzplotlib.save(f'{Path(__file__).parent.absolute()}/plots/{tag}-{metric}.tex')
+    savepath = f'{Path(__file__).parent.absolute()}/plots/{tag}-{metric}.tex'
+    save_plot_as_tikz(fig, savepath)
     plt.show()
+
+
+def save_plot_as_tikz(fig:matplotlib.figure, savepath:str):
+    assert savepath.endswith(".tex")
+    tikzplotlib_fix_ncols(fig)
+    tikzplotlib.save(savepath)
 
 
 if __name__ == '__main__':

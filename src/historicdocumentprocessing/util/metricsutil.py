@@ -9,6 +9,8 @@ from torchvision.models.detection import fasterrcnn_resnet50_fpn, FasterRCNN_Res
 from tqdm import tqdm
 
 from src.historicdocumentprocessing.kosmos_eval import calcstats_IoU, reversetablerelativebboxes_outer
+from src.historicdocumentprocessing.util.plottotikz import save_plot_as_tikz
+
 
 def findoptimalfilterpoint_outer(modelfolder:str= f"{Path(__file__).parent.absolute()}/../../../checkpoints/fasterrcnn", valid: bool = True):
     for modelpath in glob.glob(f"{modelfolder}/*"):
@@ -85,6 +87,7 @@ def findoptimalfilterpoint(modelpath:str, testdatasetpath:str, tablerelative:boo
     bestpred = round(torch.min(preds[torch.argmax(sum_tp-sum_fp)]).item(),2)
     #print(sum_tp/sum_fp)
     #print(torch.argmax(sum_tp-sum_fp))
+    fig = plt.figure()
     plt.title('true positives and false positives at iou_threshold 0.5 by bbox probability score')
     plt.plot(preds, sum_tp, color='green', label='tp')
     plt.plot(preds, sum_fp, color='red', label='fp')
@@ -93,6 +96,8 @@ def findoptimalfilterpoint(modelpath:str, testdatasetpath:str, tablerelative:boo
     plt.legend()
     os.makedirs(f"{Path(__file__).parent.absolute()}/../../../images/fasterrcnn/{modelname}", exist_ok=True)
     plt.savefig(f"{Path(__file__).parent.absolute()}/../../../images/fasterrcnn/{modelname}/threshold_graph{'_valid' if valid else ''}.png")
+    os.makedirs(f"{Path(__file__).parent.absolute()}/../../../tikzplots/fasterrcnn/{modelname}", exist_ok=True)
+    save_plot_as_tikz(fig=fig, savepath=f"{Path(__file__).parent.absolute()}/../../../tikzplots/fasterrcnn/{modelname}/threshold_graph{'_valid' if valid else ''}.tex")
     os.makedirs(f"{Path(__file__).parent.absolute()}/../../../results/fasterrcnn/bestfilterthresholds{'_valid' if valid else ''}", exist_ok=True)
     plt.close()
     with open(f"{Path(__file__).parent.absolute()}/../../../results/fasterrcnn/bestfilterthresholds{'_valid' if valid else ''}/{modelname}.txt", 'w') as f:
@@ -102,4 +107,4 @@ def findoptimalfilterpoint(modelpath:str, testdatasetpath:str, tablerelative:boo
 
 if __name__=='__main__':
     findoptimalfilterpoint_outer(valid=True)
-    #findoptimalfilterpoint(modelpath=f"{Path(__file__).parent.absolute()}/../../../checkpoints/fasterrcnn/BonnDataFullImage1_BonnData_fullimage_e250_es.pt", testdatasetpath=f"{Path(__file__).parent.absolute()}/../../../data/BonnData/test")
+    #findoptimalfilterpoint(modelpath=f"{Path(__file__).parent.absolute()}/../../../checkpoints/fasterrcnn/BonnDataFullImage1_BonnData_fullimage_e250_es.pt", testdatasetpath=f"{Path(__file__).parent.absolute()}/../../../data/BonnData/test", valid=True)
