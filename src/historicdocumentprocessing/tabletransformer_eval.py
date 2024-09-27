@@ -18,7 +18,7 @@ from src.historicdocumentprocessing.util.tablesutil import getcells
 
 
 def inference(modelpath:str=None, targetloc=None, iou_thresholds: List[float] = [0.5, 0.6, 0.7, 0.8, 0.9], tableareaonly=True,
-              filtering:bool = False, valid:bool = True, datasetname:str="BonnData"):
+              filtering:bool = False, valid:bool = True, datasetname:str="BonnData", celleval:bool=False):
     modelname="base_table-transformer-structure-recognition"
     model = TableTransformerForObjectDetection.from_pretrained("microsoft/table-transformer-structure-recognition")
     if modelpath:
@@ -49,6 +49,7 @@ def inference(modelpath:str=None, targetloc=None, iou_thresholds: List[float] = 
         saveloc = f"{Path(__file__).parent.absolute()}/../../results/tabletransformer/testevalfinal1/fullimg/{datasetname}/{modelname}/filtering_{filterthreshold}_iou{'_'.join([str(iou_thresholds[0]), str(iou_thresholds[-1])])}"
     elif filtering and tableareaonly:
         saveloc = f"{Path(__file__).parent.absolute()}/../../results/tabletransformer/testevalfinal1/fullimg/{datasetname}/{modelname}/tableareaonly/filtering_{filterthreshold}_iou{'_'.join([str(iou_thresholds[0]), str(iou_thresholds[-1])])}"
+    saveloc=f"{saveloc}{'/cells' if celleval else ''}"
     os.makedirs(saveloc, exist_ok=True)
 
     ### initializing variables ###
@@ -89,7 +90,9 @@ def inference(modelpath:str=None, targetloc=None, iou_thresholds: List[float] = 
         transforms=None,
     )
     for i in tqdm(range(len(dataset))):
-        img, fullimagegroundbox, labels = dataset.getimgtarget(i)
+        img, fullimagegroundbox, labels = dataset.getimgtarget(i, addtables=False)
+        if celleval:
+            fullimagegroundbox, labels = dataset.getcells(i, addtables=False)
         encoding = move_data_to_device(dataset.ImageProcessor(img, return_tensors="pt"), device=device)
         folder = dataset.getfolder(i)
         imname = folder.split("/")[-1]
@@ -102,7 +105,10 @@ def inference(modelpath:str=None, targetloc=None, iou_thresholds: List[float] = 
         else:
             output = dataset.ImageProcessor.post_process_object_detection(results, target_sizes=[(height, width)])[0]
         #labels = torch.Tensor([str(model.config.id2label[label]) for label in output["labels"].tolist()])
-        boxes = getcells(rows=output["boxes"][output["labels"]==2], cols=output["boxes"][output["labels"]==1])
+        if celleval:
+            boxes = getcells(rows=output["boxes"][output["labels"]==2], cols=output["boxes"][output["labels"]==1])
+        else:
+            boxes = torch.vstack([output["boxes"][output["labels"]==2], output["boxes"][output["labels"]==1]])
         print(boxes.shape)
         if tableareaonly:
             boxes = tableareabboxes(boxes, folder)
@@ -370,3 +376,24 @@ if __name__=='__main__':
     inference(
         modelpath=f"{Path(__file__).parent.absolute()}/../../checkpoints/tabletransformer/tabletransformer_v0_new_BonnDataFullImage_tabletransformer_estest_BonnData_fullimage_e250_valid_end.pt",
         targetloc=f"{Path(__file__).parent.absolute()}/../../data/BonnData/test")
+    inference(
+        modelpath=f"{Path(__file__).parent.absolute()}/../../checkpoints/tabletransformer/tabletransformer_v0_new_GloSatFullImage_tabletransformer_newenv_fixed_GloSat_fullimage_e250_valid_es.pt",
+        targetloc=f"{Path(__file__).parent.absolute()}/../../data/GloSat/test", datasetname="GloSat")
+    inference(
+        modelpath=f"{Path(__file__).parent.absolute()}/../../checkpoints/tabletransformer/tabletransformer_v0_new_GloSatFullImage_tabletransformer_newenv_fixed_GloSat_fullimage_e250_valid_end.pt",
+        targetloc=f"{Path(__file__).parent.absolute()}/../../data/GloSat/test", datasetname="GloSat")
+    inference(
+        modelpath=f"{Path(__file__).parent.absolute()}/../../checkpoints/tabletransformer/tabletransformer_v0_new_BonnDataFullImage_tabletransformer_v0_bbox_xywh_BonnData_fullimage_e250_valid_end.pt",
+        targetloc=f"{Path(__file__).parent.absolute()}/../../data/BonnData/test", celleval=True)
+    inference(
+        modelpath=f"{Path(__file__).parent.absolute()}/../../checkpoints/tabletransformer/tabletransformer_v0_new_BonnDataFullImage_tabletransformer_estest_BonnData_fullimage_e250_valid_es.pt",
+        targetloc=f"{Path(__file__).parent.absolute()}/../../data/BonnData/test", celleval=True)
+    inference(
+        modelpath=f"{Path(__file__).parent.absolute()}/../../checkpoints/tabletransformer/tabletransformer_v0_new_BonnDataFullImage_tabletransformer_estest_BonnData_fullimage_e250_valid_end.pt",
+        targetloc=f"{Path(__file__).parent.absolute()}/../../data/BonnData/test", celleval=True)
+    inference(
+        modelpath=f"{Path(__file__).parent.absolute()}/../../checkpoints/tabletransformer/tabletransformer_v0_new_GloSatFullImage_tabletransformer_newenv_fixed_GloSat_fullimage_e250_valid_es.pt",
+        targetloc=f"{Path(__file__).parent.absolute()}/../../data/GloSat/test", datasetname="GloSat", celleval=True)
+    inference(
+        modelpath=f"{Path(__file__).parent.absolute()}/../../checkpoints/tabletransformer/tabletransformer_v0_new_GloSatFullImage_tabletransformer_newenv_fixed_GloSat_fullimage_e250_valid_end.pt",
+        targetloc=f"{Path(__file__).parent.absolute()}/../../data/GloSat/test", datasetname="GloSat", celleval=True)

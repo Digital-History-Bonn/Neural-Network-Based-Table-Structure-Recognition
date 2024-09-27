@@ -35,6 +35,7 @@ from unicodedata import category
 
 import torch
 from PIL import Image
+from sympy import false
 from torch.nn import Module
 from torch.utils.data import Dataset, DataLoader
 from torchvision.io import read_image
@@ -196,7 +197,35 @@ class CustomDataset(Dataset):  # type: ignore
         encoding = self.ImageProcessor.pad(pixelvalues, return_tensors="pt")
         return {"pixel_values": encoding["pixel_values"], "pixel_mask": encoding["pixel_mask"], "labels": [b["labels"][0] for b in batch]}
 
-    def getimgtarget(self, index):
+    def getcells(self, index, addtables:bool=True):
+        imgnum = self.data[index].split(os.sep)[-1]
+        # if index == 0:
+        #    print(imgnum)
+        if self.objective == "fullimage":
+            img = Image.open(f"{self.data[index]}/{imgnum}.jpg").convert("RGB")
+            bboxes = []
+            labels = []
+            if self.dataset in ["BonnData", "GloSat", "Tablesinthewild"]:
+                target = reversetablerelativebboxes_outer(self.data[index])
+                bboxes.append(target)
+                labels += ([f"cell" for i in range(target.shape[0])])
+                if addtables:
+                    tables = torch.load(glob.glob(f"{self.data[index]}/*tables.pt")[0])
+                    labels += ([f"tables" for i in range(tables.shape[0])])
+                    bboxes.append(tables)
+                target = torch.vstack(bboxes)
+            else:
+                target = torch.load(f"{self.data[index]}/{imgnum}.pt")
+            # print(img.dtype)
+        else:
+            "not yet implemented since there is no need, left in so it can be added in future"
+            target = None
+            img = None
+            labels = None
+            pass
+        return target, labels
+
+    def getimgtarget(self, index, addtables:bool=True)->Tuple[Image.Image, torch.Tensor, List]:
         """get image and target and labels at index"""
         # load image and targets depending on objective
         imgnum = self.data[index].split(os.sep)[-1]
@@ -211,9 +240,10 @@ class CustomDataset(Dataset):  # type: ignore
                     target = reversetablerelativebboxes_outer_rowcoll(self.data[index], category=cat)
                     bboxes.append(target)
                     labels+=([f"{cat}" for i in range(target.shape[0])])
-                tables = torch.load(glob.glob(f"{self.data[index]}/*tables.pt")[0])
-                labels+=([f"tables" for i in range(tables.shape[0])])
-                bboxes.append(tables)
+                if addtables:
+                    tables = torch.load(glob.glob(f"{self.data[index]}/*tables.pt")[0])
+                    labels+=([f"tables" for i in range(tables.shape[0])])
+                    bboxes.append(tables)
                 target= torch.vstack(bboxes)
             else:
                 target = torch.load(f"{self.data[index]}/{imgnum}.pt")
@@ -260,12 +290,23 @@ if __name__ == "__main__":
     newbatch = move_data_to_device(batch, device)
     #print(newbatch, device)
     img, target, labels = dataset.getimgtarget(1)
+    #result = draw_bounding_boxes(
+    #    image=pil_to_tensor(img).to(torch.uint8),
+    #    boxes=target,
+    #    labels=labels,
+    #)
+    #img = Image.fromarray(result.permute(1, 2, 0).numpy())
+    print(labels)
+    # print(f"{savepath}/{identifier}.jpg")
+    #img.save(f"{Path(__file__).parent.absolute()}/../../images/test/testtabletransformerdatasettablesinthewild.jpg")
+    cells, labels = dataset.getcells(1, addtables=False)
     result = draw_bounding_boxes(
         image=pil_to_tensor(img).to(torch.uint8),
-        boxes=target,
+        boxes=cells,
         labels=labels,
     )
     img = Image.fromarray(result.permute(1, 2, 0).numpy())
-    print(labels)
-    # print(f"{savepath}/{identifier}.jpg")
-    img.save(f"{Path(__file__).parent.absolute()}/../../images/test/testtabletransformerdatasettablesinthewild.jpg")
+    img.save(f"{Path(__file__).parent.absolute()}/../../images/test/testtabletransformerdatasettablesinthewild_cells.jpg")
+    print(dataset.getcells(2, addtables=false))
+    print(cells.shape)
+    print(dataset.getimgtarget(1, addtables=false))
