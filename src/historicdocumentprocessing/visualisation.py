@@ -4,20 +4,24 @@ from pathlib import Path
 from typing import List
 
 import torch
+from PIL import Image
+from lightning_fabric.utilities import move_data_to_device
 from torchvision.io import read_image
 from torchvision.models.detection import fasterrcnn_resnet50_fpn, FasterRCNN_ResNet50_FPN_Weights
 from tqdm import tqdm
+from transformers import TableTransformerForObjectDetection, AutoImageProcessor
 
 from src.historicdocumentprocessing.kosmos_eval import (
     extractboxes,
     reversetablerelativebboxes_outer,
 )
-from src.historicdocumentprocessing.util.tablesutil import remove_invalid_bbox
+from src.historicdocumentprocessing.tabletransformer_dataset import CustomDataset
+from src.historicdocumentprocessing.util.tablesutil import remove_invalid_bbox, getcells
 from src.historicdocumentprocessing.postprocessing import postprocess
 from src.historicdocumentprocessing.util.visualisationutil import drawimg_varformat_inner
 
 
-def drawimg_allmodels(datasetname:str, imgpath:str, rcnnmodels:List[str], datasetaddon_pred:str=None, datasetaddon_additional:str="", valid:bool = True):
+def drawimg_allmodels(datasetname:str, imgpath:str, rcnnmodels:List[str],tabletransformermodels:List[str], datasetaddon_pred:str=None, datasetaddon_additional:str="", valid:bool = True):
     imname = imgpath.split("/")[-1].split(".")[-2]
     groundpath = f"{Path(__file__).parent.absolute()}/../../data/{datasetname.split('/')[-2]}/preprocessed/{datasetname.split('/')[-1]}" if "/" in datasetname else f"{Path(__file__).parent.absolute()}/../../data/{datasetname}/test"
     groundpath = f"{groundpath}/{imname}"
@@ -66,6 +70,52 @@ def drawimg_allmodels(datasetname:str, imgpath:str, rcnnmodels:List[str], datase
         filtered_processed = postprocess(fullimagepredbox_filtered, imname=imname, saveloc= f"{Path(__file__).parent.absolute()}/../../images/test.pt", minsamples=[2, 3])
         drawimg_varformat_inner(impath=imgpath, box=filtered_processed, groundpath=groundpath,
                                 savepath=f"{Path(__file__).parent.absolute()}/../../images/fasterrcnn/{modelpath.split('/')[-1]}/filtered_{filter}{'_valid' if valid else ''}_postprocessed")
+    for modelname in tabletransformermodels:
+        model = TableTransformerForObjectDetection.from_pretrained("microsoft/table-transformer-structure-recognition")
+        modelpath = f"{Path(__file__).parent.absolute()}/../../checkpoints/tabletransformer/{modelname}"
+        model.load_state_dict(torch.load(modelpath))
+        print("loaded_model:", modelname)
+        assert model.config.id2label[1] == "table column"
+        assert model.config.id2label[2] == "table row"
+        # image_processor = DetrImageProcessor.from_pretrained("facebook/detr-resnet-50")
+        # image_processor = AutoImageProcessor.from_pretrained("microsoft/table-transformer-structure-recognition")
+        if torch.cuda.is_available():
+            device = torch.device("cuda")
+            model.to(device)
+            model.eval()
+        else:
+            print("Cuda not available")
+            return
+        try:
+            with open(
+                    f"{Path(__file__).parent.absolute()}/../../results/tabletransformer/bestfilterthresholds{'_valid' if valid else ''}/{modelname}.txt",
+                    'r') as f:
+                filterthreshold = float(f.read())
+        except FileNotFoundError:
+            filterthreshold = 0.7
+        img = Image.open(imgpath).convert("RGB")
+        ImageProcessor = AutoImageProcessor.from_pretrained("microsoft/table-transformer-structure-recognition")
+        encoding = move_data_to_device(ImageProcessor(img, return_tensors="pt"), device=device)
+        with torch.no_grad():
+            results = model(**encoding)
+        width, height = img.size
+        output = ImageProcessor.post_process_object_detection(results, threshold=0.0,
+                                                                      target_sizes=[(height, width)])[0]
+        cellboxes = getcells(rows=output["boxes"][output["labels"] == 2],
+                                     cols=output["boxes"][output["labels"] == 1])
+        boxes = torch.vstack([output["boxes"][output["labels"] == 2], output["boxes"][output["labels"] == 1]])
+        outputfiltered = ImageProcessor.post_process_object_detection(results, threshold=filterthreshold,
+                                                                      target_sizes=[(height, width)])[0]
+        cellboxesfiltered = getcells(rows=outputfiltered["boxes"][outputfiltered["labels"] == 2], cols=outputfiltered["boxes"][outputfiltered["labels"] == 1])
+        boxesfiltered = torch.vstack([outputfiltered["boxes"][outputfiltered["labels"] == 2], outputfiltered["boxes"][outputfiltered["labels"] == 1]])
+        drawimg_varformat_inner(impath=imgpath, box=cellboxes, groundpath=groundpath, savepath=f"{Path(__file__).parent.absolute()}/../../images/tabletransformer/{modelpath.split('/')[-1]}/cellimg")
+        drawimg_varformat_inner(impath=imgpath, box=cellboxesfiltered, groundpath=groundpath,
+                                savepath=f"{Path(__file__).parent.absolute()}/../../images/tabletransformer/{modelpath.split('/')[-1]}/cellimg_filtered_{filterthreshold}")
+        drawimg_varformat_inner(impath=imgpath, box=boxes, groundpath=groundpath,
+                                savepath=f"{Path(__file__).parent.absolute()}/../../images/tabletransformer/{modelpath.split('/')[-1]}/rowcolimg")
+        drawimg_varformat_inner(impath=imgpath, box=boxesfiltered, groundpath=groundpath,
+                                savepath=f"{Path(__file__).parent.absolute()}/../../images/tabletransformer/{modelpath.split('/')[-1]}/rowcolimg_filtered_{filterthreshold}")
+
 
 def drawimg_varformat(
     impath: str = f"{Path(__file__).parent.absolute()}/../../data/BonnData/test/Konflikttabelle.jpg",
