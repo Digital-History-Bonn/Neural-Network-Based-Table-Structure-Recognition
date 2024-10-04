@@ -91,8 +91,11 @@ def drawimg_allmodels(datasetname:str, imgpath:str, rcnnmodels:List[str],tabletr
                     f"{Path(__file__).parent.absolute()}/../../results/tabletransformer/bestfilterthresholds{'_valid' if valid else ''}/{modelname}.txt",
                     'r') as f:
                 filterthreshold = float(f.read())
+                if filterthreshold==1.0:
+                    filterthreshold=0.5
         except FileNotFoundError:
             filterthreshold = 0.7
+        #print(filterthreshold)
         img = Image.open(imgpath).convert("RGB")
         ImageProcessor = AutoImageProcessor.from_pretrained("microsoft/table-transformer-structure-recognition")
         encoding = move_data_to_device(ImageProcessor(img, return_tensors="pt"), device=device)
@@ -102,12 +105,12 @@ def drawimg_allmodels(datasetname:str, imgpath:str, rcnnmodels:List[str],tabletr
         output = ImageProcessor.post_process_object_detection(results, threshold=0.0,
                                                                       target_sizes=[(height, width)])[0]
         cellboxes = getcells(rows=output["boxes"][output["labels"] == 2],
-                                     cols=output["boxes"][output["labels"] == 1])
-        boxes = torch.vstack([output["boxes"][output["labels"] == 2], output["boxes"][output["labels"] == 1]])
+                                     cols=output["boxes"][output["labels"] == 1]).to(device="cpu")
+        boxes = torch.vstack([output["boxes"][output["labels"] == 2], output["boxes"][output["labels"] == 1]]).to(device="cpu")
         outputfiltered = ImageProcessor.post_process_object_detection(results, threshold=filterthreshold,
                                                                       target_sizes=[(height, width)])[0]
-        cellboxesfiltered = getcells(rows=outputfiltered["boxes"][outputfiltered["labels"] == 2], cols=outputfiltered["boxes"][outputfiltered["labels"] == 1])
-        boxesfiltered = torch.vstack([outputfiltered["boxes"][outputfiltered["labels"] == 2], outputfiltered["boxes"][outputfiltered["labels"] == 1]])
+        cellboxesfiltered = getcells(rows=outputfiltered["boxes"][outputfiltered["labels"] == 2], cols=outputfiltered["boxes"][outputfiltered["labels"] == 1]).to(device="cpu")
+        boxesfiltered = torch.vstack([outputfiltered["boxes"][outputfiltered["labels"] == 2], outputfiltered["boxes"][outputfiltered["labels"] == 1]]).to(device="cpu")
         drawimg_varformat_inner(impath=imgpath, box=cellboxes, groundpath=groundpath, savepath=f"{Path(__file__).parent.absolute()}/../../images/tabletransformer/{modelpath.split('/')[-1]}/cellimg")
         drawimg_varformat_inner(impath=imgpath, box=cellboxesfiltered, groundpath=groundpath,
                                 savepath=f"{Path(__file__).parent.absolute()}/../../images/tabletransformer/{modelpath.split('/')[-1]}/cellimg_filtered_{filterthreshold}")
@@ -226,16 +229,17 @@ def main():
 
 
 if __name__ == "__main__":
-    #drawimg_allmodels(datasetname="BonnData", imgpath=f"{Path(__file__).parent.absolute()}/../../data/BonnData/preprocessed/I_HA_Rep_89_Nr_16160_0227/I_HA_Rep_89_Nr_16160_0227.jpg", datasetaddon_pred="Tabellen/test", rcnnmodels=['BonnDataFullImage1_BonnData_fullimage_e250_es.pt','BonnDataFullImage_pretrain_GloSatFullImage1_GloSat_fullimage_e250_es_BonnData_fullimage_e250_es.pt'])
-    #drawimg_allmodels(datasetname="BonnData",
-    #                  imgpath=f"{Path(__file__).parent.absolute()}/../../data/BonnData/preprocessed/I_HA_Rep_89_Nr_16160_0170/I_HA_Rep_89_Nr_16160_0170.jpg",
-    #                  datasetaddon_pred="Tabellen/test", rcnnmodels=['BonnDataFullImage1_BonnData_fullimage_e250_es.pt',
-    #                                                                 'BonnDataFullImage_pretrain_GloSatFullImage1_GloSat_fullimage_e250_es_BonnData_fullimage_e250_es.pt'])
+    drawimg_allmodels(datasetname="BonnData", imgpath=f"{Path(__file__).parent.absolute()}/../../data/BonnData/preprocessed/I_HA_Rep_89_Nr_16160_0227/I_HA_Rep_89_Nr_16160_0227.jpg", datasetaddon_pred="Tabellen/test", rcnnmodels=['BonnDataFullImage1_BonnData_fullimage_e250_es.pt','BonnDataFullImage_pretrain_GloSatFullImage1_GloSat_fullimage_e250_es_BonnData_fullimage_e250_es.pt'], tabletransformermodels=["tabletransformer_v0_new_BonnDataFullImage_tabletransformer_estest_BonnData_fullimage_e250_valid_es.pt", "tabletransformer_v0_new_BonnDataFullImage_tabletransformer_estest_BonnData_fullimage_e1_init_tabletransformer_v0_new_GloSatFullImage_tabletransformer_newenv_fixed_GloSat_fullimage_e250_valid_es.pt_valid_es.pt", "tabletransformer_v0_new_BonnDataFullImage_tabletransformer_loadtest_BonnData_fullimage_e250_init_tabletransformer_v0_new_GloSatFullImage_tabletransformer_newenv_fixed_GloSat_fullimage_e250_valid_es.pt_valid_es.pt"])
+    drawimg_allmodels(datasetname="BonnData",
+                      imgpath=f"{Path(__file__).parent.absolute()}/../../data/BonnData/preprocessed/I_HA_Rep_89_Nr_16160_0170/I_HA_Rep_89_Nr_16160_0170.jpg",
+                      datasetaddon_pred="Tabellen/test", rcnnmodels=['BonnDataFullImage1_BonnData_fullimage_e250_es.pt',
+                                                                     'BonnDataFullImage_pretrain_GloSatFullImage1_GloSat_fullimage_e250_es_BonnData_fullimage_e250_es.pt'], tabletransformermodels=["tabletransformer_v0_new_BonnDataFullImage_tabletransformer_estest_BonnData_fullimage_e250_valid_es.pt", "tabletransformer_v0_new_BonnDataFullImage_tabletransformer_estest_BonnData_fullimage_e1_init_tabletransformer_v0_new_GloSatFullImage_tabletransformer_newenv_fixed_GloSat_fullimage_e250_valid_es.pt_valid_es.pt", "tabletransformer_v0_new_BonnDataFullImage_tabletransformer_loadtest_BonnData_fullimage_e250_init_tabletransformer_v0_new_GloSatFullImage_tabletransformer_newenv_fixed_GloSat_fullimage_e250_valid_es.pt_valid_es.pt"])
     #drawimg_allmodels(datasetname="GloSat",
     #                  imgpath=f"{Path(__file__).parent.absolute()}/../../data/GloSat/preprocessed/98/98.jpg",
     #                  datasetaddon_pred="test1", rcnnmodels=['GloSatFullImage1_GloSat_fullimage_e250_es.pt',
-    #                                                                 'GloSatFullImage_random_GloSat_fullimage_e250_random_init_es.pt'])
+    #                                                                 'GloSatFullImage_random_GloSat_fullimage_e250_random_init_es.pt'], tabletransformermodels=["tabletransformer_v0_new_GloSatFullImage_tabletransformer_newenv_fixed_GloSat_fullimage_e250_valid_es.pt"])
     #drawimg_allmodels(datasetname="Tablesinthewild/curved", imgpath=f'{Path(__file__).parent.absolute()}/../../data/Tablesinthewild/preprocessed/curved/mit_google_image_search-10918758-7f5f72bb8440c9caf8b07b28ffdc54d33bd370ab/mit_google_image_search-10918758-7f5f72bb8440c9caf8b07b28ffdc54d33bd370ab.jpg', rcnnmodels=['testseveralcalls_4_with_valid_split_Tablesinthewild_fullimage_e50_es.pt', 'testseveralcalls_valid_random_init_e_250_es.pt'])
+    """
     drawimg_allmodels(datasetname="Tablesinthewild/extremeratio",
                       imgpath=f'{Path(__file__).parent.absolute()}/../../data/Tablesinthewild/preprocessed/extremeratio/customs-declaration-12039/customs-declaration-12039.jpg',
                       rcnnmodels=['testseveralcalls_4_with_valid_split_Tablesinthewild_fullimage_e50_es.pt',
@@ -268,6 +272,7 @@ if __name__ == "__main__":
                       imgpath=f"{Path(__file__).parent.absolute()}/../../data/GloSat/preprocessed/471/471.jpg",
                       datasetaddon_pred="test1", rcnnmodels=['GloSatFullImage1_GloSat_fullimage_e250_es.pt',
                                                              'GloSatFullImage_random_GloSat_fullimage_e250_random_init_es.pt'])
+    """
     # drawimg_varformat(savepath=f"{Path(__file__).parent.absolute()}/../../images/rcnn/BonnTables/test",
     #                  impath=f"{Path(__file__).parent.absolute()}/../../data/BonnData/Tabellen/test/IMG_20190821_132903/IMG_20190821_132903_table_0.jpg",
     #                  groundpath=f"{Path(__file__).parent.absolute()}/../../data/BonnData/Tabellen/test/IMG_20190821_132903/IMG_20190821_132903_cell_0.pt",

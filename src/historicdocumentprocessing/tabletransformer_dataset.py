@@ -198,6 +198,8 @@ class CustomDataset(Dataset):  # type: ignore
         return {"pixel_values": encoding["pixel_values"], "pixel_mask": encoding["pixel_mask"], "labels": [b["labels"][0] for b in batch]}
 
     def getcells(self, index, addtables:bool=True):
+        """get cell targets at index
+        also returns table targets if addtables is True"""
         imgnum = self.data[index].split(os.sep)[-1]
         # if index == 0:
         #    print(imgnum)
@@ -226,7 +228,8 @@ class CustomDataset(Dataset):  # type: ignore
         return target, labels
 
     def getimgtarget(self, index, addtables:bool=True)->Tuple[Image.Image, torch.Tensor, List]:
-        """get image and target and labels at index"""
+        """get image and row/col target and labels at index
+        also returns table targets if addtables is true"""
         # load image and targets depending on objective
         imgnum = self.data[index].split(os.sep)[-1]
         #if index == 0:
@@ -252,6 +255,7 @@ class CustomDataset(Dataset):  # type: ignore
             "not yet implemented since there is no need, left in so it can be added in future"
             target = None
             img = None
+            labels = None
             pass
         return img, target, labels
 

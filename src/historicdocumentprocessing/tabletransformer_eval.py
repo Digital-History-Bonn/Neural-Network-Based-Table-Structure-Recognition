@@ -368,6 +368,16 @@ def inference(modelpath:str=None, targetloc=None, iou_thresholds: List[float] = 
     conclusiondf.to_csv(f"{saveloc}/overview.csv")
 
 if __name__=='__main__':
+    inference(modelpath=f"{Path(__file__).parent.absolute()}/../../checkpoints/tabletransformer/tabletransformer_v0_new_BonnDataFullImage_tabletransformer_loadtest_BonnData_fullimage_e250_init_tabletransformer_v0_new_GloSatFullImage_tabletransformer_newenv_fixed_GloSat_fullimage_e250_valid_es.pt_valid_es.pt", targetloc=f"{Path(__file__).parent.absolute()}/../../data/BonnData/test")
+    inference(
+        modelpath=f"{Path(__file__).parent.absolute()}/../../checkpoints/tabletransformer/tabletransformer_v0_new_BonnDataFullImage_tabletransformer_loadtest_BonnData_fullimage_e250_init_tabletransformer_v0_new_GloSatFullImage_tabletransformer_newenv_fixed_GloSat_fullimage_e250_valid_es.pt_valid_es.pt",
+        targetloc=f"{Path(__file__).parent.absolute()}/../../data/BonnData/test", filtering=True)
+    inference(
+        modelpath=f"{Path(__file__).parent.absolute()}/../../checkpoints/tabletransformer/tabletransformer_v0_new_BonnDataFullImage_tabletransformer_loadtest_BonnData_fullimage_e250_init_tabletransformer_v0_new_GloSatFullImage_tabletransformer_newenv_fixed_GloSat_fullimage_e250_valid_es.pt_valid_es.pt",
+        targetloc=f"{Path(__file__).parent.absolute()}/../../data/BonnData/test", celleval=True)
+    inference(
+        modelpath=f"{Path(__file__).parent.absolute()}/../../checkpoints/tabletransformer/tabletransformer_v0_new_BonnDataFullImage_tabletransformer_loadtest_BonnData_fullimage_e250_init_tabletransformer_v0_new_GloSatFullImage_tabletransformer_newenv_fixed_GloSat_fullimage_e250_valid_es.pt_valid_es.pt",
+        targetloc=f"{Path(__file__).parent.absolute()}/../../data/BonnData/test", filtering=True, celleval=True)
     """
     inference(modelpath=f"{Path(__file__).parent.absolute()}/../../checkpoints/tabletransformer/tabletransformer_v0_new_BonnDataFullImage_tabletransformer_estest_BonnData_fullimage_e1_init_tabletransformer_v0_new_GloSatFullImage_tabletransformer_newenv_fixed_GloSat_fullimage_e250_valid_es.pt_valid_es.pt", targetloc=f"{Path(__file__).parent.absolute()}/../../data/BonnData/test")
     inference(
@@ -404,6 +414,7 @@ if __name__=='__main__':
         targetloc=f"{Path(__file__).parent.absolute()}/../../data/GloSat/test", datasetname="GloSat", celleval=True)
     """
     ##################################################################################################################
+    """
     print("with filtering")
     inference(
         modelpath=f"{Path(__file__).parent.absolute()}/../../checkpoints/tabletransformer/tabletransformer_v0_new_BonnDataFullImage_tabletransformer_estest_BonnData_fullimage_e1_init_tabletransformer_v0_new_GloSatFullImage_tabletransformer_newenv_fixed_GloSat_fullimage_e250_valid_es.pt_valid_es.pt",
@@ -441,3 +452,4 @@ if __name__=='__main__':
     inference(
         modelpath=f"{Path(__file__).parent.absolute()}/../../checkpoints/tabletransformer/tabletransformer_v0_new_GloSatFullImage_tabletransformer_newenv_fixed_GloSat_fullimage_e250_valid_end.pt",
         targetloc=f"{Path(__file__).parent.absolute()}/../../data/GloSat/test", datasetname="GloSat", celleval=True, filtering=True)
+    """
