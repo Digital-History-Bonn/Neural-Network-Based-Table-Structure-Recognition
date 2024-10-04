@@ -53,7 +53,8 @@ class TableTransformer(pl.LightningModule):
          # see https://github.com/PyTorchLightning/pytorch-lightning/pull/1896
          #print(model.config.id2label)
          if loadmodelcheckpoint:
-             self.model.load_state_dict(torch.load(f"{Path(__file__).parent.absolute()}/../../checkpoints/tabletransformer/{loadmodelcheckpoint}"))
+             self.model.load_state_dict(torch.load(f"{Path(__file__).parent.absolute()}/../../checkpoints/tabletransformer/{loadmodelcheckpoint}.pt"))
+             self.model.train()
              print("loaded: ", loadmodelcheckpoint)
          self.lr = lr
          self.lr_backbone = lr_backbone
@@ -279,6 +280,9 @@ def get_args() -> argparse.Namespace:
     parser.add_argument("--no-early_stopping","-no_es", dest="early_stopping", action="store_false")
     parser.set_defaults(early_stopping=False)
 
+    parser.add_argument("--identicalname", action="store_true")
+    parser.set_defaults(identicalname=False)
+
     return parser.parse_args()
 
 if __name__=='__main__':
@@ -301,6 +305,7 @@ if __name__=='__main__':
         args.objective
     )
 
+    if args.identicalname: name = args.name
     print("start training:")
     print(f"\tname: {name}")
     print(f"\tobjective: {args.objective}")
@@ -326,10 +331,16 @@ if __name__=='__main__':
     print(f"{len(traindataset)=}")
     print(f"{len(validdataset)=}")
 
+
     checkpoint_callback = ModelCheckpoint(dirpath=f"{Path(__file__).parent.absolute()}/../../checkpoints/tabletransformer/", filename=f"{f'{name}_es' if args.early_stopping else f'{name}_end'}")
-    logger = loggers.TensorBoardLogger(save_dir=train_log_dir, name=name)
+    logger = loggers.TensorBoardLogger(save_dir=train_log_dir, name=name, version="severalcalls") #version needs to be constant for same log in case of resuming training
     model = TableTransformer(lr=args.lr, lr_backbone=args.lr_backbone, weight_decay=args.weight_decay, traindataset=traindataset, valdataset=validdataset, testdataset=testdataset, datasetname=args.dataset, savepath=f"{Path(__file__).parent.absolute()}/../../checkpoints/tabletransformer/{name}", loadmodelcheckpoint=args.load)
-    if args.valid and not args.early_stopping:
+    if args.identicalname and args.load and args.valid and not args.early_stopping:
+        trainer = Trainer(logger=logger,max_epochs=args.epochs, devices=args.gpus, accelerator="cuda", num_nodes=args.num_nodes, callbacks=[checkpoint_callback])
+        trainer.fit(model, ckpt_path=f"{Path(__file__).parent.absolute()}/../../checkpoints/tabletransformer/{args.load}.ckpt")
+        checkpoint = torch.load(f"{Path(__file__).parent.absolute()}/../../checkpoints/tabletransformer/{args.load}.ckpt")
+        print("global_step", checkpoint["global_step"])
+    elif args.valid and not args.early_stopping:
         trainer = Trainer(logger=logger,max_epochs=args.epochs, devices=args.gpus, accelerator="cuda", num_nodes=args.num_nodes, callbacks=[checkpoint_callback])
         trainer.fit(model)
     elif args.valid and args.early_stopping:
