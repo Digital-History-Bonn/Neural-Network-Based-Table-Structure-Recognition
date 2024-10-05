@@ -603,6 +603,7 @@ def postprocess(
         if saveempty:
             os.makedirs(saveloc, exist_ok=True)
             torch.save(torch.empty((0,4)), f"{saveloc}/{imname}.pt")
+        return torch.empty((0,4))
     # print(boxes)
     # colors = ["green" for i in range(boxes.shape[0])]
     # res = draw_bounding_boxes(image=img, boxes=boxes, colors=colors)
@@ -659,7 +660,7 @@ def postprocess_tabletransformer(modelname:str=None, targetloc:str= None, datase
     saveloc = f"{Path(__file__).parent.absolute()}/../../results/tabletransformer/postprocessed/fullimg/{datasetname}"
     model = AutoModelForObjectDetection.from_pretrained(
              "microsoft/table-transformer-structure-recognition")
-    model.load_state_dict(torch.load(f"{Path(__file__).parent.absolute()}/../../checkpoints/tabletransformer/{modelname}.pt"))
+    model.load_state_dict(torch.load(f"{Path(__file__).parent.absolute()}/../../checkpoints/tabletransformer/{modelname}"))
     if torch.cuda.is_available():
         device = torch.device("cuda")
         model.to(device)
@@ -1033,8 +1034,10 @@ def postprocess_eval(
 
 
 if __name__ == "__main__":
-    postprocess_tabletransformer(modelname="tabletransformer_v0_new_BonnDataFullImage_tabletransformer_estest_BonnData_fullimage_e250_valid_es", targetloc= f"{Path(__file__).parent.absolute()}/../../data/BonnData/test",
+    postprocess_tabletransformer(modelname="tabletransformer_v0_new_BonnDataFullImage_tabletransformer_estest_BonnData_fullimage_e250_valid_es.pt", targetloc= f"{Path(__file__).parent.absolute()}/../../data/BonnData/test",
                                  datasetname="BonnData")
+    postprocess_eval(modelpath=f"{Path(__file__).parent.absolute()}/../../checkpoints/tabletransformer/tabletransformer_v0_new_BonnDataFullImage_tabletransformer_estest_BonnData_fullimage_e250_valid_es.pt", targetloc= f"{Path(__file__).parent.absolute()}/../../data/BonnData/test",
+                                 datasetname="BonnData", modeltype="tabletransformer")
     """
     postprocess_kosmos_sep(targetloc = f"{Path(__file__).parent.absolute()}/../../data/BonnData/test",
     predloc = f"{Path(__file__).parent.absolute()}/../../results/kosmos25/BonnData"
