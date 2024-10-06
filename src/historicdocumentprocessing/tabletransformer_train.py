@@ -337,9 +337,10 @@ if __name__=='__main__':
     model = TableTransformer(lr=args.lr, lr_backbone=args.lr_backbone, weight_decay=args.weight_decay, traindataset=traindataset, valdataset=validdataset, testdataset=testdataset, datasetname=args.dataset, savepath=f"{Path(__file__).parent.absolute()}/../../checkpoints/tabletransformer/{name}", loadmodelcheckpoint=args.load)
     if args.identicalname and args.load and args.valid and not args.early_stopping:
         trainer = Trainer(logger=logger,max_epochs=args.epochs, devices=args.gpus, accelerator="cuda", num_nodes=args.num_nodes, callbacks=[checkpoint_callback])
-        trainer.fit(model, ckpt_path=f"{Path(__file__).parent.absolute()}/../../checkpoints/tabletransformer/{args.load}.ckpt")
-        checkpoint = torch.load(f"{Path(__file__).parent.absolute()}/../../checkpoints/tabletransformer/{args.load}.ckpt")
+        checkpoint = torch.load(
+            f"{Path(__file__).parent.absolute()}/../../checkpoints/tabletransformer/{args.load}.ckpt")
         print("global_step", checkpoint["global_step"])
+        trainer.fit(model, ckpt_path=f"{Path(__file__).parent.absolute()}/../../checkpoints/tabletransformer/{args.load}.ckpt")
     elif args.valid and not args.early_stopping:
         trainer = Trainer(logger=logger,max_epochs=args.epochs, devices=args.gpus, accelerator="cuda", num_nodes=args.num_nodes, callbacks=[checkpoint_callback])
         trainer.fit(model)
