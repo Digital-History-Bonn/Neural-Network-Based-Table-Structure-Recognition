@@ -102,17 +102,17 @@ class TableTransformer(pl.LightningModule):
         loss, loss_dict = self.common_step(batch, batch_idx)
         # logs metrics for each training_step,
         # and the average across the epoch
-        self.log("training_loss", loss, on_epoch=True)
+        self.log("training_loss", loss, on_epoch=True, sync_dist=True)
         for k,v in loss_dict.items():
-          self.log("train_" + k, v.item(), on_epoch=True)
+          self.log("train_" + k, v.item(), on_epoch=True, sync_dist=True)
 
         return loss
 
      def validation_step(self, batch, batch_idx):
         loss, loss_dict = self.common_step(batch, batch_idx)
-        self.log("validation_loss", loss, on_epoch=True)
+        self.log("validation_loss", loss, on_epoch=True, sync_dist=True)
         for k,v in loss_dict.items():
-          self.log("validation_" + k, v.item(), on_epoch=True)
+          self.log("validation_" + k, v.item(), on_epoch=True, sync_dist=True)
         self.val_losses.append(loss.detach().item())
         return loss
 
@@ -186,6 +186,9 @@ class TableTransformer(pl.LightningModule):
             "Valid/example", result[:, ::2, ::2], global_step=self.global_step
         )
 
+     def get_step_epoch(self):
+         return self.global_step, self.current_epoch
+     
      def configure_optimizers(self):
         param_dicts = [
               {"params": [p for n, p in self.named_parameters() if "backbone" not in n and p.requires_grad]},
@@ -333,23 +336,28 @@ if __name__=='__main__':
 
 
     checkpoint_callback = ModelCheckpoint(dirpath=f"{Path(__file__).parent.absolute()}/../../checkpoints/tabletransformer/", filename=f"{f'{name}_es' if args.early_stopping else f'{name}_end'}")
-    logger = loggers.TensorBoardLogger(save_dir=train_log_dir, name=name, version="severalcalls") #version needs to be constant for same log in case of resuming training
+    logger = loggers.TensorBoardLogger(save_dir=train_log_dir, name=name) #version needs to be constant for same log in case of resuming training
     model = TableTransformer(lr=args.lr, lr_backbone=args.lr_backbone, weight_decay=args.weight_decay, traindataset=traindataset, valdataset=validdataset, testdataset=testdataset, datasetname=args.dataset, savepath=f"{Path(__file__).parent.absolute()}/../../checkpoints/tabletransformer/{name}", loadmodelcheckpoint=args.load)
     if args.identicalname and args.load and args.valid and not args.early_stopping:
-        trainer = Trainer(logger=logger,max_epochs=args.epochs, devices=args.gpus, accelerator="cuda", num_nodes=args.num_nodes, callbacks=[checkpoint_callback])
+        trainer = Trainer(logger=logger,max_epochs=args.epochs, devices=args.gpus, accelerator="cuda", strategy="ddp", num_nodes=args.num_nodes, callbacks=[checkpoint_callback])
         checkpoint = torch.load(
             f"{Path(__file__).parent.absolute()}/../../checkpoints/tabletransformer/{args.load}.ckpt")
         print("global_step", checkpoint["global_step"])
         trainer.fit(model, ckpt_path=f"{Path(__file__).parent.absolute()}/../../checkpoints/tabletransformer/{args.load}.ckpt")
     elif args.valid and not args.early_stopping:
-        trainer = Trainer(logger=logger,max_epochs=args.epochs, devices=args.gpus, accelerator="cuda", num_nodes=args.num_nodes, callbacks=[checkpoint_callback])
+        print("gpu per node: ", args.gpus)
+        print("nodes: ", args.num_nodes)
+        print("step, epoch: ", model.get_step_epoch())
+        trainer = Trainer(logger=logger,max_epochs=args.epochs, max_time="00:00:30:00" ,devices=args.gpus, accelerator="cuda", strategy="ddp", num_nodes=args.num_nodes, callbacks=[checkpoint_callback])
         trainer.fit(model)
+        print("step, epoch: ", model.get_step_epoch())
     elif args.valid and args.early_stopping:
-        trainer = Trainer(logger=logger,max_epochs=args.epochs, devices=args.gpus, num_nodes=args.num_nodes,  callbacks=[EarlyStopping(monitor="training_loss", mode="min"), checkpoint_callback])
+        trainer = Trainer(logger=logger,max_epochs=args.epochs, devices=args.gpus, accelerator="cuda", strategy="ddp", num_nodes=args.num_nodes,  callbacks=[EarlyStopping(monitor="training_loss", mode="min"), checkpoint_callback])
         trainer.fit(model)
     else:
         #no validation
-        trainer = Trainer(logger=logger,max_epochs=args.epochs, devices=args.gpus, accelerator="cuda", num_nodes=args.num_nodes, limit_val_batches=0, num_sanity_val_steps=0, callbacks=[checkpoint_callback])
+        trainer = Trainer(logger=logger,max_epochs=args.epochs, devices=args.gpus, accelerator="cuda", strategy="ddp", num_nodes=args.num_nodes, limit_val_batches=0, num_sanity_val_steps=0, callbacks=[checkpoint_callback])
         trainer.fit(model)
     #trainer.fit(model, train_dataloader)
+	
 
