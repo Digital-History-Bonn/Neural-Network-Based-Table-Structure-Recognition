@@ -12,4 +12,4 @@ conda activate kosmos2
 nodes=$1
 gpus=$2
 
-python -m src.historicdocumentprocessing.tabletransformer_train --name "titw_gputest" --dataset "Tablesinthewild" --valid --no-early_stopping --gpus "$gpus" --num_nodes "$nodes"
+srun python -m src.historicdocumentprocessing.tabletransformer_train --name "titw_gputest" --dataset "Tablesinthewild" --valid --no-early_stopping --gpus "$gpus" --num_nodes "$nodes"
