@@ -6,7 +6,17 @@ GloSAT:https://github.com/stuartemiddleton/glosat_table_dataset/tree/main
 
 Wired Table in the Wild (WTW): https://tianchi.aliyun.com/dataset/108587
 
-Bonner Tabellendatensatz
+Bonner Tabellendatensatz BonnData
+
+# Used Models
+Kosmos 2.5: https://pytorch.org/vision/stable/models/generated/torchvision.models.detection.fasterrcnn_resnet50_fpn.html#torchvision.models.detection.fasterrcnn_resnet50_fpn
+
+TableTransformer: https://huggingface.co/docs/transformers/model_doc/table-transformer
+
+Faster R-CNN: https://pytorch.org/vision/stable/models/generated/torchvision.models.detection.fasterrcnn_resnet50_fpn.html#torchvision.models.detection.fasterrcnn_resnet50_fpn
+
+# Dependencies
+Please see https://github.com/Digital-History-Bonn/HistorischeTabellenSemanticExtraction/tree/main to preprocess GloSAT and BonnData Datasets
 
 # Used Code
 Included Post-Processing from https://github.com/stuartemiddleton/glosat_table_dataset/blob/main/dla/src/table_structure_analysis.py
