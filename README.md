@@ -1,4 +1,4 @@
-# Table Structure Recognition with Neural Networks
+# Neural Network Based Table Structure Recognition
 This is the code for my BA.
 
 # Used Datasets
