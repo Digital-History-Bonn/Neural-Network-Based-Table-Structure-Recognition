@@ -2,11 +2,11 @@
 
 jid1=$(sbatch bashscripts/tabletrain_wild 50 | awk '{print $NF}')
 echo "$jid1"
-jid2=$(sbatch -d afterok:"$jid1" bashscripts/tabletrain_wild 100 titw_severalcalls_e250_end | awk '{print $NF}')
+jid2=$(sbatch -d afterok:"$jid1" bashscripts/tabletrain_wild 100 titw_severalcalls_2_e250_end | awk '{print $NF}')
 echo "$jid2"
-jid3=$(sbatch -d afterok:"$jid2" bashscripts/tabletrain_wild 150 titw_severalcalls_250_end | awk '{print $NF}')
+jid3=$(sbatch -d afterok:"$jid2" bashscripts/tabletrain_wild 150 titw_severalcalls_2_e250_end | awk '{print $NF}')
 echo "$jid3"
-jid4=$(sbatch -d afterok:"$jid3" bashscripts/tabletrain_wild 200 titw_severalcalls_e250_end | awk '{print $NF}')
+jid4=$(sbatch -d afterok:"$jid3" bashscripts/tabletrain_wild 200 titw_severalcalls_2_e250_end | awk '{print $NF}')
 echo "$jid4"
-jid5=$(sbatch -d afterok:"$jid4" bashscripts/tabletrain_wild 250 titw_severalcalls_e250_end | awk '{print $NF}')
+jid5=$(sbatch -d afterok:"$jid4" bashscripts/tabletrain_wild 250 titw_severalcalls_2_e250_end | awk '{print $NF}')
 echo "$jid5"

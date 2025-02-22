@@ -1,9 +1,9 @@
-"""Functions to preprocess data from WTW Dataset to match preprocessing in
-https://github.com/Digital-History-Bonn/HistorischeTabellenSemanticExtraction/blob/main/src/TableExtraction/preprocess.py.
+"""Functions to preprocess data from WTW Dataset to match preprocessing in https://github.com/Digital-History-Bonn/HistorischeTabellenSemanticExtraction/blob/main/src/TableExtraction/preprocess.py.
+
 Note key difference regarding <imname>.pt, which is bbox coordinates on full image here (instead of image saved as pytorch tensor)
 
 """
-
+import argparse
 import glob
 import os
 import shutil
@@ -16,7 +16,6 @@ from bs4 import BeautifulSoup
 from PIL import Image
 from scipy.cluster.hierarchy import DisjointSet
 from torchvision.io import read_image
-from torchvision.utils import draw_bounding_boxes
 from tqdm import tqdm
 
 from src.historicdocumentprocessing.util.tablesutil import (
@@ -27,10 +26,12 @@ from src.historicdocumentprocessing.util.tablesutil import (
 
 def processdata_wildtable_inner(datapath) -> torch.Tensor:
     """Extract cell BBoxes from XML to torch tensor (coordinates relative to full image).
+
     Args:
         datapath: path to WTW xml file
 
-    Returns: nx4 torch tensor with stacked BBox coordinates (xmin, ymin, xmax, ymax)
+    Returns:
+        nx4 torch tensor with stacked BBox coordinates (xmin, ymin, xmax, ymax)
     """
     with open(datapath) as d:
         xml = BeautifulSoup(d, "xml")
@@ -59,12 +60,13 @@ def processdata_wildtable_inner(datapath) -> torch.Tensor:
 def processdata_wildtable_tablerelative(
     datapath: str,
 ) -> (List[torch.Tensor], List[torch.Tensor]):
-    """
-    Extract cell BBoxes from XML to torch tensor (cell BBox coordinates relative to table, table coords relative to full image).
+    """Extract cell BBoxes from XML to torch tensor (cell BBox coordinates relative to table, table coords relative to full image).
+
     Args:
         datapath: path to WTW xml file
 
-    Returns: tuple(cell,table) of nx4 torch tensors with stacked BBox coordinates (xmin, ymin, xmax, ymax)
+    Returns:
+        tuple(cell,table) of nx4 torch tensors with stacked BBox coordinates (xmin, ymin, xmax, ymax)
     """
     with open(datapath) as d:
         xml = BeautifulSoup(d, "xml")
@@ -104,14 +106,15 @@ def processdata_wildtable_tablerelative(
 def processdata_wildtable_rowcoll(
     datapath: str,
 ) -> (List[Dict]):
-    """
-    Extract cell, row, col BBoxes from XML, to torch tensor (cell, row, col BBox coordinates relative to table, table coords relative to full image).
+    """Extract cell, row, col BBoxes from XML, to torch tensor (cell, row, col BBox coordinates relative to table, table coords relative to full image).
+
     Extraction method for row, col from https://github.com/Digital-History-Bonn/HistorischeTabellenSemanticExtraction/blob/main/src/TableExtraction/preprocess.py.
+
     Args:
         datapath: path to WTW xml file
 
-    Returns: list of table dictionaries with rows, cols, cells, tablecoords as nx4 torch tensors with stacked BBox coordinates (xmin, ymin, xmax, ymax)
-
+    Returns:
+        list of table dictionaries with rows, cols, cells, tablecoords as nx4 torch tensors with stacked BBox coordinates (xmin, ymin, xmax, ymax)
     """
     with open(datapath) as d:
         xml = BeautifulSoup(d, "xml")
@@ -208,19 +211,16 @@ def processdata_wildtable_rowcoll(
 
 
 def processdata_wildtable_outer(
-    datapath: str = f"{Path(__file__).parent.absolute()}/../../data/Tablesinthewild/rawdata/train",
-    tablerelative=False,
-    rowcol=True,
+    datapath: str,  # f"{Path(__file__).parent.absolute()}/../../data/Tablesinthewild/rawdata/train"
+    tablerelative: bool = False,
+    rowcol: bool = True,
 ):
-    """
-    Outer method for processing WTW data from XML
+    """Outer method for processing WTW data from XML.
+
     Args:
         datapath: path to raw WTW test or train folder
         tablerelative: set True if tablerelative cell BBoxes are needed
         rowcol: set True of row and column BBoxes are needed (tablerelative)
-
-    Returns:
-
     """
     xmlfolder = f"{datapath}/xml"
     imfolder = f"{datapath}/images"
@@ -302,58 +302,20 @@ def processdata_wildtable_outer(
             #    return
 
 
+def get_args() -> argparse.Namespace:
+    """Define args."""
+    parser = argparse.ArgumentParser(description="dataprocessing_wtw")
+    parser.add_argument('-p', '--path', default=f"{Path(__file__).parent.absolute()}/../../data/Tablesinthewild/rawdata")
+    parser.add_argument('--folder', default="train")
+    parser.add_argument('--tablerelative', action='store_true', default=False)
+    parser.add_argument('--no-tablerelative', dest='tablerelative', action='store_false')
+    parser.add_argument('--rowcol', action='store_true', default=False)
+    parser.add_argument('--no-rowcol', dest='rowcol', action='store_false')
+
+    return parser.parse_args()
+
+
 if __name__ == "__main__":
-    # processdata_wildtable_outer(rowcol=True)
-    # tables = processdata_wildtable_rowcoll(f"{Path(__file__).parent.absolute()}/../../data/Tablesinthewild/rawdata/test/test-xml-revise/test-xml-revise/0hZg6EpcTdKXk6j44umj3gAAACMAAQED.xml")
-    # print(tables)
-    # img = read_image(
-    #    f"{Path(__file__).parent.absolute()}/../../data/Tablesinthewild/rawdata/test/images/mit_google_image_search-10918758-7f5f72bb8440c9caf8b07b28ffdc54d33bd370ab.jpg")
-    # tables = processdata_wildtable_rowcoll(f"{Path(__file__).parent.absolute()}/../../data/Tablesinthewild/rawdata/test/test-xml-revise/test-xml-revise/mit_google_image_search-10918758-7f5f72bb8440c9caf8b07b28ffdc54d33bd370ab.xml")
-    # print(tables)
-    #
-    # img = read_image(f"{Path(__file__).parent.absolute()}/../../data/Tablesinthewild/rawdata/train/images/008ae846c799f80b34252eb58358d166aa3a82d2.jpg")
-    # tables = torch.load(f"{Path(__file__).parent.absolute()}/../../data/Tablesinthewild/train/008ae846c799f80b34252eb58358d166aa3a82d2/008ae846c799f80b34252eb58358d166aa3a82d2_tables.pt")
-    # print(tables)
-    # for n, table in enumerate(tables):
-    #    row = reversetablerelativebboxes_inner(tablebbox=table, cellbboxes=torch.load(f"{Path(__file__).parent.absolute()}/../../data/Tablesinthewild/train/008ae846c799f80b34252eb58358d166aa3a82d2/008ae846c799f80b34252eb58358d166aa3a82d2_col_{n}.pt"))
-    #    rowimg = draw_bounding_boxes(image=img, boxes=row, colors=["black" for i in range(len(row))],
-    #                                                              labels=["row" for i in range(len(row))])
-    #    rowimg = Image.fromarray(rowimg.permute(1, 2, 0).numpy())
-    #    rowimg.save(f"{Path(__file__).parent.absolute()}/../../images/coltest_saved_{n}.jpg")
-    # row = reversetablerelativebboxes_inner(tablebbox=table[0], cellbboxes=torch.load(f"{Path(__file__).parent.absolute()}/../../data/Tablesinthewild/train/000e84efe82c0f7c17c77334704e93bc/000e84efe82c0f7c17c77334704e93bc_row_0.pt"))
-    # rowimg = draw_bounding_boxes(image=img, boxes=row, colors=["black" for i in range(len(row))],
-    #                             labels=["row" for i in range(len(row))])
-    # rowimg = Image.fromarray(rowimg.permute(1, 2, 0).numpy())
-    # rowimg.save(f"{Path(__file__).parent.absolute()}/../../images/rowtest_saved.jpg")
-    """
-    for n,table in enumerate(tables):
-        tab = tables[n]["table"]
-        rows = reversetablerelativebboxes_inner(tablebbox=tab, cellbboxes=tables[n]["rows"])
-        colls = reversetablerelativebboxes_inner(tablebbox=tab, cellbboxes=tables[n]["cols"])
-        cells = reversetablerelativebboxes_inner(tablebbox=tab, cellbboxes=tables[n]["cells"])
-        #rows, colls = processdata_wildtable_rowcoll(f"{Path(__file__).parent.absolute()}/../../data/Tablesinthewild/rawdata/test/test-xml-revise/test-xml-revise/0hZg6EpcTdKXk6j44umj3gAAACMAAQED.xml")
-        #img = read_image(f"{Path(__file__).parent.absolute()}/../../data/Tablesinthewild/rawdata/test/images/0hZg6EpcTdKXk6j44umj3gAAACMAAQED.jpg")
-        cellimg = draw_bounding_boxes(image=img, boxes=cells, colors=["black" for i in range(len(cells))],
-                                     labels=["cell" for i in range(len(cells))])
-        cellimg = Image.fromarray(cellimg.permute(1, 2, 0).numpy())
-        cellimg.save(f"{Path(__file__).parent.absolute()}/../../images/celltest_multi_{n}.jpg")
-        rowimg = draw_bounding_boxes(image=img, boxes=rows, colors=["black" for i in range(len(rows))], labels=["row" for i in range(len(rows))])
-        colimg = draw_bounding_boxes(image=img, boxes=colls, colors=["black" for i in range(len(colls))], labels=["col" for i in range(len(colls))])
-        rowimg= Image.fromarray(rowimg.permute(1, 2, 0).numpy())
-        rowimg.save(f"{Path(__file__).parent.absolute()}/../../images/rowtest_multi_{n}.jpg")
-        colimg= Image.fromarray(colimg.permute(1, 2, 0).numpy())
-        colimg.save(f"{Path(__file__).parent.absolute()}/../../images/coltest_multi_{n}.jpg")
-    """
-    # rows, colls = processdata_wildtable_rowcoll(
-    #    f"{Path(__file__).parent.absolute()}/../../data/Tablesinthewild/rawdata/test/test-xml-revise/test-xml-revise/0hZg6EpcTdKXk6j44umj3gAAACMAAQED.xml")
-    # img = read_image(
-    #    f"{Path(__file__).parent.absolute()}/../../data/Tablesinthewild/rawdata/test/images/0hZg6EpcTdKXk6j44umj3gAAACMAAQED.jpg")
-    # rowimg = draw_bounding_boxes(image=img, boxes=rows, colors=["black" for i in range(len(rows))])
-    # colimg = draw_bounding_boxes(image=img, boxes=colls, colors=["black" for i in range(len(colls))])
-    # rowimg = Image.fromarray(rowimg.permute(1, 2, 0).numpy())
-    # rowimg.save(f"{Path(__file__).parent.absolute()}/../../images/rowtest.jpg")
-    # colimg = Image.fromarray(colimg.permute(1, 2, 0).numpy())
-    # colimg.save(f"{Path(__file__).parent.absolute()}/../../images/coltest.jpg")
-    # processdata_wildtable_outer(tablerelative=True)
-    # processdata_wildtable_inner(f"{Path(__file__).parent.absolute()}/../../data/Tablesinthewild/test/test-xml-revise/test-xml-revise/0hZg6EpcTdKXk6j44umj3gAAACMAAQED.xml")
-    pass
+    args = get_args()
+    path = f"{args.path}/{args.folder}"
+    processdata_wildtable_outer(datapath=path, tablerelative=args.tablerelative, rowcol=args.rowcol)

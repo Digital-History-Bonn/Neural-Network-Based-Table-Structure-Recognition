@@ -4,38 +4,70 @@ from pathlib import Path
 from typing import List
 
 import torch
-from PIL import Image
 from lightning_fabric.utilities import move_data_to_device
+from PIL import Image
 from torchvision.io import read_image
-from torchvision.models.detection import fasterrcnn_resnet50_fpn, FasterRCNN_ResNet50_FPN_Weights
+from torchvision.models.detection import (
+    FasterRCNN_ResNet50_FPN_Weights,
+    fasterrcnn_resnet50_fpn,
+)
 from tqdm import tqdm
-from transformers import TableTransformerForObjectDetection, AutoImageProcessor
+from transformers import AutoImageProcessor, TableTransformerForObjectDetection
 
 from src.historicdocumentprocessing.kosmos_eval import (
     extractboxes,
     reversetablerelativebboxes_outer,
 )
-from src.historicdocumentprocessing.tabletransformer_dataset import CustomDataset
-from src.historicdocumentprocessing.util.tablesutil import remove_invalid_bbox, getcells
 from src.historicdocumentprocessing.postprocessing import postprocess
-from src.historicdocumentprocessing.util.visualisationutil import drawimg_varformat_inner
+from src.historicdocumentprocessing.tabletransformer_dataset import CustomDataset
+from src.historicdocumentprocessing.util.tablesutil import getcells, remove_invalid_bbox
+from src.historicdocumentprocessing.util.visualisationutil import (
+    drawimg_varformat_inner,
+)
 
 
-def drawimg_allmodels(datasetname:str, imgpath:str, rcnnmodels:List[str],tabletransformermodels:List[str], datasetaddon_pred:str=None, datasetaddon_additional:str="", valid:bool = True):
+def drawimg_allmodels(
+    datasetname: str,
+    imgpath: str,
+    rcnnmodels: List[str] = [],
+    tabletransformermodels: List[str] = [],
+    datasetaddon_pred: str = None,
+    datasetaddon_additional: str = "",
+    valid: bool = True,
+):
     imname = imgpath.split("/")[-1].split(".")[-2]
-    groundpath = f"{Path(__file__).parent.absolute()}/../../data/{datasetname.split('/')[-2]}/preprocessed/{datasetname.split('/')[-1]}" if "/" in datasetname else f"{Path(__file__).parent.absolute()}/../../data/{datasetname}/test"
+    groundpath = (
+        f"{Path(__file__).parent.absolute()}/../../data/{datasetname.split('/')[-2]}/preprocessed/{datasetname.split('/')[-1]}"
+        if "/" in datasetname
+        else f"{Path(__file__).parent.absolute()}/../../data/{datasetname}/test"
+    )
     groundpath = f"{groundpath}/{imname}"
     predpath_kosmos = f'{f"{Path(__file__).parent.absolute()}/../../results/kosmos25/{datasetname}{datasetaddon_additional}/{imname}/{imname}" if not datasetaddon_pred else f"{Path(__file__).parent.absolute()}/../../results/kosmos25/{datasetname}/{datasetaddon_pred}/{imname}/{imname}"}.jpg.json'
     predpath_kosmos_postprocessed = f"{Path(__file__).parent.absolute()}/../../results/kosmos25/postprocessed/fullimg/{datasetname}/eps_3.0_1.5/withoutoutlier_excludeoutliers_glosat/{imname}/{imname}.pt"
     predpath_rcnn_postprocessed = f"{Path(__file__).parent.absolute()}/../../results/fasterrcnn/postprocessed/fullimg/{datasetname}"
-    for name, path in zip(['not_postprocessed', 'postprocessed'], [predpath_kosmos, predpath_kosmos_postprocessed]):
+    for name, path in zip(
+        ["not_postprocessed", "postprocessed"],
+        [predpath_kosmos, predpath_kosmos_postprocessed],
+    ):
         savepath = f"{Path(__file__).parent.absolute()}/../../images/kosmos25/{name}"
-        drawimg_varformat(impath=imgpath, predpath=path, groundpath=groundpath, tableonly=False, savepath=savepath)
+        drawimg_varformat(
+            impath=imgpath,
+            predpath=path,
+            groundpath=groundpath,
+            tableonly=False,
+            savepath=savepath,
+        )
     for model in glob.glob(f"{predpath_rcnn_postprocessed}/*"):
-        if 'end' not in model:
+        if "end" not in model:
             savepath = f"{Path(__file__).parent.absolute()}/../../images/fasterrcnn/{model.split('/')[-1]}/postprocessed"
             try:
-                drawimg_varformat(impath=imgpath, predpath=f"{model}/eps_3.0_1.5/withoutoutlier_excludeoutliers_glosat/{imname}/{imname}.pt", groundpath=groundpath, tableonly=False, savepath=savepath)
+                drawimg_varformat(
+                    impath=imgpath,
+                    predpath=f"{model}/eps_3.0_1.5/withoutoutlier_excludeoutliers_glosat/{imname}/{imname}.pt",
+                    groundpath=groundpath,
+                    tableonly=False,
+                    savepath=savepath,
+                )
             except FileNotFoundError:
                 print(f"{imname} has no valid predicitons with model {model}")
                 pass
@@ -57,23 +89,52 @@ def drawimg_allmodels(datasetname:str, imgpath:str, rcnnmodels:List[str],tabletr
         output = model([img])
         output = {k: v.detach().cpu() for k, v in output[0].items()}
         try:
-            with open(f"{Path(__file__).parent.absolute()}/../../results/fasterrcnn/bestfilterthresholds{'_valid' if valid else ''}/{modelname}.txt", 'r') as f:
+            with open(
+                f"{Path(__file__).parent.absolute()}/../../results/fasterrcnn/bestfilterthresholds{'_valid' if valid else ''}/{modelname}.txt",
+                "r",
+            ) as f:
                 filter = float(f.read())
         except FileNotFoundError:
             filter = 0.7
-        fullimagepredbox_filtered = remove_invalid_bbox(output["boxes"][output["scores"]>filter])
+        fullimagepredbox_filtered = remove_invalid_bbox(
+            output["boxes"][output["scores"] > filter]
+        )
         fullimagepredbox = remove_invalid_bbox(output["boxes"])
-        #print("imgpath", imgpath)
-        drawimg_varformat_inner(impath=imgpath, box=fullimagepredbox, groundpath=groundpath, savepath=f"{Path(__file__).parent.absolute()}/../../images/fasterrcnn/{modelpath.split('/')[-1]}")
-        drawimg_varformat_inner(impath=imgpath, box=fullimagepredbox_filtered, groundpath=groundpath,
-                                savepath=f"{Path(__file__).parent.absolute()}/../../images/fasterrcnn/{modelpath.split('/')[-1]}/filtered_{filter}{'_valid' if valid else ''}")
-        filtered_processed = postprocess(fullimagepredbox_filtered, imname=imname, saveloc= f"{Path(__file__).parent.absolute()}/../../images/test.pt", minsamples=[2, 3])
-        drawimg_varformat_inner(impath=imgpath, box=filtered_processed, groundpath=groundpath,
-                                savepath=f"{Path(__file__).parent.absolute()}/../../images/fasterrcnn/{modelpath.split('/')[-1]}/filtered_{filter}{'_valid' if valid else ''}_postprocessed")
+        # print("imgpath", imgpath)
+        drawimg_varformat_inner(
+            impath=imgpath,
+            box=fullimagepredbox,
+            groundpath=groundpath,
+            savepath=f"{Path(__file__).parent.absolute()}/../../images/fasterrcnn/{modelpath.split('/')[-1]}",
+        )
+        drawimg_varformat_inner(
+            impath=imgpath,
+            box=fullimagepredbox_filtered,
+            groundpath=groundpath,
+            savepath=f"{Path(__file__).parent.absolute()}/../../images/fasterrcnn/{modelpath.split('/')[-1]}/filtered_{filter}{'_valid' if valid else ''}",
+        )
+        filtered_processed = postprocess(
+            fullimagepredbox_filtered,
+            imname=imname,
+            saveloc=f"{Path(__file__).parent.absolute()}/../../images/test.pt",
+            minsamples=[2, 3],
+        )
+        drawimg_varformat_inner(
+            impath=imgpath,
+            box=filtered_processed,
+            groundpath=groundpath,
+            savepath=f"{Path(__file__).parent.absolute()}/../../images/fasterrcnn/{modelpath.split('/')[-1]}/filtered_{filter}{'_valid' if valid else ''}_postprocessed",
+        )
     for modelname in tabletransformermodels:
-        model = TableTransformerForObjectDetection.from_pretrained("microsoft/table-transformer-structure-recognition")
+        model = TableTransformerForObjectDetection.from_pretrained(
+            "microsoft/table-transformer-structure-recognition"
+        )
         modelpath = f"{Path(__file__).parent.absolute()}/../../checkpoints/tabletransformer/{modelname}"
-        model.load_state_dict(torch.load(modelpath))
+        # model.load_state_dict(torch.load(modelpath))
+        if "call" in modelname:
+            model.load_state_dict(torch.load(modelpath, map_location="cuda:0"))
+        else:
+            model.load_state_dict(torch.load(modelpath))
         print("loaded_model:", modelname)
         assert model.config.id2label[1] == "table column"
         assert model.config.id2label[2] == "table row"
@@ -88,42 +149,103 @@ def drawimg_allmodels(datasetname:str, imgpath:str, rcnnmodels:List[str],tabletr
             return
         try:
             with open(
-                    f"{Path(__file__).parent.absolute()}/../../results/tabletransformer/bestfilterthresholds{'_valid' if valid else ''}/{modelname}.txt",
-                    'r') as f:
+                f"{Path(__file__).parent.absolute()}/../../results/tabletransformer/bestfilterthresholds{'_valid' if valid else ''}/{modelname}.txt",
+                "r",
+            ) as f:
                 filterthreshold = float(f.read())
-                if filterthreshold==1.0:
-                    filterthreshold=0.5
+                if filterthreshold == 1.0:
+                    filterthreshold = 0.99
+                if filterthreshold == 0.0:
+                    filterthreshold = 0.01
         except FileNotFoundError:
             filterthreshold = 0.7
-        #print(filterthreshold)
+        # print(filterthreshold)
         img = Image.open(imgpath).convert("RGB")
-        ImageProcessor = AutoImageProcessor.from_pretrained("microsoft/table-transformer-structure-recognition")
-        encoding = move_data_to_device(ImageProcessor(img, return_tensors="pt"), device=device)
+        ImageProcessor = AutoImageProcessor.from_pretrained(
+            "microsoft/table-transformer-structure-recognition"
+        )
+        encoding = move_data_to_device(
+            ImageProcessor(img, return_tensors="pt"), device=device
+        )
         with torch.no_grad():
             results = model(**encoding)
         width, height = img.size
-        output = ImageProcessor.post_process_object_detection(results, threshold=0.0,
-                                                                      target_sizes=[(height, width)])[0]
-        cellboxes = getcells(rows=output["boxes"][output["labels"] == 2],
-                                     cols=output["boxes"][output["labels"] == 1]).to(device="cpu")
-        boxes = torch.vstack([output["boxes"][output["labels"] == 2], output["boxes"][output["labels"] == 1]]).to(device="cpu")
-        outputfiltered = ImageProcessor.post_process_object_detection(results, threshold=filterthreshold,
-                                                                      target_sizes=[(height, width)])[0]
-        cellboxesfiltered = getcells(rows=outputfiltered["boxes"][outputfiltered["labels"] == 2], cols=outputfiltered["boxes"][outputfiltered["labels"] == 1]).to(device="cpu")
-        boxesfiltered = torch.vstack([outputfiltered["boxes"][outputfiltered["labels"] == 2], outputfiltered["boxes"][outputfiltered["labels"] == 1]]).to(device="cpu")
-        drawimg_varformat_inner(impath=imgpath, box=cellboxes, groundpath=groundpath, savepath=f"{Path(__file__).parent.absolute()}/../../images/tabletransformer/{modelpath.split('/')[-1]}/cellimg")
-        drawimg_varformat_inner(impath=imgpath, box=cellboxesfiltered, groundpath=groundpath,
-                                savepath=f"{Path(__file__).parent.absolute()}/../../images/tabletransformer/{modelpath.split('/')[-1]}/cellimg_filtered_{filterthreshold}{'_valid' if valid else ''}")
-        drawimg_varformat_inner(impath=imgpath, box=boxes, groundpath=groundpath,
-                                savepath=f"{Path(__file__).parent.absolute()}/../../images/tabletransformer/{modelpath.split('/')[-1]}/rowcolimg")
-        drawimg_varformat_inner(impath=imgpath, box=boxesfiltered, groundpath=groundpath,
-                                savepath=f"{Path(__file__).parent.absolute()}/../../images/tabletransformer/{modelpath.split('/')[-1]}/rowcolimg_filtered_{filterthreshold}{'_valid' if valid else ''}")
-        postprocessed = postprocess(cellboxes, imname=imname, saveloc= f"{Path(__file__).parent.absolute()}/../../images/test.pt", minsamples=[2, 3])
-        postprocessed_filtered = postprocess(cellboxesfiltered, imname=imname, saveloc= f"{Path(__file__).parent.absolute()}/../../images/test.pt", minsamples=[2, 3])
-        drawimg_varformat_inner(impath=imgpath, box=postprocessed_filtered, groundpath=groundpath,
-                                savepath=f"{Path(__file__).parent.absolute()}/../../images/tabletransformer/{modelpath.split('/')[-1]}/cellimg_filtered_{filterthreshold}{'_valid' if valid else ''}_postprocessed")
-        drawimg_varformat_inner(impath=imgpath, box=postprocessed, groundpath=groundpath,
-                                savepath=f"{Path(__file__).parent.absolute()}/../../images/tabletransformer/{modelpath.split('/')[-1]}/cellimg_postprocessed")
+        output = ImageProcessor.post_process_object_detection(
+            results, threshold=0.0, target_sizes=[(height, width)]
+        )[0]
+        cellboxes = getcells(
+            rows=output["boxes"][output["labels"] == 2],
+            cols=output["boxes"][output["labels"] == 1],
+        ).to(device="cpu")
+        boxes = torch.vstack(
+            [
+                output["boxes"][output["labels"] == 2],
+                output["boxes"][output["labels"] == 1],
+            ]
+        ).to(device="cpu")
+        outputfiltered = ImageProcessor.post_process_object_detection(
+            results, threshold=filterthreshold, target_sizes=[(height, width)]
+        )[0]
+        cellboxesfiltered = getcells(
+            rows=outputfiltered["boxes"][outputfiltered["labels"] == 2],
+            cols=outputfiltered["boxes"][outputfiltered["labels"] == 1],
+        ).to(device="cpu")
+        boxesfiltered = torch.vstack(
+            [
+                outputfiltered["boxes"][outputfiltered["labels"] == 2],
+                outputfiltered["boxes"][outputfiltered["labels"] == 1],
+            ]
+        ).to(device="cpu")
+        drawimg_varformat_inner(
+            impath=imgpath,
+            box=cellboxes,
+            groundpath=groundpath,
+            savepath=f"{Path(__file__).parent.absolute()}/../../images/tabletransformer/{modelpath.split('/')[-1]}/cellimg",
+        )
+        drawimg_varformat_inner(
+            impath=imgpath,
+            box=cellboxesfiltered,
+            groundpath=groundpath,
+            savepath=f"{Path(__file__).parent.absolute()}/../../images/tabletransformer/{modelpath.split('/')[-1]}/cellimg_filtered_{filterthreshold}{'_valid' if valid else ''}",
+        )
+        drawimg_varformat_inner(
+            impath=imgpath,
+            box=boxes,
+            groundpath=groundpath,
+            rowcol=True,
+            savepath=f"{Path(__file__).parent.absolute()}/../../images/tabletransformer/{modelpath.split('/')[-1]}/rowcolimg",
+        )
+        drawimg_varformat_inner(
+            impath=imgpath,
+            box=boxesfiltered,
+            groundpath=groundpath,
+            rowcol=True,
+            savepath=f"{Path(__file__).parent.absolute()}/../../images/tabletransformer/{modelpath.split('/')[-1]}/rowcolimg_filtered_{filterthreshold}{'_valid' if valid else ''}",
+        )
+        postprocessed = postprocess(
+            cellboxes,
+            imname=imname,
+            saveloc=f"{Path(__file__).parent.absolute()}/../../images/test.pt",
+            minsamples=[2, 3],
+        )
+        postprocessed_filtered = postprocess(
+            cellboxesfiltered,
+            imname=imname,
+            saveloc=f"{Path(__file__).parent.absolute()}/../../images/test.pt",
+            minsamples=[2, 3],
+        )
+        drawimg_varformat_inner(
+            impath=imgpath,
+            box=postprocessed_filtered,
+            groundpath=groundpath,
+            savepath=f"{Path(__file__).parent.absolute()}/../../images/tabletransformer/{modelpath.split('/')[-1]}/cellimg_filtered_{filterthreshold}{'_valid' if valid else ''}_postprocessed",
+        )
+        drawimg_varformat_inner(
+            impath=imgpath,
+            box=postprocessed,
+            groundpath=groundpath,
+            savepath=f"{Path(__file__).parent.absolute()}/../../images/tabletransformer/{modelpath.split('/')[-1]}/cellimg_postprocessed",
+        )
 
 
 def drawimg_varformat(
@@ -157,7 +279,9 @@ def drawimg_varformat(
     if not box.numel():
         print(predpath.split("/")[-1])
 
-    drawimg_varformat_inner(box=box, groundpath=groundpath, impath=impath, savepath=savepath)
+    drawimg_varformat_inner(
+        box=box, groundpath=groundpath, impath=impath, savepath=savepath
+    )
     # plt.show()
 
 
@@ -235,16 +359,62 @@ def main():
 
 
 if __name__ == "__main__":
-    drawimg_allmodels(datasetname="BonnData", imgpath=f"{Path(__file__).parent.absolute()}/../../data/BonnData/preprocessed/I_HA_Rep_89_Nr_16160_0227/I_HA_Rep_89_Nr_16160_0227.jpg", datasetaddon_pred="Tabellen/test", rcnnmodels=['BonnDataFullImage1_BonnData_fullimage_e250_es.pt','BonnDataFullImage_pretrain_GloSatFullImage1_GloSat_fullimage_e250_es_BonnData_fullimage_e250_es.pt'], tabletransformermodels=["tabletransformer_v0_new_BonnDataFullImage_tabletransformer_estest_BonnData_fullimage_e250_valid_es.pt", "tabletransformer_v0_new_BonnDataFullImage_tabletransformer_estest_BonnData_fullimage_e1_init_tabletransformer_v0_new_GloSatFullImage_tabletransformer_newenv_fixed_GloSat_fullimage_e250_valid_es.pt_valid_es.pt", "tabletransformer_v0_new_BonnDataFullImage_tabletransformer_loadtest_BonnData_fullimage_e250_init_tabletransformer_v0_new_GloSatFullImage_tabletransformer_newenv_fixed_GloSat_fullimage_e250_valid_es.pt_valid_es.pt"])
+    drawimg_allmodels(
+        datasetname="Tablesinthewild/Inclined",
+        imgpath=f"{Path(__file__).parent.absolute()}/../../data/Tablesinthewild/preprocessed/Inclined/000d210d0f9b4101af2006b4aab33c42/000d210d0f9b4101af2006b4aab33c42.jpg",
+        rcnnmodels=[],
+        tabletransformermodels=[
+            "titw_severalcalls_2_e250_es.pt",
+            "titw_severalcalls_2_e250_end.pt",
+            "titw_call_aachen_e250_es.pt",
+            "titw_call_aachen_e250_end.pt",
+        ],
+        datasetaddon_additional="1",
+    )
+    """
+    drawimg_allmodels(datasetname="GloSat",
+                                        imgpath=f"{Path(__file__).parent.absolute()}/../../data/GloSat/preprocessed/471/471.jpg",
+                                        datasetaddon_pred="test1",
+                      #rcnnmodels=['GloSatFullImage1_GloSat_fullimage_e250_es.pt','GloSatFullImage_random_GloSat_fullimage_e250_random_init_es.pt'],
+                      tabletransformermodels=["tabletransformer_v0_new_GloSatFullImage_tabletransformer_newenv_fixed_GloSat_fullimage_e250_valid_es.pt"])
+
+    drawimg_allmodels(datasetname="Tablesinthewild/curved", imgpath=f'{Path(__file__).parent.absolute()}/../../data/Tablesinthewild/preprocessed/curved/mit_google_image_search-10918758-7f5f72bb8440c9caf8b07b28ffdc54d33bd370ab/mit_google_image_search-10918758-7f5f72bb8440c9caf8b07b28ffdc54d33bd370ab.jpg', rcnnmodels=[],
+                      tabletransformermodels=["titw_severalcalls_2_e250_es.pt", "titw_severalcalls_2_e250_end.pt",
+        "titw_call_aachen_e250_es.pt", "titw_call_aachen_e250_end.pt"])
+    drawimg_allmodels(datasetname="Tablesinthewild/extremeratio",
+                      imgpath=f'{Path(__file__).parent.absolute()}/../../data/Tablesinthewild/preprocessed/extremeratio/customs-declaration-12039/customs-declaration-12039.jpg', rcnnmodels=[], tabletransformermodels=["titw_severalcalls_2_e250_es.pt", "titw_severalcalls_2_e250_end.pt",
+        "titw_call_aachen_e250_es.pt", "titw_call_aachen_e250_end.pt"], datasetaddon_additional="1")
+    drawimg_allmodels(datasetname="Tablesinthewild/Inclined",
+                      imgpath=f'{Path(__file__).parent.absolute()}/../../data/Tablesinthewild/preprocessed/Inclined/car-invoice-img03807/car-invoice-img03807.jpg', rcnnmodels=[], tabletransformermodels=["titw_severalcalls_2_e250_es.pt", "titw_severalcalls_2_e250_end.pt",
+        "titw_call_aachen_e250_es.pt", "titw_call_aachen_e250_end.pt"], datasetaddon_additional="1")
+    drawimg_allmodels(datasetname="Tablesinthewild/muticolorandgrid",
+                      imgpath=f'{Path(__file__).parent.absolute()}/../../data/Tablesinthewild/preprocessed/muticolorandgrid/1023c6c68d37ed3366fe808dc0d4ab56ba98114f/1023c6c68d37ed3366fe808dc0d4ab56ba98114f.jpg', rcnnmodels=[], tabletransformermodels=["titw_severalcalls_2_e250_es.pt", "titw_severalcalls_2_e250_end.pt",
+        "titw_call_aachen_e250_es.pt", "titw_call_aachen_e250_end.pt"], datasetaddon_additional="1")
+    drawimg_allmodels(datasetname="Tablesinthewild/occblu",
+                      imgpath=f'{Path(__file__).parent.absolute()}/../../data/Tablesinthewild/preprocessed/occblu/Commodity_lst_Medical_SciTSRO1CN01bXt1zh20dshY2Fc3f_!!6000000006873-0-lxb/Commodity_lst_Medical_SciTSRO1CN01bXt1zh20dshY2Fc3f_!!6000000006873-0-lxb.jpg', rcnnmodels=[], tabletransformermodels=["titw_severalcalls_2_e250_es.pt", "titw_severalcalls_2_e250_end.pt",
+        "titw_call_aachen_e250_es.pt", "titw_call_aachen_e250_end.pt"])
+    drawimg_allmodels(datasetname="Tablesinthewild/overlaid",
+                      imgpath=f'{Path(__file__).parent.absolute()}/../../data/Tablesinthewild/preprocessed/overlaid/IMG_0437/IMG_0437.jpg', rcnnmodels=[], tabletransformermodels=["titw_severalcalls_2_e250_es.pt", "titw_severalcalls_2_e250_end.pt",
+        "titw_call_aachen_e250_es.pt", "titw_call_aachen_e250_end.pt"])
+    drawimg_allmodels(datasetname="Tablesinthewild/simple",
+                      imgpath=f'{Path(__file__).parent.absolute()}/../../data/Tablesinthewild/preprocessed/simple/dkl-10-4/dkl-10-4.jpg', rcnnmodels=[], tabletransformermodels=["titw_severalcalls_2_e250_es.pt", "titw_severalcalls_2_e250_end.pt",
+        "titw_call_aachen_e250_es.pt", "titw_call_aachen_e250_end.pt"])
+    drawimg_allmodels(datasetname="BonnData", imgpath=f"{Path(__file__).parent.absolute()}/../../data/BonnData/preprocessed/I_HA_Rep_89_Nr_16160_0227/I_HA_Rep_89_Nr_16160_0227.jpg", datasetaddon_pred="Tabellen/test",
+                      #rcnnmodels=['BonnDataFullImage1_BonnData_fullimage_e250_es.pt','BonnDataFullImage_pretrain_GloSatFullImage1_GloSat_fullimage_e250_es_BonnData_fullimage_e250_es.pt'],
+                      tabletransformermodels=["tabletransformer_v0_new_BonnDataFullImage_tabletransformer_estest_BonnData_fullimage_e250_valid_es.pt", "tabletransformer_v0_new_BonnDataFullImage_tabletransformer_estest_BonnData_fullimage_e1_init_tabletransformer_v0_new_GloSatFullImage_tabletransformer_newenv_fixed_GloSat_fullimage_e250_valid_es.pt_valid_es.pt", "tabletransformer_v0_new_BonnDataFullImage_tabletransformer_loadtest_BonnData_fullimage_e250_init_tabletransformer_v0_new_GloSatFullImage_tabletransformer_newenv_fixed_GloSat_fullimage_e250_valid_es.pt_valid_es.pt"])
     drawimg_allmodels(datasetname="BonnData",
                       imgpath=f"{Path(__file__).parent.absolute()}/../../data/BonnData/preprocessed/I_HA_Rep_89_Nr_16160_0170/I_HA_Rep_89_Nr_16160_0170.jpg",
-                      datasetaddon_pred="Tabellen/test", rcnnmodels=['BonnDataFullImage1_BonnData_fullimage_e250_es.pt',
-                                                                     'BonnDataFullImage_pretrain_GloSatFullImage1_GloSat_fullimage_e250_es_BonnData_fullimage_e250_es.pt'], tabletransformermodels=["tabletransformer_v0_new_BonnDataFullImage_tabletransformer_estest_BonnData_fullimage_e250_valid_es.pt", "tabletransformer_v0_new_BonnDataFullImage_tabletransformer_estest_BonnData_fullimage_e1_init_tabletransformer_v0_new_GloSatFullImage_tabletransformer_newenv_fixed_GloSat_fullimage_e250_valid_es.pt_valid_es.pt", "tabletransformer_v0_new_BonnDataFullImage_tabletransformer_loadtest_BonnData_fullimage_e250_init_tabletransformer_v0_new_GloSatFullImage_tabletransformer_newenv_fixed_GloSat_fullimage_e250_valid_es.pt_valid_es.pt"])
+                      datasetaddon_pred="Tabellen/test",
+                      #rcnnmodels=['BonnDataFullImage1_BonnData_fullimage_e250_es.pt', 'BonnDataFullImage_pretrain_GloSatFullImage1_GloSat_fullimage_e250_es_BonnData_fullimage_e250_es.pt'],
+                      tabletransformermodels=["tabletransformer_v0_new_BonnDataFullImage_tabletransformer_estest_BonnData_fullimage_e250_valid_es.pt", "tabletransformer_v0_new_BonnDataFullImage_tabletransformer_estest_BonnData_fullimage_e1_init_tabletransformer_v0_new_GloSatFullImage_tabletransformer_newenv_fixed_GloSat_fullimage_e250_valid_es.pt_valid_es.pt", "tabletransformer_v0_new_BonnDataFullImage_tabletransformer_loadtest_BonnData_fullimage_e250_init_tabletransformer_v0_new_GloSatFullImage_tabletransformer_newenv_fixed_GloSat_fullimage_e250_valid_es.pt_valid_es.pt"])
     drawimg_allmodels(datasetname="GloSat",
                       imgpath=f"{Path(__file__).parent.absolute()}/../../data/GloSat/preprocessed/98/98.jpg",
-                      datasetaddon_pred="test1", rcnnmodels=['GloSatFullImage1_GloSat_fullimage_e250_es.pt',
-                                                                     'GloSatFullImage_random_GloSat_fullimage_e250_random_init_es.pt'], tabletransformermodels=["tabletransformer_v0_new_GloSatFullImage_tabletransformer_newenv_fixed_GloSat_fullimage_e250_valid_es.pt"])
-    #drawimg_allmodels(datasetname="Tablesinthewild/curved", imgpath=f'{Path(__file__).parent.absolute()}/../../data/Tablesinthewild/preprocessed/curved/mit_google_image_search-10918758-7f5f72bb8440c9caf8b07b28ffdc54d33bd370ab/mit_google_image_search-10918758-7f5f72bb8440c9caf8b07b28ffdc54d33bd370ab.jpg', rcnnmodels=['testseveralcalls_4_with_valid_split_Tablesinthewild_fullimage_e50_es.pt', 'testseveralcalls_valid_random_init_e_250_es.pt'])
+                      datasetaddon_pred="test1",
+                      #rcnnmodels=['GloSatFullImage1_GloSat_fullimage_e250_es.pt','GloSatFullImage_random_GloSat_fullimage_e250_random_init_es.pt'],
+                      tabletransformermodels=["tabletransformer_v0_new_GloSatFullImage_tabletransformer_newenv_fixed_GloSat_fullimage_e250_valid_es.pt"])
+    #drawimg_allmodels(datasetname="Tablesinthewild/curved", imgpath=f'{Path(__file__).parent.absolute()}/../../data/Tablesinthewild/preprocessed/curved/mit_google_image_search-10918758-7f5f72bb8440c9caf8b07b28ffdc54d33bd370ab/mit_google_image_search-10918758-7f5f72bb8440c9caf8b07b28ffdc54d33bd370ab.jpg',
+    #                  rcnnmodels=['testseveralcalls_4_with_valid_split_Tablesinthewild_fullimage_e50_es.pt', 'testseveralcalls_valid_random_init_e_250_es.pt'])
+    """
     """
     drawimg_allmodels(datasetname="Tablesinthewild/extremeratio",
                       imgpath=f'{Path(__file__).parent.absolute()}/../../data/Tablesinthewild/preprocessed/extremeratio/customs-declaration-12039/customs-declaration-12039.jpg',
@@ -283,13 +453,13 @@ if __name__ == "__main__":
     #                  impath=f"{Path(__file__).parent.absolute()}/../../data/BonnData/Tabellen/test/IMG_20190821_132903/IMG_20190821_132903_table_0.jpg",
     #                  groundpath=f"{Path(__file__).parent.absolute()}/../../data/BonnData/Tabellen/test/IMG_20190821_132903/IMG_20190821_132903_cell_0.pt",
     #                  predpath=f"{Path(__file__).parent.absolute()}/../../results/fasterrcnn/BonnData/IMG_20190821_132903/IMG_20190821_132903.pt")
-    #drawimg_varformat(
+    # drawimg_varformat(
     #    impath=f"{Path(__file__).parent.absolute()}/../../data/Tablesinthewild/preprocessed/curved/table_spider_00909/table_spider_00909.jpg",
     #    groundpath=f"{Path(__file__).parent.absolute()}/../../data/Tablesinthewild/preprocessed/curved/table_spider_00909/table_spider_00909.pt",
     #    predpath=f"{Path(__file__).parent.absolute()}/../../results/kosmos25/Tablesinthewild/curved/table_spider_00909/table_spider_00909.jpg.json",
     #    savepath=f"{Path(__file__).parent.absolute()}/../../images/test/tablespider",
     #    tableonly=False,
-    #)
+    # )
     # drawimages_var(impath=f"{Path(__file__).parent.absolute()}/../../data/Tablesinthewild/preprocessed/overlaid",
     #                  groundpath=f"{Path(__file__).parent.absolute()}/../../data/Tablesinthewild/preprocessed/overlaid",
     #                  jsonpath=f"{Path(__file__).parent.absolute()}/../../results/kosmos25/Tablesinthewild/overlaid",

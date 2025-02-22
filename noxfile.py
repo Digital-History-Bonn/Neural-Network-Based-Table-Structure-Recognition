@@ -3,6 +3,9 @@
 import nox
 
 
+nox.options.sessions = ["lint", "typing", "format"]
+
+
 @nox.session(name="test")
 def run_test(session):
     """Run pytest."""
@@ -14,6 +17,7 @@ def run_test(session):
 
 @nox.session(name="limited-test")
 def run_small_test(session):
+    """Run ioucalc test."""
     session.install(".")
     session.install("pytest")
     session.install("torchvision")
@@ -53,7 +57,7 @@ def lint(session):
         "pydocstyle",
         "darglint",
     )
-    session.run("flake8", "src", "tests", "noxfile.py")
+    session.run("flake8", "src/historicdocumentprocessing", "tests", "noxfile.py")
 
 
 @nox.session(name="typing")

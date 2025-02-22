@@ -5,30 +5,55 @@ from typing import List
 
 import pandas
 import torch
-from PIL import Image
 from lightning.fabric.utilities import move_data_to_device
+from PIL import Image
 from tqdm import tqdm
-from  transformers import AutoModelForObjectDetection, DetrImageProcessor, TableTransformerForObjectDetection
+from transformers import (
+    AutoModelForObjectDetection,
+    DetrImageProcessor,
+    TableTransformerForObjectDetection,
+)
 
 from src.historicdocumentprocessing.fasterrcnn_eval import tableareabboxes
-from src.historicdocumentprocessing.kosmos_eval import reversetablerelativebboxes_outer, calcstats_IoDT, calcmetric, \
-    calcstats_IoU, calcstats_overlap, calcmetric_overlap, get_dataframe
+from src.historicdocumentprocessing.kosmos_eval import (
+    calcmetric,
+    calcmetric_overlap,
+    calcstats_IoDT,
+    calcstats_IoU,
+    calcstats_overlap,
+    get_dataframe,
+    reversetablerelativebboxes_outer,
+)
 from src.historicdocumentprocessing.tabletransformer_dataset import CustomDataset
 from src.historicdocumentprocessing.util.tablesutil import getcells
 
 
-def inference(modelpath:str=None, targetloc=None, iou_thresholds: List[float] = [0.5, 0.6, 0.7, 0.8, 0.9], tableareaonly=True,
-              filtering:bool = False, valid:bool = True, datasetname:str="BonnData", celleval:bool=False):
-    modelname="base_table-transformer-structure-recognition"
-    model = TableTransformerForObjectDetection.from_pretrained("microsoft/table-transformer-structure-recognition")
+def inference(
+    modelpath: str = None,
+    targetloc=None,
+    iou_thresholds: List[float] = [0.5, 0.6, 0.7, 0.8, 0.9],
+    tableareaonly=False,
+    filtering: bool = False,
+    valid: bool = True,
+    datasetname: str = "BonnData",
+    celleval: bool = False,
+):
+    modelname = "base_table-transformer-structure-recognition"
+    model = TableTransformerForObjectDetection.from_pretrained(
+        "microsoft/table-transformer-structure-recognition"
+    )
     if modelpath:
-        model.load_state_dict(torch.load(modelpath))
-        modelname = modelpath.split('/')[-1]
+        # model.load_state_dict(torch.load(modelpath))
+        modelname = modelpath.split("/")[-1]
+        if "aachen" in modelname:
+            model.load_state_dict(torch.load(modelpath, map_location="cuda:0"))
+        else:
+            model.load_state_dict(torch.load(modelpath))
         print("loaded_model:", modelname)
-    assert model.config.id2label[1]=="table column"
-    assert model.config.id2label[2]=="table row"
-    #image_processor = DetrImageProcessor.from_pretrained("facebook/detr-resnet-50")
-    #image_processor = AutoImageProcessor.from_pretrained("microsoft/table-transformer-structure-recognition")
+    assert model.config.id2label[1] == "table column"
+    assert model.config.id2label[2] == "table row"
+    # image_processor = DetrImageProcessor.from_pretrained("facebook/detr-resnet-50")
+    # image_processor = AutoImageProcessor.from_pretrained("microsoft/table-transformer-structure-recognition")
     if torch.cuda.is_available():
         device = torch.device("cuda")
         model.to(device)
@@ -38,18 +63,19 @@ def inference(modelpath:str=None, targetloc=None, iou_thresholds: List[float] = 
         return
     if filtering:
         with open(
-                f"{Path(__file__).parent.absolute()}/../../results/tabletransformer/bestfilterthresholds{'_valid' if valid else ''}/{modelname}.txt",
-                'r') as f:
+            f"{Path(__file__).parent.absolute()}/../../results/tabletransformer/bestfilterthresholds{'_valid' if valid else ''}/{modelname}.txt",
+            "r",
+        ) as f:
             filterthreshold = float(f.read())
     saveloc = f"{Path(__file__).parent.absolute()}/../../results/tabletransformer/testevalfinal1/fullimg/{datasetname}/{modelname}/no_filtering_iou_{'_'.join([str(iou_thresholds[0]), str(iou_thresholds[-1])])}"
     # boxsaveloc = f"{Path(__file__).parent.absolute()}/../../results/fasterrcnn/{datasetname}/{modelname}"
     if tableareaonly and not filtering:
         saveloc = f"{Path(__file__).parent.absolute()}/../../results/tabletransformer/testevalfinal1/fullimg/{datasetname}/{modelname}/tableareaonly/no_filtering_iou_{'_'.join([str(iou_thresholds[0]), str(iou_thresholds[-1])])}"
     elif filtering and not tableareaonly:
-        saveloc = f"{Path(__file__).parent.absolute()}/../../results/tabletransformer/testevalfinal1/fullimg/{datasetname}/{modelname}/filtering_{filterthreshold}_iou{'_'.join([str(iou_thresholds[0]), str(iou_thresholds[-1])])}"
+        saveloc = f"{Path(__file__).parent.absolute()}/../../results/tabletransformer/testevalfinal1/fullimg/{datasetname}/{modelname}/filtering_{filterthreshold}{'_novalid' if not valid else ''}_iou{'_'.join([str(iou_thresholds[0]), str(iou_thresholds[-1])])}"
     elif filtering and tableareaonly:
-        saveloc = f"{Path(__file__).parent.absolute()}/../../results/tabletransformer/testevalfinal1/fullimg/{datasetname}/{modelname}/tableareaonly/filtering_{filterthreshold}_iou{'_'.join([str(iou_thresholds[0]), str(iou_thresholds[-1])])}"
-    saveloc=f"{saveloc}{'/cells' if celleval else ''}"
+        saveloc = f"{Path(__file__).parent.absolute()}/../../results/tabletransformer/testevalfinal1/fullimg/{datasetname}/{modelname}/tableareaonly/filtering_{filterthreshold}{'_novalid' if not valid else ''}_iou{'_'.join([str(iou_thresholds[0]), str(iou_thresholds[-1])])}"
+    saveloc = f"{saveloc}{'/cells' if celleval else ''}"
     os.makedirs(saveloc, exist_ok=True)
 
     ### initializing variables ###
@@ -93,7 +119,9 @@ def inference(modelpath:str=None, targetloc=None, iou_thresholds: List[float] = 
         img, fullimagegroundbox, labels = dataset.getimgtarget(i, addtables=False)
         if celleval:
             fullimagegroundbox, labels = dataset.getcells(i, addtables=False)
-        encoding = move_data_to_device(dataset.ImageProcessor(img, return_tensors="pt"), device=device)
+        encoding = move_data_to_device(
+            dataset.ImageProcessor(img, return_tensors="pt"), device=device
+        )
         folder = dataset.getfolder(i)
         imname = folder.split("/")[-1]
 
@@ -101,19 +129,31 @@ def inference(modelpath:str=None, targetloc=None, iou_thresholds: List[float] = 
             results = model(**encoding)
         width, height = img.size
         if filtering:
-            output = dataset.ImageProcessor.post_process_object_detection(results, threshold=filterthreshold, target_sizes=[(height, width)])[0]
+            output = dataset.ImageProcessor.post_process_object_detection(
+                results, threshold=filterthreshold, target_sizes=[(height, width)]
+            )[0]
         else:
-            output = dataset.ImageProcessor.post_process_object_detection(results, threshold=0.0, target_sizes=[(height, width)])[0]
-        #labels = torch.Tensor([str(model.config.id2label[label]) for label in output["labels"].tolist()])
+            output = dataset.ImageProcessor.post_process_object_detection(
+                results, threshold=0.0, target_sizes=[(height, width)]
+            )[0]
+        # labels = torch.Tensor([str(model.config.id2label[label]) for label in output["labels"].tolist()])
         if celleval:
-            boxes = getcells(rows=output["boxes"][output["labels"]==2], cols=output["boxes"][output["labels"]==1])
+            boxes = getcells(
+                rows=output["boxes"][output["labels"] == 2],
+                cols=output["boxes"][output["labels"] == 1],
+            )
         else:
-            boxes = torch.vstack([output["boxes"][output["labels"]==2], output["boxes"][output["labels"]==1]])
-        #print(boxes.shape)
+            boxes = torch.vstack(
+                [
+                    output["boxes"][output["labels"] == 2],
+                    output["boxes"][output["labels"] == 1],
+                ]
+            )
+        # print(boxes.shape)
         if tableareaonly:
             boxes = tableareabboxes(boxes, folder)
         fullimagepredbox = boxes.to(device="cpu")
-        #print(boxes.shape)
+        # print(boxes.shape)
 
         # .......................................
         # fullimagemetrics with IoDT
@@ -187,6 +227,8 @@ def inference(modelpath:str=None, targetloc=None, iou_thresholds: List[float] = 
             iou_thresholds=iou_thresholds,
             imname=imname,
         )
+        # print(fullfn)
+        # print(fullimagegroundbox)
         # print(calcstats(fullimagepredbox, fullimagegroundbox,
         #                                                               iou_thresholds=iou_thresholds, imname=preds.split('/')[-1]), fullfp, targets[0])
         fullprec, fullrec, fullf1, fullwf1 = calcmetric(
@@ -242,6 +284,12 @@ def inference(modelpath:str=None, targetloc=None, iou_thresholds: List[float] = 
                 for i in range(len(iou_thresholds))
             }
         )
+        # print(fullimagemetrics)
+        if imname == "000d210d0f9b4101af2006b4aab33c42":
+            print(fullfn)
+            print(fullimagegroundbox)
+
+        #    exit()
 
         # ........................................
         # fullimagemetrics with alternate metric
@@ -367,24 +415,164 @@ def inference(modelpath:str=None, targetloc=None, iou_thresholds: List[float] = 
     iodtdf.to_csv(f"{saveloc}/fullimageiodt.csv")
     conclusiondf.to_csv(f"{saveloc}/overview.csv")
 
-if __name__=='__main__':
-    inference(modelpath=f"{Path(__file__).parent.absolute()}/../../checkpoints/tabletransformer/tabletransformer_v0_new_BonnDataFullImage_tabletransformer_loadtest_BonnData_fullimage_e250_init_tabletransformer_v0_new_GloSatFullImage_tabletransformer_newenv_fixed_GloSat_fullimage_e250_valid_es.pt_valid_es.pt", targetloc=f"{Path(__file__).parent.absolute()}/../../data/BonnData/test")
-    inference(
-        modelpath=f"{Path(__file__).parent.absolute()}/../../checkpoints/tabletransformer/tabletransformer_v0_new_BonnDataFullImage_tabletransformer_loadtest_BonnData_fullimage_e250_init_tabletransformer_v0_new_GloSatFullImage_tabletransformer_newenv_fixed_GloSat_fullimage_e250_valid_es.pt_valid_es.pt",
-        targetloc=f"{Path(__file__).parent.absolute()}/../../data/BonnData/test", filtering=True)
-    inference(
-        modelpath=f"{Path(__file__).parent.absolute()}/../../checkpoints/tabletransformer/tabletransformer_v0_new_BonnDataFullImage_tabletransformer_loadtest_BonnData_fullimage_e250_init_tabletransformer_v0_new_GloSatFullImage_tabletransformer_newenv_fixed_GloSat_fullimage_e250_valid_es.pt_valid_es.pt",
-        targetloc=f"{Path(__file__).parent.absolute()}/../../data/BonnData/test", celleval=True)
-    inference(
-        modelpath=f"{Path(__file__).parent.absolute()}/../../checkpoints/tabletransformer/tabletransformer_v0_new_BonnDataFullImage_tabletransformer_loadtest_BonnData_fullimage_e250_init_tabletransformer_v0_new_GloSatFullImage_tabletransformer_newenv_fixed_GloSat_fullimage_e250_valid_es.pt_valid_es.pt",
-        targetloc=f"{Path(__file__).parent.absolute()}/../../data/BonnData/test", filtering=True, celleval=True)
+
+if __name__ == "__main__":
     """
-    inference(modelpath=f"{Path(__file__).parent.absolute()}/../../checkpoints/tabletransformer/tabletransformer_v0_new_BonnDataFullImage_tabletransformer_estest_BonnData_fullimage_e1_init_tabletransformer_v0_new_GloSatFullImage_tabletransformer_newenv_fixed_GloSat_fullimage_e250_valid_es.pt_valid_es.pt", targetloc=f"{Path(__file__).parent.absolute()}/../../data/BonnData/test")
     inference(
-        modelpath=f"{Path(__file__).parent.absolute()}/../../checkpoints/tabletransformer/tabletransformer_v0_new_BonnDataFullImage_tabletransformer_estest_BonnData_fullimage_e1_init_tabletransformer_v0_new_GloSatFullImage_tabletransformer_newenv_fixed_GloSat_fullimage_e250_valid_es.pt_valid_end.pt",
-        targetloc=f"{Path(__file__).parent.absolute()}/../../data/BonnData/test")
-    inference(modelpath=f"{Path(__file__).parent.absolute()}/../../checkpoints/tabletransformer/tabletransformer_v0_new_BonnDataFullImage_tabletransformer_v0_bbox_xywh_BonnData_fullimage_e250_valid_end.pt",
-              targetloc=f"{Path(__file__).parent.absolute()}/../../data/BonnData/test")
+        modelpath=f"{Path(__file__).parent.absolute()}/../../checkpoints/tabletransformer/titw_call_aachen_e250_es.pt",
+        targetloc=f"{Path(__file__).parent.absolute()}/../../data/Tablesinthewild/test", datasetname=f"Tablesinthewild")
+    inference(
+        modelpath=f"{Path(__file__).parent.absolute()}/../../checkpoints/tabletransformer/titw_call_aachen_e250_es.pt",
+        targetloc=f"{Path(__file__).parent.absolute()}/../../data/Tablesinthewild/test", filtering=True, datasetname=f"Tablesinthewild")
+    inference(
+        modelpath=f"{Path(__file__).parent.absolute()}/../../checkpoints/tabletransformer/titw_call_aachen_e250_es.pt",
+        targetloc=f"{Path(__file__).parent.absolute()}/../../data/Tablesinthewild/test", celleval=True, datasetname=f"Tablesinthewild")
+    inference(
+        modelpath=f"{Path(__file__).parent.absolute()}/../../checkpoints/tabletransformer/titw_call_aachen_e250_es.pt",
+        targetloc=f"{Path(__file__).parent.absolute()}/../../data/Tablesinthewild/test", filtering=True, celleval=True, datasetname=f"Tablesinthewild")
+
+    inference(
+        modelpath=f"{Path(__file__).parent.absolute()}/../../checkpoints/tabletransformer/titw_severalcalls_2_e250_es.pt",
+        targetloc=f"{Path(__file__).parent.absolute()}/../../data/Tablesinthewild/test", datasetname=f"Tablesinthewild")
+    inference(
+        modelpath=f"{Path(__file__).parent.absolute()}/../../checkpoints/tabletransformer/titw_severalcalls_2_e250_es.pt",
+        targetloc=f"{Path(__file__).parent.absolute()}/../../data/Tablesinthewild/test", filtering=True, datasetname=f"Tablesinthewild")
+    inference(
+        modelpath=f"{Path(__file__).parent.absolute()}/../../checkpoints/tabletransformer/titw_severalcalls_2_e250_es.pt",
+        targetloc=f"{Path(__file__).parent.absolute()}/../../data/Tablesinthewild/test", celleval=True, datasetname=f"Tablesinthewild")
+    inference(
+        modelpath=f"{Path(__file__).parent.absolute()}/../../checkpoints/tabletransformer/titw_severalcalls_2_e250_es.pt",
+        targetloc=f"{Path(__file__).parent.absolute()}/../../data/Tablesinthewild/test", filtering=True, celleval=True, datasetname=f"Tablesinthewild")
+    #####################################################################################################################
+    inference(
+        modelpath=f"{Path(__file__).parent.absolute()}/../../checkpoints/tabletransformer/titw_call_aachen_e250_end.pt",
+        targetloc=f"{Path(__file__).parent.absolute()}/../../data/Tablesinthewild/test", datasetname=f"Tablesinthewild")
+    inference(
+        modelpath=f"{Path(__file__).parent.absolute()}/../../checkpoints/tabletransformer/titw_call_aachen_e250_end.pt",
+        targetloc=f"{Path(__file__).parent.absolute()}/../../data/Tablesinthewild/test", filtering=True, datasetname=f"Tablesinthewild")
+    inference(
+        modelpath=f"{Path(__file__).parent.absolute()}/../../checkpoints/tabletransformer/titw_call_aachen_e250_end.pt",
+        targetloc=f"{Path(__file__).parent.absolute()}/../../data/Tablesinthewild/test", celleval=True, datasetname=f"Tablesinthewild")
+    inference(
+        modelpath=f"{Path(__file__).parent.absolute()}/../../checkpoints/tabletransformer/titw_call_aachen_e250_end.pt",
+        targetloc=f"{Path(__file__).parent.absolute()}/../../data/Tablesinthewild/test", filtering=True, celleval=True, datasetname=f"Tablesinthewild")
+
+    inference(
+        modelpath=f"{Path(__file__).parent.absolute()}/../../checkpoints/tabletransformer/titw_severalcalls_2_e250_end.pt",
+        targetloc=f"{Path(__file__).parent.absolute()}/../../data/Tablesinthewild/test", datasetname=f"Tablesinthewild")
+    inference(
+        modelpath=f"{Path(__file__).parent.absolute()}/../../checkpoints/tabletransformer/titw_severalcalls_2_e250_end.pt",
+        targetloc=f"{Path(__file__).parent.absolute()}/../../data/Tablesinthewild/test", filtering=True, datasetname=f"Tablesinthewild")
+    inference(
+        modelpath=f"{Path(__file__).parent.absolute()}/../../checkpoints/tabletransformer/titw_severalcalls_2_e250_end.pt",
+        targetloc=f"{Path(__file__).parent.absolute()}/../../data/Tablesinthewild/test", celleval=True, datasetname=f"Tablesinthewild")
+    inference(
+        modelpath=f"{Path(__file__).parent.absolute()}/../../checkpoints/tabletransformer/titw_severalcalls_2_e250_end.pt",
+        targetloc=f"{Path(__file__).parent.absolute()}/../../data/Tablesinthewild/test", filtering=True, celleval=True, datasetname=f"Tablesinthewild")
+    """
+    # inference(
+    #    modelpath=f"{Path(__file__).parent.absolute()}/../../checkpoints/tabletransformer/titw_severalcalls_2_e250_es.pt",
+    #    targetloc=f"{Path(__file__).parent.absolute()}/../../data/Tablesinthewild/preprocessed/Inclined", datasetname=f"Tablesinthewild/Inclined", celleval=False)
+
+    for cat in glob.glob(
+        f"{Path(__file__).parent.absolute()}/../../data/Tablesinthewild/preprocessed/*"
+    ):
+        print(cat)
+        inference(
+            modelpath=f"{Path(__file__).parent.absolute()}/../../checkpoints/tabletransformer/titw_call_aachen_e250_es.pt",
+            targetloc=cat,
+            datasetname=f"Tablesinthewild/{cat.split('/')[-1]}",
+        )
+        inference(
+            modelpath=f"{Path(__file__).parent.absolute()}/../../checkpoints/tabletransformer/titw_call_aachen_e250_es.pt",
+            targetloc=cat,
+            filtering=True,
+            datasetname=f"Tablesinthewild/{cat.split('/')[-1]}",
+        )
+        # inference(
+        #    modelpath=f"{Path(__file__).parent.absolute()}/../../checkpoints/tabletransformer/titw_call_aachen_e250_es.pt",
+        #    targetloc=cat, celleval=True, datasetname=f"Tablesinthewild/{cat.split('/')[-1]}")
+        # inference(
+        #    modelpath=f"{Path(__file__).parent.absolute()}/../../checkpoints/tabletransformer/titw_call_aachen_e250_es.pt",
+        #    targetloc=cat, filtering=True, celleval=True, datasetname=f"Tablesinthewild/{cat.split('/')[-1]}")
+
+        inference(
+            modelpath=f"{Path(__file__).parent.absolute()}/../../checkpoints/tabletransformer/titw_severalcalls_2_e250_es.pt",
+            targetloc=cat,
+            datasetname=f"Tablesinthewild/{cat.split('/')[-1]}",
+        )
+        inference(
+            modelpath=f"{Path(__file__).parent.absolute()}/../../checkpoints/tabletransformer/titw_severalcalls_2_e250_es.pt",
+            targetloc=cat,
+            filtering=True,
+            datasetname=f"Tablesinthewild/{cat.split('/')[-1]}",
+        )
+        # inference(
+        #    modelpath=f"{Path(__file__).parent.absolute()}/../../checkpoints/tabletransformer/titw_severalcalls_2_e250_es.pt",
+        #    targetloc=cat, celleval=True, datasetname=f"Tablesinthewild/{cat.split('/')[-1]}")
+        # inference(
+        #    modelpath=f"{Path(__file__).parent.absolute()}/../../checkpoints/tabletransformer/titw_severalcalls_2_e250_es.pt",
+        #    targetloc=cat, filtering=True, celleval=True, datasetname=f"Tablesinthewild/{cat.split('/')[-1]}")
+        #####################################################################################################################
+        inference(
+            modelpath=f"{Path(__file__).parent.absolute()}/../../checkpoints/tabletransformer/titw_call_aachen_e250_end.pt",
+            targetloc=cat,
+            datasetname=f"Tablesinthewild/{cat.split('/')[-1]}",
+        )
+        inference(
+            modelpath=f"{Path(__file__).parent.absolute()}/../../checkpoints/tabletransformer/titw_call_aachen_e250_end.pt",
+            targetloc=cat,
+            filtering=True,
+            datasetname=f"Tablesinthewild/{cat.split('/')[-1]}",
+        )
+        # inference(
+        #    modelpath=f"{Path(__file__).parent.absolute()}/../../checkpoints/tabletransformer/titw_call_aachen_e250_end.pt",
+        #    targetloc=cat, celleval=True, datasetname=f"Tablesinthewild/{cat.split('/')[-1]}")
+        # inference(
+        #    modelpath=f"{Path(__file__).parent.absolute()}/../../checkpoints/tabletransformer/titw_call_aachen_e250_end.pt",
+        #    targetloc=cat, filtering=True, celleval=True, datasetname=f"Tablesinthewild/{cat.split('/')[-1]}")
+
+        inference(
+            modelpath=f"{Path(__file__).parent.absolute()}/../../checkpoints/tabletransformer/titw_severalcalls_2_e250_end.pt",
+            targetloc=cat,
+            datasetname=f"Tablesinthewild/{cat.split('/')[-1]}",
+        )
+        inference(
+            modelpath=f"{Path(__file__).parent.absolute()}/../../checkpoints/tabletransformer/titw_severalcalls_2_e250_end.pt",
+            targetloc=cat,
+            filtering=True,
+            datasetname=f"Tablesinthewild/{cat.split('/')[-1]}",
+        )
+        # inference(
+        #    modelpath=f"{Path(__file__).parent.absolute()}/../../checkpoints/tabletransformer/titw_severalcalls_2_e250_end.pt",
+        #    targetloc=cat, celleval=True, datasetname=f"Tablesinthewild/{cat.split('/')[-1]}")
+        # inference(
+        #    modelpath=f"{Path(__file__).parent.absolute()}/../../checkpoints/tabletransformer/titw_severalcalls_2_e250_end.pt",
+        #    targetloc=cat, filtering=True, celleval=True, datasetname=f"Tablesinthewild/{cat.split('/')[-1]}")
+    """
+    """
+    """
+    #inference(modelpath=f"{Path(__file__).parent.absolute()}/../../checkpoints/tabletransformer/tabletransformer_v0_new_BonnDataFullImage_tabletransformer_loadtest_BonnData_fullimage_e250_init_tabletransformer_v0_new_GloSatFullImage_tabletransformer_newenv_fixed_GloSat_fullimage_e250_valid_es.pt_valid_es.pt", targetloc=f"{Path(__file__).parent.absolute()}/../../data/BonnData/test")
+    #inference(
+    #    modelpath=f"{Path(__file__).parent.absolute()}/../../checkpoints/tabletransformer/tabletransformer_v0_new_BonnDataFullImage_tabletransformer_loadtest_BonnData_fullimage_e250_init_tabletransformer_v0_new_GloSatFullImage_tabletransformer_newenv_fixed_GloSat_fullimage_e250_valid_es.pt_valid_es.pt",
+    #    targetloc=f"{Path(__file__).parent.absolute()}/../../data/BonnData/test", filtering=True)
+    #inference(
+    #    modelpath=f"{Path(__file__).parent.absolute()}/../../checkpoints/tabletransformer/tabletransformer_v0_new_BonnDataFullImage_tabletransformer_loadtest_BonnData_fullimage_e250_init_tabletransformer_v0_new_GloSatFullImage_tabletransformer_newenv_fixed_GloSat_fullimage_e250_valid_es.pt_valid_es.pt",
+    #    targetloc=f"{Path(__file__).parent.absolute()}/../../data/BonnData/test", celleval=True)
+    #inference(
+    #    modelpath=f"{Path(__file__).parent.absolute()}/../../checkpoints/tabletransformer/tabletransformer_v0_new_BonnDataFullImage_tabletransformer_loadtest_BonnData_fullimage_e250_init_tabletransformer_v0_new_GloSatFullImage_tabletransformer_newenv_fixed_GloSat_fullimage_e250_valid_es.pt_valid_es.pt",
+    #    targetloc=f"{Path(__file__).parent.absolute()}/../../data/BonnData/test", filtering=True, celleval=True)
+    """
+    """
+    """
+    """
+    #inference(modelpath=f"{Path(__file__).parent.absolute()}/../../checkpoints/tabletransformer/tabletransformer_v0_new_BonnDataFullImage_tabletransformer_estest_BonnData_fullimage_e1_init_tabletransformer_v0_new_GloSatFullImage_tabletransformer_newenv_fixed_GloSat_fullimage_e250_valid_es.pt_valid_es.pt", targetloc=f"{Path(__file__).parent.absolute()}/../../data/BonnData/test")
+    #inference(
+    #    modelpath=f"{Path(__file__).parent.absolute()}/../../checkpoints/tabletransformer/tabletransformer_v0_new_BonnDataFullImage_tabletransformer_estest_BonnData_fullimage_e1_init_tabletransformer_v0_new_GloSatFullImage_tabletransformer_newenv_fixed_GloSat_fullimage_e250_valid_es.pt_valid_end.pt",
+    #    targetloc=f"{Path(__file__).parent.absolute()}/../../data/BonnData/test")
+    #inference(modelpath=f"{Path(__file__).parent.absolute()}/../../checkpoints/tabletransformer/tabletransformer_v0_new_BonnDataFullImage_tabletransformer_v0_bbox_xywh_BonnData_fullimage_e250_valid_end.pt",
+    #          targetloc=f"{Path(__file__).parent.absolute()}/../../data/BonnData/test")
+    
     inference(
         modelpath=f"{Path(__file__).parent.absolute()}/../../checkpoints/tabletransformer/tabletransformer_v0_new_BonnDataFullImage_tabletransformer_estest_BonnData_fullimage_e250_valid_es.pt",
         targetloc=f"{Path(__file__).parent.absolute()}/../../data/BonnData/test")
@@ -397,9 +585,9 @@ if __name__=='__main__':
     inference(
         modelpath=f"{Path(__file__).parent.absolute()}/../../checkpoints/tabletransformer/tabletransformer_v0_new_GloSatFullImage_tabletransformer_newenv_fixed_GloSat_fullimage_e250_valid_end.pt",
         targetloc=f"{Path(__file__).parent.absolute()}/../../data/GloSat/test", datasetname="GloSat")
-    inference(
-        modelpath=f"{Path(__file__).parent.absolute()}/../../checkpoints/tabletransformer/tabletransformer_v0_new_BonnDataFullImage_tabletransformer_v0_bbox_xywh_BonnData_fullimage_e250_valid_end.pt",
-        targetloc=f"{Path(__file__).parent.absolute()}/../../data/BonnData/test", celleval=True)
+    #inference(
+    #    modelpath=f"{Path(__file__).parent.absolute()}/../../checkpoints/tabletransformer/tabletransformer_v0_new_BonnDataFullImage_tabletransformer_v0_bbox_xywh_BonnData_fullimage_e250_valid_end.pt",
+    #    targetloc=f"{Path(__file__).parent.absolute()}/../../data/BonnData/test", celleval=True)
     inference(
         modelpath=f"{Path(__file__).parent.absolute()}/../../checkpoints/tabletransformer/tabletransformer_v0_new_BonnDataFullImage_tabletransformer_estest_BonnData_fullimage_e250_valid_es.pt",
         targetloc=f"{Path(__file__).parent.absolute()}/../../data/BonnData/test", celleval=True)
@@ -431,21 +619,27 @@ if __name__=='__main__':
     inference(
         modelpath=f"{Path(__file__).parent.absolute()}/../../checkpoints/tabletransformer/tabletransformer_v0_new_BonnDataFullImage_tabletransformer_estest_BonnData_fullimage_e250_valid_end.pt",
         targetloc=f"{Path(__file__).parent.absolute()}/../../data/BonnData/test", filtering=True)
+    """
+    """
     inference(
         modelpath=f"{Path(__file__).parent.absolute()}/../../checkpoints/tabletransformer/tabletransformer_v0_new_GloSatFullImage_tabletransformer_newenv_fixed_GloSat_fullimage_e250_valid_es.pt",
         targetloc=f"{Path(__file__).parent.absolute()}/../../data/GloSat/test", datasetname="GloSat", filtering=True)
     inference(
         modelpath=f"{Path(__file__).parent.absolute()}/../../checkpoints/tabletransformer/tabletransformer_v0_new_GloSatFullImage_tabletransformer_newenv_fixed_GloSat_fullimage_e250_valid_end.pt",
         targetloc=f"{Path(__file__).parent.absolute()}/../../data/GloSat/test", datasetname="GloSat", filtering=True)
-    #inference(
+    """
+    # inference(
     #    modelpath=f"{Path(__file__).parent.absolute()}/../../checkpoints/tabletransformer/tabletransformer_v0_new_BonnDataFullImage_tabletransformer_v0_bbox_xywh_BonnData_fullimage_e250_valid_end.pt",
     #    targetloc=f"{Path(__file__).parent.absolute()}/../../data/BonnData/test", celleval=True, filtering=True)
+    """
     inference(
         modelpath=f"{Path(__file__).parent.absolute()}/../../checkpoints/tabletransformer/tabletransformer_v0_new_BonnDataFullImage_tabletransformer_estest_BonnData_fullimage_e250_valid_es.pt",
         targetloc=f"{Path(__file__).parent.absolute()}/../../data/BonnData/test", celleval=True, filtering=True)
     inference(
         modelpath=f"{Path(__file__).parent.absolute()}/../../checkpoints/tabletransformer/tabletransformer_v0_new_BonnDataFullImage_tabletransformer_estest_BonnData_fullimage_e250_valid_end.pt",
         targetloc=f"{Path(__file__).parent.absolute()}/../../data/BonnData/test", celleval=True, filtering=True)
+    """
+    """
     inference(
         modelpath=f"{Path(__file__).parent.absolute()}/../../checkpoints/tabletransformer/tabletransformer_v0_new_GloSatFullImage_tabletransformer_newenv_fixed_GloSat_fullimage_e250_valid_es.pt",
         targetloc=f"{Path(__file__).parent.absolute()}/../../data/GloSat/test", datasetname="GloSat", celleval=True, filtering=True)

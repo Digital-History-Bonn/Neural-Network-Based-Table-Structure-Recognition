@@ -2,7 +2,7 @@ import glob
 import json
 import math
 from pathlib import Path
-from typing import Tuple, List
+from typing import List, Tuple
 
 import numpy as np
 import pandas as pd
@@ -20,32 +20,35 @@ from torchvision.utils import draw_bounding_boxes
 
 from src.historicdocumentprocessing.kosmos_eval import calcmetric, extractboxes
 
-def getcells(rows: torch.Tensor, cols: torch.Tensor, keepnonoverlap:bool=True)->torch.Tensor:
+
+def getcells(
+    rows: torch.Tensor, cols: torch.Tensor, keepnonoverlap: bool = True
+) -> torch.Tensor:
     """get cell bboxes by intersecting row and column bboxes (for tabletransformer)"""
-    #print("rows:",rows.shape)
-    #print("cols:",cols.shape)
+    # print("rows:",rows.shape)
+    # print("cols:",cols.shape)
     inter, _ = _box_inter_union(rows, cols)
     newcells = []
     for rowidx, colidx in inter.nonzero():
         minxmaxymax = torch.min(rows[rowidx, 2:], cols[colidx, 2:])
         maxxminymin = torch.max(rows[rowidx, :2], cols[colidx, :2])
-        newcell = torch.hstack([maxxminymin,minxmaxymax])
-        #print(newcell.shape)
+        newcell = torch.hstack([maxxminymin, minxmaxymax])
+        # print(newcell.shape)
         newcells.append(newcell)
     if keepnonoverlap:
-        if cols.shape[0]>0:
-            for rowidx in torch.where(inter.amax(dim=1)<=0, 1, 0).nonzero():
+        if cols.shape[0] > 0:
+            for rowidx in torch.where(inter.amax(dim=1) <= 0, 1, 0).nonzero():
                 newcells.append(rows[rowidx])
         else:
             for row in rows:
                 newcells.append(row)
-        if rows.shape[0]>0:
-            for colidx in torch.where(inter.amax(dim=0)<=0, 1, 0).nonzero():
+        if rows.shape[0] > 0:
+            for colidx in torch.where(inter.amax(dim=0) <= 0, 1, 0).nonzero():
                 newcells.append(cols[colidx])
         else:
             for col in cols:
                 newcells.append(col)
-    return torch.vstack(newcells) if newcells else torch.empty(0,4)
+    return torch.vstack(newcells) if newcells else torch.empty(0, 4)
 
 
 def avrgeuc(boxes: torch.Tensor) -> float:
@@ -121,7 +124,7 @@ def clustertablesseperately(
     boxes: torch.Tensor,
     epsprefactor: Tuple[float, float] = tuple([3, 1.5]),
     includeoutlier: bool = True,
-    minsamples: List[int] = [4, 5]
+    minsamples: List[int] = [4, 5],
 ):
     tables = []
     xtables = []
@@ -151,7 +154,9 @@ def clustertablesseperately(
             ydist = avrgeuc(yboxes)
             if ydist:
                 clustering = DBSCAN(
-                    eps=(epsprefactor2) * ydist, min_samples=minsamples[1], metric=eucsimilarity
+                    eps=(epsprefactor2) * ydist,
+                    min_samples=minsamples[1],
+                    metric=eucsimilarity,
                 ).fit(yboxes.numpy())
                 for label in set(clustering.labels_):
                     table = prototable[(clustering.labels_ == label)]
@@ -251,6 +256,42 @@ def BonnTablebyCat(
 
 
 if __name__ == "__main__":
+    BonnTablebyCat(
+        resultfile=f"{Path(__file__).parent.absolute()}/../../../results/tabletransformer/testevalfinal1/fullimg/BonnData/tabletransformer_v0_new_BonnDataFullImage_tabletransformer_estest_BonnData_fullimage_e250_valid_es.pt/tableareaonly/filtering_0.49_iou0.5_0.9/cells/fullimageiodt.csv"
+    )
+    BonnTablebyCat(
+        resultfile=f"{Path(__file__).parent.absolute()}/../../../results/tabletransformer/testevalfinal1/fullimg/BonnData/tabletransformer_v0_new_BonnDataFullImage_tabletransformer_estest_BonnData_fullimage_e250_valid_es.pt/tableareaonly/filtering_0.49_iou0.5_0.9/cells/fullimageiou.csv",
+        resultmetric="iou",
+    )
+    BonnTablebyCat(
+        resultfile=f"{Path(__file__).parent.absolute()}/../../../results/tabletransformer/testevalfinal1/fullimg/BonnData/tabletransformer_v0_new_BonnDataFullImage_tabletransformer_estest_BonnData_fullimage_e250_valid_es.pt/tableareaonly/filtering_0.49_iou0.5_0.9/fullimageiodt.csv"
+    )
+    BonnTablebyCat(
+        resultfile=f"{Path(__file__).parent.absolute()}/../../../results/tabletransformer/testevalfinal1/fullimg/BonnData/tabletransformer_v0_new_BonnDataFullImage_tabletransformer_estest_BonnData_fullimage_e250_valid_es.pt/tableareaonly/filtering_0.49_iou0.5_0.9/fullimageiou.csv",
+        resultmetric="iou",
+    )
+    """
+    BonnTablebyCat(
+        resultfile=f"{Path(__file__).parent.absolute()}/../../../results/tabletransformer/testevalfinal1/fullimg/BonnData/tabletransformer_v0_new_BonnDataFullImage_tabletransformer_estest_BonnData_fullimage_e250_valid_es.pt/tableareaonly/no_filtering_iou_0.5_0.9/cells/fullimageiodt.csv")
+    BonnTablebyCat(
+        resultfile=f"{Path(__file__).parent.absolute()}/../../../results/tabletransformer/testevalfinal1/fullimg/BonnData/tabletransformer_v0_new_BonnDataFullImage_tabletransformer_estest_BonnData_fullimage_e250_valid_es.pt/tableareaonly/no_filtering_iou_0.5_0.9/cells/fullimageiou.csv",
+        resultmetric="iou")
+    BonnTablebyCat(
+        resultfile=f"{Path(__file__).parent.absolute()}/../../../results/tabletransformer/testevalfinal1/fullimg/BonnData/tabletransformer_v0_new_BonnDataFullImage_tabletransformer_estest_BonnData_fullimage_e250_valid_es.pt/tableareaonly/no_filtering_iou_0.5_0.9/fullimageiodt.csv")
+    BonnTablebyCat(
+        resultfile=f"{Path(__file__).parent.absolute()}/../../../results/tabletransformer/testevalfinal1/fullimg/BonnData/tabletransformer_v0_new_BonnDataFullImage_tabletransformer_estest_BonnData_fullimage_e250_valid_es.pt/tableareaonly/no_filtering_iou_0.5_0.9/fullimageiou.csv",
+        resultmetric="iou")
+    BonnTablebyCat(
+        resultfile=f"{Path(__file__).parent.absolute()}/../../../results/tabletransformer/testevalfinal1/fullimg/BonnData/tabletransformer_v0_new_BonnDataFullImage_tabletransformer_estest_BonnData_fullimage_e250_valid_end.pt/tableareaonly/no_filtering_iou_0.5_0.9/cells/fullimageiodt.csv")
+    BonnTablebyCat(
+        resultfile=f"{Path(__file__).parent.absolute()}/../../../results/tabletransformer/testevalfinal1/fullimg/BonnData/tabletransformer_v0_new_BonnDataFullImage_tabletransformer_estest_BonnData_fullimage_e250_valid_end.pt/tableareaonly/no_filtering_iou_0.5_0.9/cells/fullimageiou.csv",
+        resultmetric="iou")
+    BonnTablebyCat(
+        resultfile=f"{Path(__file__).parent.absolute()}/../../../results/tabletransformer/testevalfinal1/fullimg/BonnData/tabletransformer_v0_new_BonnDataFullImage_tabletransformer_estest_BonnData_fullimage_e250_valid_end.pt/tableareaonly/no_filtering_iou_0.5_0.9/fullimageiodt.csv")
+    BonnTablebyCat(
+        resultfile=f"{Path(__file__).parent.absolute()}/../../../results/tabletransformer/testevalfinal1/fullimg/BonnData/tabletransformer_v0_new_BonnDataFullImage_tabletransformer_estest_BonnData_fullimage_e250_valid_end.pt/tableareaonly/no_filtering_iou_0.5_0.9/fullimageiou.csv",
+        resultmetric="iou")
+    """
     """
     BonnTablebyCat(resultfile=f"{Path(__file__).parent.absolute()}/../../../results/kosmos25/testevalfinal1/BonnData_Tables/iou_0.5_0.9/tableareaonly/fullimageiodt.csv")
     BonnTablebyCat(
@@ -338,6 +379,7 @@ if __name__ == "__main__":
        res.save(f"{Path(__file__).parent.absolute()}/../../../images/test/test_rcnn_{i}.jpg")
 
     """
+    """
     with open(
         f"{Path(__file__).parent.absolute()}/../../../results/kosmos25/BonnData/Tabellen/test/I_HA_Rep_89_Nr_16160_0170/I_HA_Rep_89_Nr_16160_0170.jpg.json"
     ) as p:
@@ -354,8 +396,8 @@ if __name__ == "__main__":
         res.save(
             f"{Path(__file__).parent.absolute()}/../../../images/test/test_{i}.jpg"
         )
-
-    """"
+    """
+    """
     BonnTablebyCat()
     BonnTablebyCat(resultfile=f"{Path(__file__).parent.absolute()}/../../../results/kosmos25/testevaltotal/BonnData_Tables/fullimageiou.csv", resultmetric="iou")
     BonnTablebyCat(

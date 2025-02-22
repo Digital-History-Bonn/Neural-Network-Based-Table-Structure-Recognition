@@ -91,7 +91,9 @@ def run_dbs_1D(cells: list, eps: int, include_outliers=True, min_samples=2) -> l
     )
 
 
-def reconstruct_table(cells: list, table: list, eps: int, include_outliers = False) -> (list, list):
+def reconstruct_table(
+    cells: list, table: list, eps: int, include_outliers=False
+) -> (list, list):
     """
     Reconstructs the cells, given the table region using DBScan with hyperparmeter eps.
 

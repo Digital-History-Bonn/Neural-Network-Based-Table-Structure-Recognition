@@ -132,21 +132,21 @@ if __name__ == "__main__":
         f"{Path(__file__).parent.absolute()}/../../data/Tablesinthewild/train",
         "fullimage",
         transforms=None,
-     )
+    )
 
-    #dataset = CustomDataset(
+    # dataset = CustomDataset(
     #    f"{Path(__file__).parent.absolute()}/../../data/BonnData/train",
     #    "fullimage",
     #    transforms=None,
-    #)
+    # )
 
     for i in tqdm(range(dataset.__len__())):
         img, target = dataset[i]
-        if img.shape[0]!=3:
+        if img.shape[0] != 3:
             print(img.shape)
-            print(target['img_number'])
+            print(target["img_number"])
 
-    #shutil.copy(src=f"{Path(__file__).parent.absolute()}/../../data/Tablesinthewild/rawdata/train/images/0SlmUiAXS2SAJ-PLom0zagAAACMAAQED.jpg", dst=f"{Path(__file__).parent.absolute()}/../../data/Tablesinthewild/train/0SlmUiAXS2SAJ-PLom0zagAAACMAAQED/0SlmUiAXS2SAJ-PLom0zagAAACMAAQED.jpg")
+    # shutil.copy(src=f"{Path(__file__).parent.absolute()}/../../data/Tablesinthewild/rawdata/train/images/0SlmUiAXS2SAJ-PLom0zagAAACMAAQED.jpg", dst=f"{Path(__file__).parent.absolute()}/../../data/Tablesinthewild/train/0SlmUiAXS2SAJ-PLom0zagAAACMAAQED/0SlmUiAXS2SAJ-PLom0zagAAACMAAQED.jpg")
     # img, target = dataset[dataset.getidx("mit_google_image_search-10918758-be4b5fa7bf3fea80823dabbe1e17e4136f0da811")]
     # print(target['boxes'])
     # img,target = dataset[dataset.getidx('customs-declaration-12689')]
@@ -157,15 +157,19 @@ if __name__ == "__main__":
     #    transforms=None,
     # )
 
-    img, target = dataset[dataset.getidx("mit_google_image_search-10918758-cdcd82db9ce0b61da60155c5c822b0be3884a2cf")]
+    img, target = dataset[
+        dataset.getidx(
+            "mit_google_image_search-10918758-cdcd82db9ce0b61da60155c5c822b0be3884a2cf"
+        )
+    ]
 
-    #img, target = dataset[0]
+    # img, target = dataset[0]
     # print(target['boxes'])
-    #result = draw_bounding_boxes(
+    # result = draw_bounding_boxes(
     #    image=(img * 255).to(torch.uint8),
     #    boxes=target["boxes"],
     #    colors=["red" for i in range(target["boxes"].shape[0])],
     #    labels=["Ground" for i in range(target["boxes"].shape[0])],
-    #)
-    #result = Image.fromarray(result.permute(1, 2, 0).numpy())
-    #result.save(f"{Path(__file__).parent.absolute()}/../../images/rcnn/testest_4.jpg")
+    # )
+    # result = Image.fromarray(result.permute(1, 2, 0).numpy())
+    # result.save(f"{Path(__file__).parent.absolute()}/../../images/rcnn/testest_4.jpg")

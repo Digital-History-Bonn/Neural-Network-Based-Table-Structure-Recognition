@@ -13,4 +13,4 @@ source /home/s6anthel/.bashrc
 module load CUDA
 conda activate newkosmos2
 
-python -m src.historicdocumentprocessing.tabletransformer_train --name "BonnDataFullImage_tabletransformer_loadtest" --dataset "BonnData" --valid --no-early_stopping --load "tabletransformer_v0_new_GloSatFullImage_tabletransformer_newenv_fixed_GloSat_fullimage_e250_valid_es.pt"
+python -m src.historicdocumentprocessing.tabletransformer_train --name "BonnDataFullImage_tabletransformer_loadtest1" --dataset "BonnData" --valid --no-early_stopping --load "tabletransformer_v0_new_GloSatFullImage_tabletransformer_newenv_fixed_GloSat_fullimage_e250_valid_es"

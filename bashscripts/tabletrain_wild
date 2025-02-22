@@ -17,7 +17,6 @@ epoch=$1
 model=$2
 
 echo "$epoch"
-echo "$startepoch"
 echo "$model"
 
-python -m src.historicdocumentprocessing.tabletransformer_train --name "titw_severalcalls_e250" --dataset "Tablesinthewild" --valid --no-early_stopping --epochs "$epoch" --load "$model" --identicalname
+python -m src.historicdocumentprocessing.tabletransformer_train --name "titw_severalcalls_2_e250" --dataset "Tablesinthewild" --valid --no-early_stopping --epochs "$epoch" --load "$model" --identicalname

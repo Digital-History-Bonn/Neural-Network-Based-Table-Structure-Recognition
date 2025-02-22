@@ -24,7 +24,7 @@ echo "$model"
 
 if [ "$randominit" = true ]
 then
-  python -m src.historicdocumentprocessing.fasterrcnn_trainer --name "testseveralcalls_valid_random_init_e_250" --epochs "$epoch" --startepoch "$startepoch" --randominit --valid --identicalname
+  python -m src.historicdocumentprocessing.fasterrcnn_trainer --name "testseveralcalls_no_valid_random_init_e_250" --epochs "$epoch" --startepoch "$startepoch" --randominit --no-valid --identicalname
 else
-  python -m src.historicdocumentprocessing.fasterrcnn_trainer --name "testseveralcalls_valid_random_init_e_250" --epochs "$epoch" --startepoch "$startepoch" --load "$model" --valid --identicalname
+  python -m src.historicdocumentprocessing.fasterrcnn_trainer --name "testseveralcalls_no_valid_random_init_e_250" --epochs "$epoch" --startepoch "$startepoch" --load "$model" --no-valid --identicalname
 fi

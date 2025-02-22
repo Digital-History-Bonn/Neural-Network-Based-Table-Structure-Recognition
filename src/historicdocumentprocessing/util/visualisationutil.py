@@ -3,17 +3,23 @@ import os
 from pathlib import Path
 
 import torch
-from PIL import Image
 from matplotlib import pyplot as plt
+from PIL import Image
 from torchvision.io import read_image
 from torchvision.utils import draw_bounding_boxes
 
-from src.historicdocumentprocessing.kosmos_eval import extractboxes, reversetablerelativebboxes_outer
+from src.historicdocumentprocessing.kosmos_eval import (
+    extractboxes,
+    reversetablerelativebboxes_outer,
+)
+from src.historicdocumentprocessing.tabletransformer_dataset import (
+    reversetablerelativebboxes_outer_rowcoll,
+)
 from src.historicdocumentprocessing.util.tablesutil import remove_invalid_bbox
 
 
-def drawimg_varformat_inner(box, impath, savepath, groundpath=None):
-    #print(impath)
+def drawimg_varformat_inner(box, impath, savepath, groundpath=None, rowcol=False):
+    # print(impath)
     img = read_image(impath)
     labels = ["Pred" for i in range(box.shape[0])]
     colors = ["green" for i in range(box.shape[0])]
@@ -25,6 +31,14 @@ def drawimg_varformat_inner(box, impath, savepath, groundpath=None):
             gbox = torch.load(groundpath)
         else:
             gbox = reversetablerelativebboxes_outer(groundpath)
+            if rowcol:
+                # gbox = reversetablerelativebboxes_outer_rowcoll(groundpath, "row")
+                torch.vstack(
+                    (
+                        reversetablerelativebboxes_outer_rowcoll(groundpath, "row"),
+                        reversetablerelativebboxes_outer_rowcoll(groundpath, "col"),
+                    )
+                )
         labels.extend(["Ground"] * gbox.shape[0])
         colors.extend(["red"] * gbox.shape[0])
         # print(gbox)

@@ -46,7 +46,7 @@ def inference_fullimg(
     filter=True,
     tablerelative: bool = False,
     tableareaonly: bool = False,
-    valid: bool = True
+    valid: bool = True,
 ):
     model = fasterrcnn_resnet50_fpn(
         weights=FasterRCNN_ResNet50_FPN_Weights.DEFAULT,
@@ -65,8 +65,9 @@ def inference_fullimg(
     # boxsaveloc = f"{Path(__file__).parent.absolute()}/../../results/fasterrcnn/{datasetname}/{modelname}"
     if filter:
         with open(
-                f"{Path(__file__).parent.absolute()}/../../results/fasterrcnn/bestfilterthresholds{'_valid' if valid else ''}/{modelname}.txt",
-                'r') as f:
+            f"{Path(__file__).parent.absolute()}/../../results/fasterrcnn/bestfilterthresholds{'_valid' if valid else ''}/{modelname}.txt",
+            "r",
+        ) as f:
             filtering = float(f.read())
     if tableareaonly and not filter:
         saveloc = f"{Path(__file__).parent.absolute()}/../../results/fasterrcnn/testevalfinal1/fullimg/{datasetname}/{modelname}/tableareaonly/iou_{'_'.join([str(iou_thresholds[0]), str(iou_thresholds[-1])])}"
@@ -665,34 +666,38 @@ if __name__ == "__main__":
         tableareaonly=False,
     )
 
-"""
+    """
     inference_fullimg(
         targetloc=f"{Path(__file__).parent.absolute()}/../../data/BonnData/test",
         datasetname="BonnData",
         modelpath=f"{Path(__file__).parent.absolute()}/../../checkpoints/fasterrcnn/BonnDataFullImage1_BonnData_fullimage_e250_es.pt",
         tablerelative=True,
-        tableareaonly=True,filter=True
+        tableareaonly=True,
+        filter=True,
     )
     inference_fullimg(
         targetloc=f"{Path(__file__).parent.absolute()}/../../data/GloSat/test",
         datasetname="GloSat",
         modelpath=f"{Path(__file__).parent.absolute()}/../../checkpoints/fasterrcnn/GloSatFullImage1_GloSat_fullimage_e250_es.pt",
         tablerelative=True,
-        tableareaonly=True, filter=True
+        tableareaonly=True,
+        filter=True,
     )
     inference_fullimg(
         targetloc=f"{Path(__file__).parent.absolute()}/../../data/BonnData/test",
         datasetname="BonnData",
         modelpath=f"{Path(__file__).parent.absolute()}/../../checkpoints/fasterrcnn/BonnDataFullImage1_BonnData_fullimage_e250_es.pt",
         tablerelative=True,
-        tableareaonly=False,filter=True
+        tableareaonly=False,
+        filter=True,
     )
     inference_fullimg(
         targetloc=f"{Path(__file__).parent.absolute()}/../../data/GloSat/test",
         datasetname="GloSat",
         modelpath=f"{Path(__file__).parent.absolute()}/../../checkpoints/fasterrcnn/GloSatFullImage1_GloSat_fullimage_e250_es.pt",
         tablerelative=True,
-        tableareaonly=False, filter=True
+        tableareaonly=False,
+        filter=True,
     )
 
     """
@@ -731,11 +736,11 @@ if __name__ == "__main__":
             modelpath=f"{Path(__file__).parent.absolute()}/../../checkpoints/fasterrcnn/testseveralcalls_5_without_valid_split_Tablesinthewild_fullimage_e50_end.pt",
             tableareaonly=True,
         )
-    #inference_fullimg(
+    # inference_fullimg(
     #    modelpath=f"{Path(__file__).parent.absolute()}/../../checkpoints/fasterrcnn/testseveralcalls_5_without_valid_split_Tablesinthewild_fullimage_e50_end.pt",
     #    targetloc=f"{Path(__file__).parent.absolute()}/../../data/Tablesinthewild/test1",
     #    datasetname="Tablesinthewild_oldxml",
-    #)
+    # )
     inference_fullimg()
     inference_fullimg(
         modelpath=f"{Path(__file__).parent.absolute()}/../../checkpoints/fasterrcnn/test5_with_valid_split_Tablesinthewild_fullimage_e50_es.pt"

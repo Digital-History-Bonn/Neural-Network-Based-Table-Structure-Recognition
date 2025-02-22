@@ -41,7 +41,7 @@ class Trainer:
         name: str,
         cuda: int = 0,
         startepoch: int = 1,
-        datasetname :str = "BonnData"
+        datasetname: str = "BonnData",
     ) -> None:
         """
         Trainer class to train models.
@@ -86,9 +86,13 @@ class Trainer:
         print(f"{train_log_dir=}")
         self.writer = SummaryWriter(train_log_dir)  # type: ignore
 
-        if datasetname=="Tablesinthewild":
-            #self.example_image, self.example_target = testdataset[testdataset.getidx("mit_google_image_search-10918758-be4b5fa7bf3fea80823dabbe1e17e4136f0da811")]
-            self.train_example_image, self.train_example_target = traindataset[traindataset.getidx("mit_google_image_search-10918758-cdcd82db9ce0b61da60155c5c822b0be3884a2cf")]
+        if datasetname == "Tablesinthewild":
+            # self.example_image, self.example_target = testdataset[testdataset.getidx("mit_google_image_search-10918758-be4b5fa7bf3fea80823dabbe1e17e4136f0da811")]
+            self.train_example_image, self.train_example_target = traindataset[
+                traindataset.getidx(
+                    "mit_google_image_search-10918758-cdcd82db9ce0b61da60155c5c822b0be3884a2cf"
+                )
+            ]
         else:
             self.train_example_image, self.train_example_target = traindataset[0]
         self.example_image, self.example_target = testdataset[0]
@@ -315,7 +319,9 @@ class Trainer:
         return meanloss
 
 
-def get_model(objective: str, load_weights: Optional[str] = None, randominit: bool=False) -> FasterRCNN:
+def get_model(
+    objective: str, load_weights: Optional[str] = None, randominit: bool = False
+) -> FasterRCNN:
     """
     Creates a FasterRCNN model for training, using the specified objective parameter.
 
@@ -332,8 +338,8 @@ def get_model(objective: str, load_weights: Optional[str] = None, randominit: bo
 
     if randominit:
         model = fasterrcnn_resnet50_fpn(
-        weights=None, weights_backbone=None, **params[objective]
-    )
+            weights=None, weights_backbone=None, **params[objective]
+        )
     else:
         model = fasterrcnn_resnet50_fpn(
             weights=FasterRCNN_ResNet50_FPN_Weights.DEFAULT, **params[objective]
@@ -452,8 +458,11 @@ if __name__ == "__main__":
         f"{f'_init_{args.load}_'if args.load else ''}"
         f"{'_random_init' if args.randominit else ''}"
     )
-    if args.identicalname: name= args.name
-    model = get_model(args.objective, load_weights=args.load, randominit=args.randominit)
+    if args.identicalname:
+        name = args.name
+    model = get_model(
+        args.objective, load_weights=args.load, randominit=args.randominit
+    )
 
     transform = None
     if args.augmentations:
@@ -499,6 +508,12 @@ if __name__ == "__main__":
     optimizer = AdamW(model.parameters(), lr=LR)
 
     trainer = Trainer(
-        model, traindataset, validdataset, optimizer, name, startepoch=args.startepoch, datasetname=args.dataset
+        model,
+        traindataset,
+        validdataset,
+        optimizer,
+        name,
+        startepoch=args.startepoch,
+        datasetname=args.dataset,
     )
     trainer.train(args.epochs)
