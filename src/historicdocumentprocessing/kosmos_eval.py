@@ -11,42 +11,46 @@ from torchvision.ops import box_area, box_iou
 from torchvision.ops.boxes import _box_inter_union
 from tqdm import tqdm
 
-# from src.historicdocumentprocessing.util.tablesutil import remove_invalid_bbox
-
 
 def remove_invalid_bbox(box, impath: str = "") -> torch.Tensor:
     newbox = []
     for b in box:
         if b[0] < b[2] and b[1] < b[3]:
-            # newbox= torch.vstack((newbox, b.clone()))
             newbox.append(b)
         else:
             print(f"Invalid bounding box in image {impath.split('/')[-1]}", b)
-    # print(newbox)
     return torch.vstack(newbox) if newbox else torch.empty(0, 4)
 
 
 def reversetablerelativebboxes_inner(
     tablebbox: torch.Tensor, cellbboxes: torch.Tensor
 ) -> torch.Tensor:
-    """
-    returns bounding boxes relative to table rather than relative to image so that evaluation of bounding box accuracy is possible on whole image
+    """Returns bounding boxes relative to image rather than relative to table so that evaluation of bounding box accuracy is possible on whole image.
+
+    inner function for one bounding box
+
     Args:
-        tablebbox:
-        cellbboxes:
+        tablebbox: table coordinates
+        cellbboxes: cell coordinates relative to table
 
     Returns:
 
     """
-    # print(cellbboxes.shape)
     return cellbboxes + torch.tensor(
         data=[tablebbox[0], tablebbox[1], tablebbox[0], tablebbox[1]]
     )
 
 
 def reversetablerelativebboxes_outer(fpath: str) -> torch.Tensor:
+    """Returns bounding boxes relative to image rather than relative to table so that evaluation of bounding box accuracy is possible on whole image.
+
+    Args:
+        fpath: path to folder with preprocessed BBox files
+
+    Returns:
+        tensor with all BBoxes in image relative to image
+    """
     tablebboxes = torch.load(glob.glob(f"{fpath}/*tables.pt")[0])
-    # print(tablebboxes)
     newcoords = torch.zeros((0, 4))
     for table in glob.glob(f"{fpath}/*_cell_*.pt"):
         n = int(table.split(".")[-2].split("_")[-1])
@@ -56,7 +60,7 @@ def reversetablerelativebboxes_outer(fpath: str) -> torch.Tensor:
 
 
 def extractboundingbox(bbox: dict) -> Tuple[int, int, int, int]:
-    """
+    """Get singular bounding box from dict.
 
     Args:
         bbox: dict of bounding box coordinates
@@ -101,13 +105,15 @@ def boxoverlap1(
 
 
 def extractboxes(boxdict: dict, fpath: str = None) -> torch.Tensor:
-    """Takes a Kosmos2.5-Output-Style Dict and extracts the bounding boxes
+    """Takes a Kosmos2.5-Output-Style Dict and extracts the bounding boxes.
+
     Args:
         fpath: path to table folder (if only bboxes in a table wanted)
         boxdict(dict): dictionary in style of kosmos output (from json)
 
     Returns:
-        bounding boxes as torch.tensor
+        bounding boxes as torch tensor
+
     """
     boxlist = []
     tablebboxes = None
@@ -128,7 +134,7 @@ def extractboxes(boxdict: dict, fpath: str = None) -> torch.Tensor:
     return torch.tensor(boxlist) if boxlist else torch.empty(0, 4)
 
 
-def calcstats_IoDT(
+def calcstats_iodt(
     predbox: torch.tensor,
     targetbox: torch.tensor,
     imname: str = None,
@@ -158,10 +164,10 @@ def calcstats_IoDT(
             torch.zeros(threshold_tensor.shape),
             torch.full(threshold_tensor.shape, fill_value=targetbox.shape[0]),
         )
-    IoDT = torch.nan_to_num(Intersection_over_Detection(predbox, targetbox))
+    iodt = torch.nan_to_num(intersection_over_detection(predbox, targetbox))
     # print(IoDT, IoDT.shape)
-    prediodt = IoDT.amax(dim=1)
-    targetiodt = IoDT.amax(dim=0)
+    prediodt = iodt.amax(dim=1)
+    targetiodt = iodt.amax(dim=0)
     # print(predbox.shape, prediodt.shape, prediodt)
     # print(targetbox.shape, targetiodt.shape, targetiodt)
     # print(imname)
@@ -172,7 +178,7 @@ def calcstats_IoDT(
         dim=0,
     )
     # print(tp, prediodt.unsqueeze(-1).expand(-1, len(threshold_tensor)))
-    fp = IoDT.shape[0] - tp
+    fp = iodt.shape[0] - tp
     fn = torch.sum(
         targetiodt.unsqueeze(-1).expand(-1, len(threshold_tensor)) < threshold_tensor,
         dim=0,
@@ -188,7 +194,7 @@ def calcstats_IoDT(
     return prediodt, targetiodt, tp, fp, fn
 
 
-def Intersection_over_Detection(predbox, targetbox):
+def intersection_over_detection(predbox, targetbox):
     """
     Calculate the IoDT (Intersection over Detection Metric): Intersection of prediction and target over the total prediction area
     Args:
@@ -202,10 +208,10 @@ def Intersection_over_Detection(predbox, targetbox):
     predarea = box_area(predbox)
     # print(inter, inter.shape)
     # print(predarea, predarea.shape)
-    IoDT = torch.div(inter, predarea)
+    iodt = torch.div(inter, predarea)
     # print(IoDT, IoDT.shape)
-    IoDT = IoDT.T
-    return IoDT
+    iodt = iodt.T
+    return iodt
 
 
 def calcstats_overlap(
@@ -263,31 +269,38 @@ def calcmetric_overlap(
 ) -> Tuple[torch.Tensor, torch.Tensor, torch.Tensor]:
     """
     Calculate Metrics from true positives, false positives, false negatives based on wether a prediciton box fully
-    overlaps with a target box Args: tp: fp: fn:
+    overlaps with a target box
+
+    Args:
+        tp: true positives
+        fp: false positives
+        fn: false negatives
 
     Returns:
+
 
     """
     precision = torch.nan_to_num(tp / (tp + fp))
     recall = torch.nan_to_num(tp / (tp + fn))
     f1 = torch.nan_to_num(2 * (precision * recall) / (precision + recall))
-    # print(precision, recall, f1)
     return precision, recall, f1
 
 
-def calcstats_IoU(
+def calcstats_iou(
     predbox: torch.tensor,
     targetbox: torch.tensor,
     iou_thresholds: List[float] = [0.5, 0.6, 0.7, 0.8, 0.9],
     imname: str = None,
 ) -> Tuple[torch.Tensor, torch.Tensor, torch.Tensor, torch.Tensor, torch.Tensor]:
-    """
+    """Calculates IoU and resulting tp, fp, fn.
+
     Calculates the intersection over union as well as resulting tp, fp, fn at given IoU Thresholds for the bounding boxes
     of a target and prediciton given as torch tensor with bounding box
     coordinates in format x_min, y_min, x_max, y_max
+
     Args:
-        predbox: path to predicition (json file)
-        targetbox: path to target (json file)
+        predbox: predictions
+        targetbox: targets
         iou_thresholds: List of IoU Thresholds
 
     Returns:
@@ -296,7 +309,6 @@ def calcstats_IoU(
     """
     threshold_tensor = torch.tensor(iou_thresholds)
     if not predbox.numel():
-        # print(predbox.shape)
         warnings.warn(
             f"A Prediction Bounding Box Tensor in {imname} is empty. (no predicitons)"
         )
@@ -308,36 +320,20 @@ def calcstats_IoU(
             torch.full(threshold_tensor.shape, fill_value=targetbox.shape[0]),
         )
     ioumat = torch.nan_to_num(box_iou(predbox, targetbox))
-    # print("ioumat:", ioumat)
     predious = ioumat.amax(dim=1)
     targetious = ioumat.amax(dim=0)
-    # print(len(targetious),predbox.shape[1])
     assert len(predious) == predbox.shape[0]
     assert len(targetious) == targetbox.shape[0]
-    # print(predious)
-    # print(targetious)
-    # mine
+
     tp = torch.sum(
         predious.unsqueeze(-1).expand(-1, len(threshold_tensor)) >= threshold_tensor,
         dim=0,
     )
-    # print(tp, predious.unsqueeze(-1).expand(-1, len(threshold_tensor)))
+
     fp = ioumat.shape[0] - tp
     fn = torch.sum(
         targetious.unsqueeze(-1).expand(-1, len(threshold_tensor)) < threshold_tensor,
         dim=0,
-    )
-    print(
-        imname,
-        fp,
-        torch.sum(
-            predious.unsqueeze(-1).expand(-1, len(threshold_tensor)) < threshold_tensor,
-            dim=0,
-        ),
-        predious,
-        ioumat,
-        predbox,
-        targetbox,
     )
     assert torch.equal(
         fp,
@@ -346,14 +342,6 @@ def calcstats_IoU(
             dim=0,
         ),
     )
-    # print(tp, fp, fn, ioumat.shape)
-
-    # from our project group
-    # n_pred, n_target = ioumat.shape
-    # tp = torch.sum(predious.expand(len(iou_thresholds), n_pred) >= threshold_tensor[:, None], dim=1)
-    # fp = len(ioumat) - tp
-    # fn = torch.sum(
-    #    targetious.expand(len(iou_thresholds), n_target) < threshold_tensor[:, None], dim=1)
     return predious, targetious, tp, fp, fn
 
 
@@ -363,78 +351,24 @@ def calcmetric(
     fn: torch.Tensor,
     iou_thresholds: List[float] = [0.5, 0.6, 0.7, 0.8, 0.9],
 ) -> Tuple[torch.Tensor, torch.Tensor, torch.Tensor, torch.Tensor]:
-    """
-    Calculate Metrics from true positives, false positives, false negatives at given iou thresholds
+    """ Calculate Metrics from true positives, false positives, false negatives at given iou thresholds.
+
     Args:
         tp: True Positives
         fp: False Positives
         fn: False Negatives
         iou_thresholds: List of IoU Thresholds
 
-    Returns: precision, recall, f1, wf1
+    Returns:
+        precision, recall, f1, wf1
 
     """
     threshold_tensor = torch.tensor(iou_thresholds)
     precision = torch.nan_to_num(tp / (tp + fp))
     recall = torch.nan_to_num(tp / (tp + fn))
     f1 = torch.nan_to_num(2 * (precision * recall) / (precision + recall))
-    # print(f1, threshold_tensor)
     wf1 = f1 @ threshold_tensor / torch.sum(threshold_tensor)
     return precision, recall, f1, wf1
-
-
-def calcmetrics_engnewspaper(
-    targetloc: str = f"{Path(__file__).parent.absolute()}/../../data/EngNewspaper/Kosmos",
-    predloc: str = f"{Path(__file__).parent.absolute()}/../../results/kosmos25/EngNewspaper",
-    iou_thresholds: List[float] = [0.5, 0.6, 0.7, 0.8, 0.9],
-) -> Tuple[
-    List[torch.Tensor],
-    List[torch.Tensor],
-    List[torch.Tensor],
-    torch.Tensor,
-    torch.Tensor,
-    torch.Tensor,
-    torch.Tensor,
-]:
-    """
-    Calculates metrics for all predictions and corresponding targets in a given location (Bboxes given as json files)
-    !incomplete since it wasnt needed so far!
-    Args:
-        targetloc: target location
-        predloc: prediction location
-
-    Returns: nested list of all ious
-
-    """
-    preds = glob.glob(f"{predloc}/*.json")
-    ioulist = []
-    f1list = []
-    wf1list = []
-    tpsum = torch.zeros(len(iou_thresholds))
-    fpsum = torch.zeros(len(iou_thresholds))
-    fnsum = torch.zeros(len(iou_thresholds))
-    for pred in preds:
-        target = glob.glob(f"{targetloc}/{pred.split('/')[-1].split('.')[-3]}.json")
-        # print(target, pred)
-        if target:
-            with open(pred) as p:
-                predbox = extractboxes(json.load(p))
-            # print(predbox)
-            with open(target[0]) as t:
-                targetbox = extractboxes(json.load(t))
-            # print(targetbox)
-            iou, tp, fp, fn = calcstats_IoU(
-                predbox, targetbox, iou_thresholds=iou_thresholds
-            )
-            prec, rec, f1, wf1 = calcmetric(tp, fp, fn, iou_thresholds=iou_thresholds)
-            tpsum += tp
-            fpsum += fp
-            fnsum += fn
-            ioulist.append(iou)
-            f1list.append(f1)
-            wf1list.append(wf1)
-    totalprec, totalrec, totalf1, totalwf1 = calcmetric(tpsum, fpsum, fnsum)
-    return ioulist, f1list, wf1list, totalprec, totalrec, totalf1, totalwf1
 
 
 def calcmetrics_tables(
@@ -477,12 +411,12 @@ def calcmetrics_tables(
     tpsum_overlap_predonly = torch.zeros(1)
     fpsum_overlap_predonly = torch.zeros(1)
     fnsum_overlap_predonly = torch.zeros(1)
-    tpsum_IoDT = torch.zeros(len(iou_thresholds))
-    fpsum_IoDT = torch.zeros(len(iou_thresholds))
-    fnsum_IoDT = torch.zeros(len(iou_thresholds))
-    tpsum_IoDT_predonly = torch.zeros(len(iou_thresholds))
-    fpsum_IoDT_predonly = torch.zeros(len(iou_thresholds))
-    fnsum_IoDT_predonly = torch.zeros(len(iou_thresholds))
+    tpsum_iodt = torch.zeros(len(iou_thresholds))
+    fpsum_iodt = torch.zeros(len(iou_thresholds))
+    fnsum_iodt = torch.zeros(len(iou_thresholds))
+    tpsum_iodt_predonly = torch.zeros(len(iou_thresholds))
+    fpsum_iodt_predonly = torch.zeros(len(iou_thresholds))
+    fnsum_iodt_predonly = torch.zeros(len(iou_thresholds))
     # tablevars
     ioulist = []
     f1list = []
@@ -533,70 +467,70 @@ def calcmetrics_tables(
         # .......................................
         # fullimagemetrics with IoDT
         # .......................................
-        prediod, tariod, IoDT_tp, IoDT_fp, IoDT_fn = calcstats_IoDT(
+        prediod, tariod, iodt_tp, iodt_fp, iodt_fn = calcstats_iodt(
             predbox=fullimagepredbox,
             targetbox=fullimagegroundbox,
             imname=preds.split("/")[-1],
             iou_thresholds=iou_thresholds,
         )
         # print(IoDT_tp, IoDT_fp, IoDT_fn)
-        IoDT_prec, IoDT_rec, IoDT_f1, IoDT_wf1 = calcmetric(
-            tp=IoDT_tp, fp=IoDT_fp, fn=IoDT_fn, iou_thresholds=iou_thresholds
+        iodt_prec, iodt_rec, iodt_f1, iodt_wf1 = calcmetric(
+            tp=iodt_tp, fp=iodt_fp, fn=iodt_fn, iou_thresholds=iou_thresholds
         )
         # print(IoDT_prec, IoDT_rec, IoDT_f1, IoDT_wf1)
-        tpsum_IoDT += IoDT_tp
-        fpsum_IoDT += IoDT_fp
-        fnsum_IoDT += IoDT_fn
-        IoDTmetrics = {
+        tpsum_iodt += iodt_tp
+        fpsum_iodt += iodt_fp
+        fnsum_iodt += iodt_fn
+        iodtmetrics = {
             "img": imname,
             "mean pred iod": torch.mean(prediod).item(),
             "mean tar iod": torch.mean(tariod).item(),
-            "wf1": IoDT_wf1.item(),
+            "wf1": iodt_wf1.item(),
             "prednum": fullimagepredbox.shape[0],
         }
-        IoDTmetrics.update(
+        iodtmetrics.update(
             {
-                f"prec@{iou_thresholds[i]}": IoDT_prec[i].item()
+                f"prec@{iou_thresholds[i]}": iodt_prec[i].item()
                 for i in range(len(iou_thresholds))
             }
         )
-        IoDTmetrics.update(
+        iodtmetrics.update(
             {
-                f"recall@{iou_thresholds[i]}": IoDT_rec[i].item()
+                f"recall@{iou_thresholds[i]}": iodt_rec[i].item()
                 for i in range(len(iou_thresholds))
             }
         )
-        IoDTmetrics.update(
+        iodtmetrics.update(
             {
-                f"f1@{iou_thresholds[i]}": IoDT_f1[i].item()
+                f"f1@{iou_thresholds[i]}": iodt_f1[i].item()
                 for i in range(len(iou_thresholds))
             }
         )
-        IoDTmetrics.update(
+        iodtmetrics.update(
             {
-                f"tp@{iou_thresholds[i]}": IoDT_tp[i].item()
+                f"tp@{iou_thresholds[i]}": iodt_tp[i].item()
                 for i in range(len(iou_thresholds))
             }
         )
-        IoDTmetrics.update(
+        iodtmetrics.update(
             {
-                f"fp@{iou_thresholds[i]}": IoDT_fp[i].item()
+                f"fp@{iou_thresholds[i]}": iodt_fp[i].item()
                 for i in range(len(iou_thresholds))
             }
         )
-        IoDTmetrics.update(
+        iodtmetrics.update(
             {
-                f"fn@{iou_thresholds[i]}": IoDT_fn[i].item()
+                f"fn@{iou_thresholds[i]}": iodt_fn[i].item()
                 for i in range(len(iou_thresholds))
             }
         )
 
-        iodtdf = pandas.concat([iodtdf, pandas.DataFrame(IoDTmetrics, index=[n])])
+        iodtdf = pandas.concat([iodtdf, pandas.DataFrame(iodtmetrics, index=[n])])
 
         # .................................
         # fullimagemetrics with iou
         # .................................
-        fullprediou, fulltargetiou, fulltp, fullfp, fullfn = calcstats_IoU(
+        fullprediou, fulltargetiou, fulltp, fullfp, fullfn = calcstats_iou(
             fullimagepredbox,
             fullimagegroundbox,
             iou_thresholds=iou_thresholds,
@@ -693,9 +627,9 @@ def calcmetrics_tables(
             tpsum_overlap_predonly += fulltp_overlap
             fpsum_overlap_predonly += fullfp_overlap
             fnsum_overlap_predonly += fullfn_overlap
-            tpsum_IoDT_predonly += IoDT_tp
-            fpsum_IoDT_predonly += IoDT_fp
-            fnsum_IoDT_predonly += IoDT_fn
+            tpsum_iodt_predonly += iodt_tp
+            fpsum_iodt_predonly += iodt_fp
+            fnsum_iodt_predonly += iodt_fn
             predcount += 1
 
             # print("here",fullimagepredbox)
@@ -718,7 +652,7 @@ def calcmetrics_tables(
                 tablepred = glob.glob(f"{preds}/*_table_{num}*.json")[0]
                 tablebox = extractboxes(json.load(open(tablepred)))
                 # print(tablebox)
-                prediou, targetiou, tp, fp, fn = calcstats_IoU(
+                prediou, targetiou, tp, fp, fn = calcstats_iou(
                     tablebox,
                     torch.load(tableground),
                     iou_thresholds=iou_thresholds,
@@ -823,17 +757,17 @@ def calcmetrics_tables(
         index=["overlap with valid preds"],
     )
     totaliodt = get_dataframe(
-        fnsum=fnsum_IoDT,
-        fpsum=fpsum_IoDT,
-        tpsum=tpsum_IoDT,
+        fnsum=fnsum_iodt,
+        fpsum=fpsum_iodt,
+        tpsum=tpsum_iodt,
         nopredcount=iodtdf.shape[0] - predcount,
         imnum=iodtdf.shape[0],
         iou_thresholds=iou_thresholds,
     )
     predonlyiodt = get_dataframe(
-        fnsum=fnsum_IoDT_predonly,
-        fpsum=fpsum_IoDT_predonly,
-        tpsum=tpsum_IoDT_predonly,
+        fnsum=fnsum_iodt_predonly,
+        fpsum=fpsum_iodt_predonly,
+        tpsum=tpsum_iodt_predonly,
         iou_thresholds=iou_thresholds,
     )
 

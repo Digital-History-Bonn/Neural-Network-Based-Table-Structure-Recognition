@@ -18,8 +18,8 @@ from src.historicdocumentprocessing.fasterrcnn_eval import tableareabboxes
 from src.historicdocumentprocessing.kosmos_eval import (
     calcmetric,
     calcmetric_overlap,
-    calcstats_IoDT,
-    calcstats_IoU,
+    calcstats_iodt,
+    calcstats_iou,
     calcstats_overlap,
     get_dataframe,
     reversetablerelativebboxes_outer,
@@ -94,12 +94,12 @@ def inference(
     tpsum_overlap_predonly = torch.zeros(1)
     fpsum_overlap_predonly = torch.zeros(1)
     fnsum_overlap_predonly = torch.zeros(1)
-    tpsum_IoDT = torch.zeros(len(iou_thresholds))
-    fpsum_IoDT = torch.zeros(len(iou_thresholds))
-    fnsum_IoDT = torch.zeros(len(iou_thresholds))
-    tpsum_IoDT_predonly = torch.zeros(len(iou_thresholds))
-    fpsum_IoDT_predonly = torch.zeros(len(iou_thresholds))
-    fnsum_IoDT_predonly = torch.zeros(len(iou_thresholds))
+    tpsum_iodt = torch.zeros(len(iou_thresholds))
+    fpsum_iodt = torch.zeros(len(iou_thresholds))
+    fnsum_iodt = torch.zeros(len(iou_thresholds))
+    tpsum_iodt_predonly = torch.zeros(len(iou_thresholds))
+    fpsum_iodt_predonly = torch.zeros(len(iou_thresholds))
+    fnsum_iodt_predonly = torch.zeros(len(iou_thresholds))
     predcount = 0
     overlapdf = pandas.DataFrame(columns=["img", "prednum"])
     fullimagedf = pandas.DataFrame(
@@ -158,70 +158,70 @@ def inference(
         # .......................................
         # fullimagemetrics with IoDT
         # .......................................
-        prediod, tariod, IoDT_tp, IoDT_fp, IoDT_fn = calcstats_IoDT(
+        prediod, tariod, iodt_tp, iodt_fp, iodt_fn = calcstats_iodt(
             predbox=fullimagepredbox,
             targetbox=fullimagegroundbox,
             imname=imname,
             iou_thresholds=iou_thresholds,
         )
         # print(IoDT_tp, IoDT_fp, IoDT_fn)
-        IoDT_prec, IoDT_rec, IoDT_f1, IoDT_wf1 = calcmetric(
-            IoDT_tp, IoDT_fp, IoDT_fn, iou_thresholds=iou_thresholds
+        iodt_prec, iodt_rec, iodt_f1, iodt_wf1 = calcmetric(
+            iodt_tp, iodt_fp, iodt_fn, iou_thresholds=iou_thresholds
         )
         # print(IoDT_prec, IoDT_rec, IoDT_f1, IoDT_wf1)
-        tpsum_IoDT += IoDT_tp
-        fpsum_IoDT += IoDT_fp
-        fnsum_IoDT += IoDT_fn
-        IoDTmetrics = {
+        tpsum_iodt += iodt_tp
+        fpsum_iodt += iodt_fp
+        fnsum_iodt += iodt_fn
+        iodtmetrics = {
             "img": imname,
             "mean pred iod": torch.mean(prediod).item(),
             "mean tar iod": torch.mean(tariod).item(),
-            "wf1": IoDT_wf1.item(),
+            "wf1": iodt_wf1.item(),
             "prednum": fullimagepredbox.shape[0],
         }
-        IoDTmetrics.update(
+        iodtmetrics.update(
             {
-                f"prec@{iou_thresholds[i]}": IoDT_prec[i].item()
+                f"prec@{iou_thresholds[i]}": iodt_prec[i].item()
                 for i in range(len(iou_thresholds))
             }
         )
-        IoDTmetrics.update(
+        iodtmetrics.update(
             {
-                f"recall@{iou_thresholds[i]}": IoDT_rec[i].item()
+                f"recall@{iou_thresholds[i]}": iodt_rec[i].item()
                 for i in range(len(iou_thresholds))
             }
         )
-        IoDTmetrics.update(
+        iodtmetrics.update(
             {
-                f"f1@{iou_thresholds[i]}": IoDT_f1[i].item()
+                f"f1@{iou_thresholds[i]}": iodt_f1[i].item()
                 for i in range(len(iou_thresholds))
             }
         )
-        IoDTmetrics.update(
+        iodtmetrics.update(
             {
-                f"tp@{iou_thresholds[i]}": IoDT_tp[i].item()
+                f"tp@{iou_thresholds[i]}": iodt_tp[i].item()
                 for i in range(len(iou_thresholds))
             }
         )
-        IoDTmetrics.update(
+        iodtmetrics.update(
             {
-                f"fp@{iou_thresholds[i]}": IoDT_fp[i].item()
+                f"fp@{iou_thresholds[i]}": iodt_fp[i].item()
                 for i in range(len(iou_thresholds))
             }
         )
-        IoDTmetrics.update(
+        iodtmetrics.update(
             {
-                f"fn@{iou_thresholds[i]}": IoDT_fn[i].item()
+                f"fn@{iou_thresholds[i]}": iodt_fn[i].item()
                 for i in range(len(iou_thresholds))
             }
         )
 
-        iodtdf = pandas.concat([iodtdf, pandas.DataFrame(IoDTmetrics, index=[i])])
+        iodtdf = pandas.concat([iodtdf, pandas.DataFrame(iodtmetrics, index=[i])])
 
         # .................................
         # fullimagemetrics with iou
         # .................................
-        fullprediou, fulltargetiou, fulltp, fullfp, fullfn = calcstats_IoU(
+        fullprediou, fulltargetiou, fulltp, fullfp, fullfn = calcstats_iou(
             fullimagepredbox,
             fullimagegroundbox,
             iou_thresholds=iou_thresholds,
@@ -326,9 +326,9 @@ def inference(
             tpsum_overlap_predonly += fulltp_overlap
             fpsum_overlap_predonly += fullfp_overlap
             fnsum_overlap_predonly += fullfn_overlap
-            tpsum_IoDT_predonly += IoDT_tp
-            fpsum_IoDT_predonly += IoDT_fp
-            fnsum_IoDT_predonly += IoDT_fn
+            tpsum_iodt_predonly += iodt_tp
+            fpsum_iodt_predonly += iodt_fp
+            fnsum_iodt_predonly += iodt_fn
             predcount += 1
 
             # print("here",fullimagepredbox)
@@ -375,17 +375,17 @@ def inference(
         {"f1": overlapf1, "prec": overlapprec, "recall": overlaprec}, index=["overlap"]
     )
     totaliodt = get_dataframe(
-        fnsum=fnsum_IoDT,
-        fpsum=fpsum_IoDT,
-        tpsum=tpsum_IoDT,
+        fnsum=fnsum_iodt,
+        fpsum=fpsum_iodt,
+        tpsum=tpsum_iodt,
         nopredcount=iodtdf.shape[0] - predcount,
         imnum=iodtdf.shape[0],
         iou_thresholds=iou_thresholds,
     )
     predonlyiodt = get_dataframe(
-        fnsum=fnsum_IoDT_predonly,
-        fpsum=fpsum_IoDT_predonly,
-        tpsum=tpsum_IoDT_predonly,
+        fnsum=fnsum_iodt_predonly,
+        fpsum=fpsum_iodt_predonly,
+        tpsum=tpsum_iodt_predonly,
         iou_thresholds=iou_thresholds,
     )
 

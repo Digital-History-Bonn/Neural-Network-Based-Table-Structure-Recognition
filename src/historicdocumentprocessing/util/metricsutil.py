@@ -16,7 +16,7 @@ from tqdm import tqdm
 from transformers import TableTransformerForObjectDetection
 
 from src.historicdocumentprocessing.kosmos_eval import (
-    calcstats_IoU,
+    calcstats_iou,
     reversetablerelativebboxes_outer,
 )
 from src.historicdocumentprocessing.tabletransformer_dataset import CustomDataset
@@ -148,7 +148,7 @@ def findoptimalfilterpoint_tabletransformer(
                 output["boxes"][output["labels"] == 1],
             ]
         ).to(device="cpu")
-        predious, _, tp, fp, _ = calcstats_IoU(
+        predious, _, tp, fp, _ = calcstats_iou(
             predbox=boxes, targetbox=fullimagegroundbox
         )
         predscores = list(
@@ -247,7 +247,7 @@ def findoptimalfilterpoint(
             )
         output = model([img])
         output = {k: v.detach().cpu() for k, v in output[0].items()}
-        predious, _, tp, fp, _ = calcstats_IoU(
+        predious, _, tp, fp, _ = calcstats_iou(
             predbox=output["boxes"], targetbox=fullimagegroundbox
         )
         predscores = list(output["scores"])

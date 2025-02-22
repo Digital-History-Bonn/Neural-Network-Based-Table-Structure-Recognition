@@ -1,11 +1,12 @@
+"""Inference and Evaluation for Faster RCNN."""
+
 import glob
 import os
 from pathlib import Path
-from typing import List, Tuple
+from typing import List
 
 import pandas
 import torch
-from PIL import Image
 from torchvision.io import read_image
 from torchvision.models.detection import (
     FasterRCNN_ResNet50_FPN_Weights,
@@ -17,8 +18,8 @@ from src.historicdocumentprocessing.kosmos_eval import (
     boxoverlap,
     calcmetric,
     calcmetric_overlap,
-    calcstats_IoDT,
-    calcstats_IoU,
+    calcstats_iodt,
+    calcstats_iou,
     calcstats_overlap,
     get_dataframe,
     reversetablerelativebboxes_outer,
@@ -26,28 +27,50 @@ from src.historicdocumentprocessing.kosmos_eval import (
 
 
 def tableareabboxes(bboxes: torch.tensor, tablepath: str) -> torch.tensor:
+    """Find the BBoxes that lie within one of the tables of an image.
+
+    Args:
+        bboxes: BoundingBox Tensor
+        tablepath: path to file with table coordinates
+
+    Returns:
+        BBoxes in tables
+
+    """
     bboxlist = []
     tablebboxes = torch.load(glob.glob(f"{tablepath}/*tables.pt")[0])
     for bbox in bboxes:
-        # print(bbox)
         for tablebbox in tablebboxes:
             if boxoverlap(bbox, tablebbox):
                 bboxlist.append(bbox)
-    # print(bboxlist)
     return torch.vstack(bboxlist) if bboxlist else torch.empty(0, 4)
 
 
 def inference_fullimg(
-    targetloc: str = f"{Path(__file__).parent.absolute()}/../../data/Tablesinthewild/test",
-    modelpath: str = f"{Path(__file__).parent.absolute()}/../../checkpoints/fasterrcnn"
-    f"/test4_Tablesinthewild_fullimage_e50_end.pt",
+    targetloc: str,  # f"{Path(__file__).parent.absolute()}/../../data/Tablesinthewild/test"
+    modelpath: str,  # f"{Path(__file__).parent.absolute()}/../../checkpoints/fasterrcnn/test4_Tablesinthewild_fullimage_e50_end.pt"
     datasetname: str = "Tablesinthewild",
-    iou_thresholds: List[float] = [0.5, 0.6, 0.7, 0.8, 0.9],
-    filter=True,
+    iou_thresholds: List[float] = None,  # [0.5, 0.6, 0.7, 0.8, 0.9]
+    filter: bool = True,
     tablerelative: bool = False,
     tableareaonly: bool = False,
     valid: bool = True,
 ):
+    """Inference on the full image.
+
+    Args:
+        targetloc: folder with preprocessed test data (images and BBoxes)
+        modelpath: path to model checkpoint
+        datasetname: name of the dataset (for save locations)
+        iou_thresholds: iou threshold list
+        filter: wether to filter the results
+        tablerelative: wether to use tablerelative groundtruth BBoxes (since GloSAT and BonnData do not have image relative)
+        tableareaonly: wether to calculate results only for BBox-Predicitions in table area or for all predictions
+        valid: wether to use valid filter value for filtering
+
+    """
+    if iou_thresholds is None:
+        iou_thresholds = [0.5, 0.6, 0.7, 0.8, 0.9]
     model = fasterrcnn_resnet50_fpn(
         weights=FasterRCNN_ResNet50_FPN_Weights.DEFAULT,
         **{"box_detections_per_img": 200},
@@ -77,7 +100,7 @@ def inference_fullimg(
         saveloc = f"{Path(__file__).parent.absolute()}/../../results/fasterrcnn/testevalfinal1/fullimg/{datasetname}/{modelname}/tableareaonly/filtering_{filtering}{'_valid' if valid else ''}_iou{'_'.join([str(iou_thresholds[0]), str(iou_thresholds[-1])])}"
     os.makedirs(saveloc, exist_ok=True)
 
-    ### initializing variables ###
+    # *** initializing variables ***
     fullioulist = []
     fullf1list = []
     fullwf1list = []
@@ -93,12 +116,12 @@ def inference_fullimg(
     tpsum_overlap_predonly = torch.zeros(1)
     fpsum_overlap_predonly = torch.zeros(1)
     fnsum_overlap_predonly = torch.zeros(1)
-    tpsum_IoDT = torch.zeros(len(iou_thresholds))
-    fpsum_IoDT = torch.zeros(len(iou_thresholds))
-    fnsum_IoDT = torch.zeros(len(iou_thresholds))
-    tpsum_IoDT_predonly = torch.zeros(len(iou_thresholds))
-    fpsum_IoDT_predonly = torch.zeros(len(iou_thresholds))
-    fnsum_IoDT_predonly = torch.zeros(len(iou_thresholds))
+    tpsum_iodt = torch.zeros(len(iou_thresholds))
+    fpsum_iodt = torch.zeros(len(iou_thresholds))
+    fnsum_iodt = torch.zeros(len(iou_thresholds))
+    tpsum_iodt_predonly = torch.zeros(len(iou_thresholds))
+    fpsum_iodt_predonly = torch.zeros(len(iou_thresholds))
+    fnsum_iodt_predonly = torch.zeros(len(iou_thresholds))
     predcount = 0
     overlapdf = pandas.DataFrame(columns=["img", "prednum"])
     fullimagedf = pandas.DataFrame(
@@ -107,10 +130,9 @@ def inference_fullimg(
     iodtdf = pandas.DataFrame(
         columns=["img", "mean pred iod", "mean tar iod", "wf1", "prednum"]
     )
-    ### initializing variables ###
+    # *** initializing variables ***
 
     for n, folder in tqdm(enumerate(glob.glob(f"{targetloc}/*"))):
-        # print(folder)
         impath = f"{folder}/{folder.split('/')[-1]}.jpg"
         imname = folder.split("/")[-1]
         if tablerelative:
@@ -132,77 +154,73 @@ def inference_fullimg(
         # .......................................
         # fullimagemetrics with IoDT
         # .......................................
-        prediod, tariod, IoDT_tp, IoDT_fp, IoDT_fn = calcstats_IoDT(
+        prediod, tariod, iodt_tp, iodt_fp, iodt_fn = calcstats_iodt(
             predbox=fullimagepredbox,
             targetbox=fullimagegroundbox,
             imname=imname,
             iou_thresholds=iou_thresholds,
         )
-        # print(IoDT_tp, IoDT_fp, IoDT_fn)
-        IoDT_prec, IoDT_rec, IoDT_f1, IoDT_wf1 = calcmetric(
-            IoDT_tp, IoDT_fp, IoDT_fn, iou_thresholds=iou_thresholds
+        iodt_prec, iodt_rec, iodt_f1, iodt_wf1 = calcmetric(
+            iodt_tp, iodt_fp, iodt_fn, iou_thresholds=iou_thresholds
         )
-        # print(IoDT_prec, IoDT_rec, IoDT_f1, IoDT_wf1)
-        tpsum_IoDT += IoDT_tp
-        fpsum_IoDT += IoDT_fp
-        fnsum_IoDT += IoDT_fn
-        IoDTmetrics = {
+        tpsum_iodt += iodt_tp
+        fpsum_iodt += iodt_fp
+        fnsum_iodt += iodt_fn
+        iodtmetrics = {
             "img": imname,
             "mean pred iod": torch.mean(prediod).item(),
             "mean tar iod": torch.mean(tariod).item(),
-            "wf1": IoDT_wf1.item(),
+            "wf1": iodt_wf1.item(),
             "prednum": fullimagepredbox.shape[0],
         }
-        IoDTmetrics.update(
+        iodtmetrics.update(
             {
-                f"prec@{iou_thresholds[i]}": IoDT_prec[i].item()
+                f"prec@{iou_thresholds[i]}": iodt_prec[i].item()
                 for i in range(len(iou_thresholds))
             }
         )
-        IoDTmetrics.update(
+        iodtmetrics.update(
             {
-                f"recall@{iou_thresholds[i]}": IoDT_rec[i].item()
+                f"recall@{iou_thresholds[i]}": iodt_rec[i].item()
                 for i in range(len(iou_thresholds))
             }
         )
-        IoDTmetrics.update(
+        iodtmetrics.update(
             {
-                f"f1@{iou_thresholds[i]}": IoDT_f1[i].item()
+                f"f1@{iou_thresholds[i]}": iodt_f1[i].item()
                 for i in range(len(iou_thresholds))
             }
         )
-        IoDTmetrics.update(
+        iodtmetrics.update(
             {
-                f"tp@{iou_thresholds[i]}": IoDT_tp[i].item()
+                f"tp@{iou_thresholds[i]}": iodt_tp[i].item()
                 for i in range(len(iou_thresholds))
             }
         )
-        IoDTmetrics.update(
+        iodtmetrics.update(
             {
-                f"fp@{iou_thresholds[i]}": IoDT_fp[i].item()
+                f"fp@{iou_thresholds[i]}": iodt_fp[i].item()
                 for i in range(len(iou_thresholds))
             }
         )
-        IoDTmetrics.update(
+        iodtmetrics.update(
             {
-                f"fn@{iou_thresholds[i]}": IoDT_fn[i].item()
+                f"fn@{iou_thresholds[i]}": iodt_fn[i].item()
                 for i in range(len(iou_thresholds))
             }
         )
 
-        iodtdf = pandas.concat([iodtdf, pandas.DataFrame(IoDTmetrics, index=[n])])
+        iodtdf = pandas.concat([iodtdf, pandas.DataFrame(iodtmetrics, index=[n])])
 
         # .................................
         # fullimagemetrics with iou
         # .................................
-        fullprediou, fulltargetiou, fulltp, fullfp, fullfn = calcstats_IoU(
+        fullprediou, fulltargetiou, fulltp, fullfp, fullfn = calcstats_iou(
             fullimagepredbox,
             fullimagegroundbox,
             iou_thresholds=iou_thresholds,
             imname=imname,
         )
-        # print(calcstats(fullimagepredbox, fullimagegroundbox,
-        #                                                               iou_thresholds=iou_thresholds, imname=preds.split('/')[-1]), fullfp, targets[0])
         fullprec, fullrec, fullf1, fullwf1 = calcmetric(
             fulltp, fullfp, fullfn, iou_thresholds=iou_thresholds
         )
@@ -273,9 +291,9 @@ def inference_fullimg(
         overlapmetric = {
             "img": imname,
             "prednum": fullimagepredbox.shape[0],
-            f"prec": fullprec_overlap.item(),
-            f"recall": fullrec_overlap.item(),
-            f"f1": fullf1_overlap.item(),
+            "prec": fullprec_overlap.item(),
+            "recall": fullrec_overlap.item(),
+            "f1": fullf1_overlap.item(),
             "tp": fulltp_overlap,
             "fp": fullfp_overlap,
             "fn": fullfn_overlap,
@@ -292,17 +310,13 @@ def inference_fullimg(
             tpsum_overlap_predonly += fulltp_overlap
             fpsum_overlap_predonly += fullfp_overlap
             fnsum_overlap_predonly += fullfn_overlap
-            tpsum_IoDT_predonly += IoDT_tp
-            fpsum_IoDT_predonly += IoDT_fp
-            fnsum_IoDT_predonly += IoDT_fn
+            tpsum_iodt_predonly += iodt_tp
+            fpsum_iodt_predonly += iodt_fp
+            fnsum_iodt_predonly += iodt_fn
             predcount += 1
-
-            # print("here",fullimagepredbox)
-        # print(fullfp, fullimagemetrics)
         fullimagedf = pandas.concat(
             [fullimagedf, pandas.DataFrame(fullimagemetrics, index=[n])]
         )
-        # print(fullimagedf.loc[n])
     totalfullmetrics = get_dataframe(
         fnsum=fullfnsum,
         fpsum=fullfpsum,
@@ -317,7 +331,6 @@ def inference_fullimg(
         tpsum=fulltpsum_predonly,
         iou_thresholds=iou_thresholds,
     )
-    # print(totalfullmetrics)
     overlapprec, overlaprec, overlapf1 = calcmetric_overlap(
         tp=tpsum_overlap, fp=fpsum_overlap, fn=fnsum_overlap
     )
@@ -329,8 +342,8 @@ def inference_fullimg(
     )
     predonlyoverlapdf = pandas.DataFrame(
         {
-            f"Number of evaluated files": overlapdf.shape[0],
-            f"Evaluated files without predictions:": overlapdf.shape[0] - predcount,
+            "Number of evaluated files": overlapdf.shape[0],
+            "Evaluated files without predictions:": overlapdf.shape[0] - predcount,
             "f1": overlapf1_predonly,
             "prec": overlapprec_predonly,
             "recall": overlaprec_predonly,
@@ -341,17 +354,17 @@ def inference_fullimg(
         {"f1": overlapf1, "prec": overlapprec, "recall": overlaprec}, index=["overlap"]
     )
     totaliodt = get_dataframe(
-        fnsum=fnsum_IoDT,
-        fpsum=fpsum_IoDT,
-        tpsum=tpsum_IoDT,
+        fnsum=fnsum_iodt,
+        fpsum=fpsum_iodt,
+        tpsum=tpsum_iodt,
         nopredcount=iodtdf.shape[0] - predcount,
         imnum=iodtdf.shape[0],
         iou_thresholds=iou_thresholds,
     )
     predonlyiodt = get_dataframe(
-        fnsum=fnsum_IoDT_predonly,
-        fpsum=fpsum_IoDT_predonly,
-        tpsum=tpsum_IoDT_predonly,
+        fnsum=fnsum_iodt_predonly,
+        fpsum=fpsum_iodt_predonly,
+        tpsum=tpsum_iodt_predonly,
         iou_thresholds=iou_thresholds,
     )
 
@@ -370,12 +383,6 @@ def inference_fullimg(
             pandas.DataFrame(predonlyiodt, index=[" full image IoDt with valid preds"]),
         ]
     )
-
-    # print(conclusiondf)
-    # save results
-    # os.makedirs(saveloc, exist_ok=True)
-    # print(fullimagedf.loc[50])
-    # print(saveloc)
     overlapdf.to_csv(f"{saveloc}/fullimageoverlapeval.csv")
     fullimagedf.to_csv(f"{saveloc}/fullimageiou.csv")
     iodtdf.to_csv(f"{saveloc}/fullimageiodt.csv")
@@ -383,15 +390,26 @@ def inference_fullimg(
 
 
 def inference_tablecutout(
-    datapath: str = f"{Path(__file__).parent.absolute()}/../../data/BonnData/test",
-    modelpath: str = f"{Path(__file__).parent.absolute()}/../../checkpoints/fasterrcnn"
-    f"/run3_BonnData_cell_aug_loadrun_GloSAT_cell_aug_e250_es_e250_es.pt",
+    datapath: str,  # f"{Path(__file__).parent.absolute()}/../../data/BonnData/test"
+    modelpath: str,  # f"{Path(__file__).parent.absolute()}/../../checkpoints/fasterrcnn/run3_BonnData_cell_aug_loadrun_GloSAT_cell_aug_e250_es_e250_es.pt",
     datasetname: str = "BonnData",
-    iou_thresholds: List[float] = [0.5, 0.6, 0.7, 0.8, 0.9],
+    iou_thresholds: List[float] = None,  # [0.5, 0.6, 0.7, 0.8, 0.9]
     filtering=False,
     saveboxes=False,
 ):
-    # print("here")
+    """Inference on cut out table images.
+
+    Args:
+        datapath: folder with preprocessed test data (images and BBoxes)
+        modelpath: path to model checkpoint
+        datasetname: name of the dataset (for save locations)
+        iou_thresholds: iou threshold list
+        filtering: wether to filter the results
+        saveboxes: wether to save result of inference
+
+    """
+    if iou_thresholds is None:
+        iou_thresholds = [0.5, 0.6, 0.7, 0.8, 0.9]
     model = fasterrcnn_resnet50_fpn(
         weights=FasterRCNN_ResNet50_FPN_Weights.DEFAULT,
         **{"box_detections_per_img": 200},
@@ -433,19 +451,13 @@ def inference_tablecutout(
     iodtdf = pandas.DataFrame(
         columns=["img", "mean pred iodt", "mean tar iodt", "wf1", "prednum"]
     )
-    # print("here")
     for n, folder in enumerate(glob.glob(f"{datapath}/*")):
-        # print(folder)
         for tableimg in glob.glob(f"{folder}/*table_*pt"):
-            # print(glob.glob(f"{folder}/*cell_*jpg"))
             num = tableimg.split(".")[-2].split("_")[-1]
             img = (torch.load(tableimg) / 255).to(device)
-            # img.to(device)
             target = torch.load(f"{folder}/{folder.split('/')[-1]}_cell_{num}.pt")
-            # print(target)
             output = model([img])
             output = {k: v.detach().cpu() for k, v in output[0].items()}
-            # print(output['boxes'], output['boxes'][output['scores']>0.8])
             if filtering:
                 output["boxes"] = output["boxes"][output["scores"] > 0.7]
 
@@ -455,10 +467,9 @@ def inference_tablecutout(
                     output["boxes"],
                     f"{boxsaveloc}/{folder.split('/')[-1]}/{folder.split('/')[-1]}_{num}.pt",
                 )
-                # print(f"{boxsaveloc}/{folder.split('/')[-1]}")
 
             # ..................IoU
-            prediou, targetiou, tp, fp, fn = calcstats_IoU(
+            prediou, targetiou, tp, fp, fn = calcstats_iou(
                 predbox=output["boxes"],
                 targetbox=target,
                 iou_thresholds=iou_thresholds,
@@ -468,7 +479,6 @@ def inference_tablecutout(
             tpsum += tp
             fpsum += fp
             fnsum += fn
-            # print(tp, fp)
             ioulist.append(prediou)
             f1list.append(f1)
             wf1list.append(wf1)
@@ -518,10 +528,9 @@ def inference_tablecutout(
             ioudf = pandas.concat(
                 [ioudf, pandas.DataFrame(ioumetrics, index=[f"{n}.{num}"])]
             )
-            # print(ioudf)
             # ...........................
             # ....................IoDt
-            prediodt, targetiodt, tp_iodt, fp_iodt, fn_iodt = calcstats_IoDT(
+            prediodt, targetiodt, tp_iodt, fp_iodt, fn_iodt = calcstats_iodt(
                 predbox=output["boxes"],
                 targetbox=target,
                 iou_thresholds=iou_thresholds,
@@ -530,7 +539,6 @@ def inference_tablecutout(
             prec_iodt, rec_iodt, f1_iodt, wf1_iodt = calcmetric(
                 tp_iodt, fp_iodt, fn_iodt, iou_thresholds=iou_thresholds
             )
-            # print(wf1)
             tpsum_iodt += tp_iodt
             fpsum_iodt += fp_iodt
             fnsum_iodt += fn_iodt
