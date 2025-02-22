@@ -1,3 +1,4 @@
 [flake8]
-ignore = BLK100, D401, W504
-max-line-length = 100
+ignore = B028
+max-line-length = 200
+docstring-convention=google
