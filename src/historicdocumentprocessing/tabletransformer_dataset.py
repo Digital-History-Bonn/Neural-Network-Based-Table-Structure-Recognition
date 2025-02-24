@@ -46,10 +46,8 @@ from torchvision.utils import draw_bounding_boxes
 from tqdm import tqdm
 from transformers import AutoImageProcessor, BatchFeature, DetrImageProcessor
 
-from src.historicdocumentprocessing.kosmos_eval import (
-    reversetablerelativebboxes_inner,
-    reversetablerelativebboxes_outer,
-)
+from src.historicdocumentprocessing.util.tablesutil import reversetablerelativebboxes_inner, \
+    reversetablerelativebboxes_outer
 
 
 def reversetablerelativebboxes_outer_rowcoll(

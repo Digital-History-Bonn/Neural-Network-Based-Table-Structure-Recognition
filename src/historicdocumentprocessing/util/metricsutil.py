@@ -1,27 +1,26 @@
 import glob
 import os
+import warnings
 from pathlib import Path
-from typing import List, Literal
+from typing import List, Literal, Tuple
 
+import pandas as pd
 import torch
 from lightning_fabric.utilities import move_data_to_device
 from matplotlib import pyplot as plt
-from torch.nn.functional import threshold
 from torchvision.io import read_image
 from torchvision.models.detection import (
     FasterRCNN_ResNet50_FPN_Weights,
     fasterrcnn_resnet50_fpn,
 )
+from torchvision.ops import box_area, box_iou
+from torchvision.ops.boxes import _box_inter_union
 from tqdm import tqdm
 from transformers import TableTransformerForObjectDetection
 
-from src.historicdocumentprocessing.kosmos_eval import (
-    calcstats_iou,
-    reversetablerelativebboxes_outer,
-)
+from src.historicdocumentprocessing.util.tablesutil import reversetablerelativebboxes_outer, boxoverlap
 from src.historicdocumentprocessing.tabletransformer_dataset import CustomDataset
 from src.historicdocumentprocessing.util.plottotikz import save_plot_as_tikz
-from src.historicdocumentprocessing.util.tablesutil import getcells
 
 
 def findoptimalfilterpoint_outer(
@@ -358,3 +357,335 @@ if __name__ == "__main__":
     #                             modelfolder=f"{Path(__file__).parent.absolute()}/../../../checkpoints/tabletransformer",
     #                             valid=False, modeltype="tabletransformer")
     # findoptimalfilterpoint(modelpath=f"{Path(__file__).parent.absolute()}/../../../checkpoints/fasterrcnn/BonnDataFullImage1_BonnData_fullimage_e250_es.pt", testdatasetpath=f"{Path(__file__).parent.absolute()}/../../../data/BonnData/test", valid=True)
+
+
+def BonnTablebyCat(
+    categoryfile: str = f"{Path(__file__).parent.absolute()}/../../../data/BonnData/Tabellen/allinfosubset_manuell_vervollständigt.xlsx",
+    resultfile: str = f"{Path(__file__).parent.absolute()}/../../../results/kosmos25/testevaltotal/BonnData_Tables/fullimageiodt.csv",
+    resultmetric: str = "iodt",
+):
+    """
+    filter bonntable eval results by category and calculate wf1 over different categories
+    Args:
+        categoryfile:
+        resultfile:
+
+    Returns:
+
+    """
+    df = pd.read_csv(resultfile)
+    catinfo = pd.read_excel(categoryfile)
+    df = df.rename(columns={"img": "Dateiname"})
+    df1 = pd.merge(df, catinfo, on="Dateiname")
+    subsetwf1df = {"wf1": [], "category": [], "len": [], "nopred": []}
+    # replace category 1 by 2 since there are no images without tables in test dataset
+    df1 = df1.replace({"category": 1}, 2)
+    # print(df1.category, df1.Dateiname)
+    for cat in df1.category.unique():
+        if not pd.isna(cat):
+            subset = df1[df1.category == cat]
+            tp = []
+            fp = []
+            fn = []
+            for i in [0.5, 0.6, 0.7, 0.8, 0.9]:
+                tp.append(subset[f"tp@{str(i)}"].sum())
+                fp.append(subset[f"fp@{str(i)}"].sum())
+                fn.append(subset[f"fn@{str(i)}"].sum())
+            # subsetwf1df['wf1'].append(subset.wf1.sum() / len(subset))
+            prec, rec, f1, wf1 = calcmetric(
+                tp=torch.Tensor(tp), fp=torch.Tensor(fp), fn=torch.Tensor(fn)
+            )
+            subsetwf1df["wf1"].append(wf1.item())
+            subsetwf1df["category"].append(cat)
+            subsetwf1df["len"].append(len(subset))
+            # print(subset[subset['prednum'].eq(0) == True])
+            subsetwf1df["nopred"].append(len(subset[subset["prednum"].eq(0) == True]))
+    if len(df1[pd.isna(df1.category)]) > 0:
+        subset = df1[pd.isna(df1.category)]
+        subsetwf1df["category"].append("no category")
+        subsetwf1df["len"].append(len(subset))
+        subsetwf1df["wf1"].append(subset.wf1.sum() / len(subset))
+        subsetwf1df["nopred"].append(len(subset[subset["nopred"].eq(0) == True]))
+    saveloc = f"{'/'.join(resultfile.split('/')[:-1])}/{resultmetric}_bycategory.xlsx"
+    pd.DataFrame(subsetwf1df).set_index("category").to_excel(saveloc)
+
+
+def calcstats_iodt(
+    predbox: torch.tensor,
+    targetbox: torch.tensor,
+    imname: str = None,
+    iou_thresholds: List[float] = [0.5, 0.6, 0.7, 0.8, 0.9],
+) -> Tuple[torch.Tensor, torch.Tensor, torch.Tensor, torch.Tensor, torch.Tensor]:
+    """
+    Calculate tp, tp, fn based on IoDT (Intersection over Detection) at given IoU Thresholds
+    Args:
+        predbox:
+        targetbox:
+        imname:
+        iou_thresholds:
+
+    Returns:
+
+    """
+    threshold_tensor = torch.tensor(iou_thresholds)
+    if not predbox.numel():
+        # print(predbox.shape)
+        warnings.warn(
+            f"A Prediction Bounding Box Tensor in {imname} is empty. (no predicitons)"
+        )
+        return (
+            torch.zeros(predbox.shape[0]),
+            torch.zeros(targetbox.shape[0]),
+            torch.zeros(threshold_tensor.shape),
+            torch.zeros(threshold_tensor.shape),
+            torch.full(threshold_tensor.shape, fill_value=targetbox.shape[0]),
+        )
+    iodt = torch.nan_to_num(intersection_over_detection(predbox, targetbox))
+    # print(IoDT, IoDT.shape)
+    prediodt = iodt.amax(dim=1)
+    targetiodt = iodt.amax(dim=0)
+    # print(predbox.shape, prediodt.shape, prediodt)
+    # print(targetbox.shape, targetiodt.shape, targetiodt)
+    # print(imname)
+    assert len(prediodt) == predbox.shape[0]
+    assert len(targetiodt) == targetbox.shape[0]
+    tp = torch.sum(
+        prediodt.unsqueeze(-1).expand(-1, len(threshold_tensor)) >= threshold_tensor,
+        dim=0,
+    )
+    # print(tp, prediodt.unsqueeze(-1).expand(-1, len(threshold_tensor)))
+    fp = iodt.shape[0] - tp
+    fn = torch.sum(
+        targetiodt.unsqueeze(-1).expand(-1, len(threshold_tensor)) < threshold_tensor,
+        dim=0,
+    )
+    assert torch.equal(
+        fp,
+        torch.sum(
+            prediodt.unsqueeze(-1).expand(-1, len(threshold_tensor)) < threshold_tensor,
+            dim=0,
+        ),
+    )
+    # print(tp, fp, fn)
+    return prediodt, targetiodt, tp, fp, fn
+
+
+def intersection_over_detection(predbox, targetbox):
+    """
+    Calculate the IoDT (Intersection over Detection Metric): Intersection of prediction and target over the total prediction area
+    Args:
+        predbox:
+        targetbox:
+
+    Returns:
+
+    """
+    inter, union = _box_inter_union(targetbox, predbox)
+    predarea = box_area(predbox)
+    # print(inter, inter.shape)
+    # print(predarea, predarea.shape)
+    iodt = torch.div(inter, predarea)
+    # print(IoDT, IoDT.shape)
+    iodt = iodt.T
+    return iodt
+
+
+def calcstats_overlap(
+    predbox: torch.tensor, targetbox: torch.tensor, imname: str = None, fuzzy: int = 25
+) -> Tuple[torch.Tensor, torch.Tensor, torch.Tensor]:
+    """
+    Calculates stats based on wether a prediciton box fully overlaps with a target box instead of IoU
+    tp = prediciton lies fully within a target box
+    fp = prediciton does not lie fully within a target box
+    fn = target boxes that do not have a prediciton lying fully within them
+    Args:
+        fuzzy:
+        predbox:
+        targetbox:
+        imname:
+
+    Returns:
+
+
+    """
+    # print(predbox.shape, targetbox.shape)
+    if not predbox.numel():
+        # print(predbox.shape)
+        warnings.warn(
+            f"A Prediction Bounding Box Tensor in {imname} is empty. (no predicitons)"
+        )
+        return (
+            torch.zeros(1),
+            torch.zeros(1),
+            torch.full([1], fill_value=targetbox.shape[0]),
+        )
+    overlapmat = torch.zeros((predbox.shape[0], targetbox.shape[0]))
+    for i, pred in enumerate(predbox):
+        for j, target in enumerate(targetbox):
+            if boxoverlap(bbox=pred, tablebox=target, fuzzy=fuzzy):
+                # print(imname, pred,target)
+                overlapmat[i, j] = 1
+    predious = overlapmat.amax(dim=1)
+    targetious = overlapmat.amax(dim=0)
+    tp = torch.sum(predious.unsqueeze(-1), dim=0)
+    # print(tp, predious.unsqueeze(-1).expand(-1, len(threshold_tensor)))
+    fp = overlapmat.shape[0] - tp
+    # print(targetious)
+    # print(torch.where((targetious.unsqueeze(-1)==0), 1.0, 0.0).flatten())
+    fn = torch.sum(targetious.unsqueeze(-1) < 1, dim=0)
+    # print(overlapmat.shape, predbox.shape, targetbox.shape)
+    # print(tp, fp, fn)
+    # print(type(tp))
+    # print(tp.shape)
+    return tp, fp, fn
+
+
+def calcmetric_overlap(
+    tp: torch.Tensor, fp: torch.Tensor, fn: torch.Tensor
+) -> Tuple[torch.Tensor, torch.Tensor, torch.Tensor]:
+    """
+    Calculate Metrics from true positives, false positives, false negatives based on wether a prediciton box fully
+    overlaps with a target box
+
+    Args:
+        tp: true positives
+        fp: false positives
+        fn: false negatives
+
+    Returns:
+
+
+    """
+    precision = torch.nan_to_num(tp / (tp + fp))
+    recall = torch.nan_to_num(tp / (tp + fn))
+    f1 = torch.nan_to_num(2 * (precision * recall) / (precision + recall))
+    return precision, recall, f1
+
+
+def calcstats_iou(
+    predbox: torch.tensor,
+    targetbox: torch.tensor,
+    iou_thresholds: List[float] = [0.5, 0.6, 0.7, 0.8, 0.9],
+    imname: str = None,
+) -> Tuple[torch.Tensor, torch.Tensor, torch.Tensor, torch.Tensor, torch.Tensor]:
+    """Calculates IoU and resulting tp, fp, fn.
+
+    Calculates the intersection over union as well as resulting tp, fp, fn at given IoU Thresholds for the bounding boxes
+    of a target and prediciton given as torch tensor with bounding box
+    coordinates in format x_min, y_min, x_max, y_max
+
+    Args:
+        predbox: predictions
+        targetbox: targets
+        iou_thresholds: List of IoU Thresholds
+
+    Returns:
+        tuple of predious, targetious, tp, fp, fn
+
+    """
+    threshold_tensor = torch.tensor(iou_thresholds)
+    if not predbox.numel():
+        warnings.warn(
+            f"A Prediction Bounding Box Tensor in {imname} is empty. (no predicitons)"
+        )
+        return (
+            torch.zeros(predbox.shape[0]),
+            torch.zeros(targetbox.shape[0]),
+            torch.zeros(threshold_tensor.shape),
+            torch.zeros(threshold_tensor.shape),
+            torch.full(threshold_tensor.shape, fill_value=targetbox.shape[0]),
+        )
+    ioumat = torch.nan_to_num(box_iou(predbox, targetbox))
+    predious = ioumat.amax(dim=1)
+    targetious = ioumat.amax(dim=0)
+    assert len(predious) == predbox.shape[0]
+    assert len(targetious) == targetbox.shape[0]
+
+    tp = torch.sum(
+        predious.unsqueeze(-1).expand(-1, len(threshold_tensor)) >= threshold_tensor,
+        dim=0,
+    )
+
+    fp = ioumat.shape[0] - tp
+    fn = torch.sum(
+        targetious.unsqueeze(-1).expand(-1, len(threshold_tensor)) < threshold_tensor,
+        dim=0,
+    )
+    assert torch.equal(
+        fp,
+        torch.sum(
+            predious.unsqueeze(-1).expand(-1, len(threshold_tensor)) < threshold_tensor,
+            dim=0,
+        ),
+    )
+    return predious, targetious, tp, fp, fn
+
+
+def calcmetric(
+    tp: torch.Tensor,
+    fp: torch.Tensor,
+    fn: torch.Tensor,
+    iou_thresholds: List[float] = [0.5, 0.6, 0.7, 0.8, 0.9],
+) -> Tuple[torch.Tensor, torch.Tensor, torch.Tensor, torch.Tensor]:
+    """ Calculate Metrics from true positives, false positives, false negatives at given iou thresholds.
+
+    Args:
+        tp: True Positives
+        fp: False Positives
+        fn: False Negatives
+        iou_thresholds: List of IoU Thresholds
+
+    Returns:
+        precision, recall, f1, wf1
+
+    """
+    threshold_tensor = torch.tensor(iou_thresholds)
+    precision = torch.nan_to_num(tp / (tp + fp))
+    recall = torch.nan_to_num(tp / (tp + fn))
+    f1 = torch.nan_to_num(2 * (precision * recall) / (precision + recall))
+    wf1 = f1 @ threshold_tensor / torch.sum(threshold_tensor)
+    return precision, recall, f1, wf1
+
+
+def get_dataframe(
+    fnsum,
+    fpsum,
+    tpsum,
+    nopredcount: int = None,
+    imnum: int = None,
+    iou_thresholds: List[float] = [0.5, 0.6, 0.7, 0.8, 0.9],
+):
+    totalfullprec, totalfullrec, totalfullf1, totalfullwf1 = calcmetric(
+        tpsum, fpsum, fnsum, iou_thresholds=iou_thresholds
+    )
+    totalfullmetrics = {"wf1": totalfullwf1.item()}
+    totalfullmetrics.update({f"Number of evaluated files": imnum})
+    totalfullmetrics.update({f"Evaluated files without predictions:": nopredcount})
+    totalfullmetrics.update(
+        {
+            f"f1@{iou_thresholds[i]}": totalfullf1[i].item()
+            for i in range(len(iou_thresholds))
+        }
+    )
+    totalfullmetrics.update(
+        {
+            f"prec@{iou_thresholds[i]}": totalfullprec[i].item()
+            for i in range(len(iou_thresholds))
+        }
+    )
+    totalfullmetrics.update(
+        {
+            f"recall@{iou_thresholds[i]}": totalfullrec[i].item()
+            for i in range(len(iou_thresholds))
+        }
+    )
+    totalfullmetrics.update(
+        {f"tp@{iou_thresholds[i]}": tpsum[i].item() for i in range(len(iou_thresholds))}
+    )
+    totalfullmetrics.update(
+        {f"fp@{iou_thresholds[i]}": fpsum[i].item() for i in range(len(iou_thresholds))}
+    )
+    totalfullmetrics.update(
+        {f"fn@{iou_thresholds[i]}": fnsum[i].item() for i in range(len(iou_thresholds))}
+    )
+    return totalfullmetrics

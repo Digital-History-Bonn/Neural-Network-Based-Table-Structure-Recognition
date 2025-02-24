@@ -13,7 +13,7 @@ from torchvision.utils import draw_bounding_boxes
 
 from PIL import Image
 
-from src.historicdocumentprocessing.kosmos_eval import reversetablerelativebboxes_outer
+from src.historicdocumentprocessing.util.tablesutil import reversetablerelativebboxes_outer
 
 
 class CustomDataset(Dataset):  # type: ignore

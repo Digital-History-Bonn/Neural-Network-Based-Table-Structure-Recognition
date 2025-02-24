@@ -8,14 +8,11 @@ from PIL import Image
 from torchvision.io import read_image
 from torchvision.utils import draw_bounding_boxes
 
-from src.historicdocumentprocessing.kosmos_eval import (
-    extractboxes,
-    reversetablerelativebboxes_outer,
-)
 from src.historicdocumentprocessing.tabletransformer_dataset import (
     reversetablerelativebboxes_outer_rowcoll,
 )
-from src.historicdocumentprocessing.util.tablesutil import remove_invalid_bbox
+from src.historicdocumentprocessing.util.tablesutil import remove_invalid_bbox, reversetablerelativebboxes_outer, \
+    extractboxes
 
 
 def drawimg_varformat_inner(box, impath, savepath, groundpath=None, rowcol=False):

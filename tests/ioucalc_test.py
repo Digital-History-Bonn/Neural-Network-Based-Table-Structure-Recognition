@@ -7,11 +7,10 @@ from torchvision.ops import box_iou
 
 from src.historicdocumentprocessing.dataprocessing import processdata_wildtable_inner
 from src.historicdocumentprocessing.kosmos_eval import (
-    calcmetric,
     calcstats_IoU,
-    get_dataframe,
-    reversetablerelativebboxes_outer,
 )
+from src.historicdocumentprocessing.util.metricsutil import calcmetric, get_dataframe
+from src.historicdocumentprocessing.util.tablesutil import reversetablerelativebboxes_outer
 
 
 def test_ioumetrics():

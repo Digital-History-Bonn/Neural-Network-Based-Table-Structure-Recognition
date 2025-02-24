@@ -18,17 +18,8 @@ from transformers import AutoModelForObjectDetection
 from typing_extensions import List
 
 from src.historicdocumentprocessing.fasterrcnn_eval import tableareabboxes
-from src.historicdocumentprocessing.kosmos_eval import (
-    boxoverlap,
-    calcmetric,
-    calcmetric_overlap,
-    calcstats_iodt,
-    calcstats_iou,
-    calcstats_overlap,
-    extractboxes,
-    get_dataframe,
-    reversetablerelativebboxes_outer,
-)
+from src.historicdocumentprocessing.util.metricsutil import calcstats_iodt, calcstats_overlap, calcmetric_overlap, \
+    calcstats_iou, calcmetric, get_dataframe
 from src.historicdocumentprocessing.tabletransformer_dataset import CustomDataset
 from src.historicdocumentprocessing.util.glosat_paper_postprocessing_method import (
     reconstruct_table,
@@ -38,7 +29,7 @@ from src.historicdocumentprocessing.util.tablesutil import (
     clustertablesseperately,
     getcells,
     getsurroundingtable,
-    remove_invalid_bbox,
+    remove_invalid_bbox, reversetablerelativebboxes_outer, boxoverlap, extractboxes,
 )
 from src.historicdocumentprocessing.util.visualisationutil import (
     drawimg_varformat_inner,

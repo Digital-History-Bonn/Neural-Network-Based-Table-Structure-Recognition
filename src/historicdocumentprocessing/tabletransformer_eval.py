@@ -15,17 +15,10 @@ from transformers import (
 )
 
 from src.historicdocumentprocessing.fasterrcnn_eval import tableareabboxes
-from src.historicdocumentprocessing.kosmos_eval import (
-    calcmetric,
-    calcmetric_overlap,
-    calcstats_iodt,
-    calcstats_iou,
-    calcstats_overlap,
-    get_dataframe,
-    reversetablerelativebboxes_outer,
-)
+from src.historicdocumentprocessing.util.metricsutil import calcstats_iodt, calcstats_overlap, calcmetric_overlap, \
+    calcstats_iou, calcmetric, get_dataframe
 from src.historicdocumentprocessing.tabletransformer_dataset import CustomDataset
-from src.historicdocumentprocessing.util.tablesutil import getcells
+from src.historicdocumentprocessing.util.tablesutil import getcells, reversetablerelativebboxes_outer
 
 
 def inference(

@@ -14,13 +14,10 @@ from torchvision.models.detection import (
 from tqdm import tqdm
 from transformers import AutoImageProcessor, TableTransformerForObjectDetection
 
-from src.historicdocumentprocessing.kosmos_eval import (
-    extractboxes,
-    reversetablerelativebboxes_outer,
-)
 from src.historicdocumentprocessing.postprocessing import postprocess
 from src.historicdocumentprocessing.tabletransformer_dataset import CustomDataset
-from src.historicdocumentprocessing.util.tablesutil import getcells, remove_invalid_bbox
+from src.historicdocumentprocessing.util.tablesutil import getcells, remove_invalid_bbox, \
+    reversetablerelativebboxes_outer, extractboxes
 from src.historicdocumentprocessing.util.visualisationutil import (
     drawimg_varformat_inner,
 )

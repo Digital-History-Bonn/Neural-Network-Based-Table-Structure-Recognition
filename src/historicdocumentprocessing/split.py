@@ -104,7 +104,7 @@ def reversewildtablesvalidsplit(
 
 
 def subclassjoinwildtables(
-    path: str = f"{Path(__file__).parent.absolute()}/../../data/Tablesinthewild/preprocessed",
+    path: str = f"{Path(__file__).parent.absolute()}/../../data/Tablesinthewild/testsubclasses",
     dst: str = f"{Path(__file__).parent.absolute()}/../../data/Tablesinthewild/test",
 ):
     for folder in glob.glob(f"{path}/*"):
@@ -126,7 +126,7 @@ def subclasssplitwildtables(
             foldername = txt.split("/")[-1].split(".")[-2]
             # print(foldername)
             destfolder = (
-                f"{'/'.join(impath.split('/')[:-2])}/../preprocessed/{foldername}"
+                f"{'/'.join(impath.split('/')[:-2])}/../testsubclasses/{foldername}"
             )
             # print(destfolder)
             for line in tqdm(f):

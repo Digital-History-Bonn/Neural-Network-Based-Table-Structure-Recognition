@@ -1,5 +1,5 @@
 """Inference and Evaluation for Faster RCNN."""
-
+import argparse
 import glob
 import os
 from pathlib import Path
@@ -7,6 +7,7 @@ from typing import List
 
 import pandas
 import torch
+from pandas.conftest import datapath
 from torchvision.io import read_image
 from torchvision.models.detection import (
     FasterRCNN_ResNet50_FPN_Weights,
@@ -14,16 +15,9 @@ from torchvision.models.detection import (
 )
 from tqdm import tqdm
 
-from src.historicdocumentprocessing.kosmos_eval import (
-    boxoverlap,
-    calcmetric,
-    calcmetric_overlap,
-    calcstats_iodt,
-    calcstats_iou,
-    calcstats_overlap,
-    get_dataframe,
-    reversetablerelativebboxes_outer,
-)
+from src.historicdocumentprocessing.util.metricsutil import calcstats_iodt, calcstats_overlap, calcmetric_overlap, \
+    calcstats_iou, calcmetric, get_dataframe
+from src.historicdocumentprocessing.util.tablesutil import reversetablerelativebboxes_outer, boxoverlap
 
 
 def tableareabboxes(bboxes: torch.tensor, tablepath: str) -> torch.tensor:
@@ -69,6 +63,8 @@ def inference_fullimg(
         valid: wether to use valid filter value for filtering
 
     """
+    print(targetloc, modelpath, datasetname, iou_thresholds, filter, tablerelative, tableareaonly, valid)
+    
     if iou_thresholds is None:
         iou_thresholds = [0.5, 0.6, 0.7, 0.8, 0.9]
     model = fasterrcnn_resnet50_fpn(
@@ -84,7 +80,7 @@ def inference_fullimg(
         print("Cuda not available")
         return
     modelname = modelpath.split(os.sep)[-1]
-    saveloc = f"{Path(__file__).parent.absolute()}/../../results/fasterrcnn/testevalfinal1/fullimg/{datasetname}/{modelname}/iou_{'_'.join([str(iou_thresholds[0]), str(iou_thresholds[-1])])}"
+    saveloc = f"{Path(__file__).parent.absolute()}/../../results/fasterrcnn/eval/fullimg/{datasetname}/{modelname}/iou_{'_'.join([str(iou_thresholds[0]), str(iou_thresholds[-1])])}"
     # boxsaveloc = f"{Path(__file__).parent.absolute()}/../../results/fasterrcnn/{datasetname}/{modelname}"
     if filter:
         with open(
@@ -93,11 +89,11 @@ def inference_fullimg(
         ) as f:
             filtering = float(f.read())
     if tableareaonly and not filter:
-        saveloc = f"{Path(__file__).parent.absolute()}/../../results/fasterrcnn/testevalfinal1/fullimg/{datasetname}/{modelname}/tableareaonly/iou_{'_'.join([str(iou_thresholds[0]), str(iou_thresholds[-1])])}"
+        saveloc = f"{Path(__file__).parent.absolute()}/../../results/fasterrcnn/eval/fullimg/{datasetname}/{modelname}/tableareaonly/iou_{'_'.join([str(iou_thresholds[0]), str(iou_thresholds[-1])])}"
     elif filter and not tableareaonly:
-        saveloc = f"{Path(__file__).parent.absolute()}/../../results/fasterrcnn/testevalfinal1/fullimg/{datasetname}/{modelname}/filtering_{filtering}{'_valid' if valid else ''}_iou{'_'.join([str(iou_thresholds[0]), str(iou_thresholds[-1])])}"
+        saveloc = f"{Path(__file__).parent.absolute()}/../../results/fasterrcnn/eval/fullimg/{datasetname}/{modelname}/filtering_{filtering}{'_valid' if valid else ''}_iou{'_'.join([str(iou_thresholds[0]), str(iou_thresholds[-1])])}"
     elif filter and tableareaonly:
-        saveloc = f"{Path(__file__).parent.absolute()}/../../results/fasterrcnn/testevalfinal1/fullimg/{datasetname}/{modelname}/tableareaonly/filtering_{filtering}{'_valid' if valid else ''}_iou{'_'.join([str(iou_thresholds[0]), str(iou_thresholds[-1])])}"
+        saveloc = f"{Path(__file__).parent.absolute()}/../../results/fasterrcnn/eval/fullimg/{datasetname}/{modelname}/tableareaonly/filtering_{filtering}{'_valid' if valid else ''}_iou{'_'.join([str(iou_thresholds[0]), str(iou_thresholds[-1])])}"
     os.makedirs(saveloc, exist_ok=True)
 
     # *** initializing variables ***
@@ -424,10 +420,10 @@ def inference_tablecutout(
         return
     model.eval()
     modelname = modelpath.split(os.sep)[-1]
-    saveloc = f"{Path(__file__).parent.absolute()}/../../results/fasterrcnn/testevalfinal1/tableareacutout/{datasetname}/{modelname}"
+    saveloc = f"{Path(__file__).parent.absolute()}/../../results/fasterrcnn/eval/tableareacutout/{datasetname}/{modelname}"
     boxsaveloc = f"{Path(__file__).parent.absolute()}/../../results/fasterrcnn/tableareacutout/{datasetname}/{modelname}"
     if filtering:
-        saveloc = f"{Path(__file__).parent.absolute()}/../../results/fasterrcnn/testevalfinal1/tableareacutout/{datasetname}/{modelname}/filtering"
+        saveloc = f"{Path(__file__).parent.absolute()}/../../results/fasterrcnn/eval/tableareacutout/{datasetname}/{modelname}/filtering"
     os.makedirs(saveloc, exist_ok=True)
     if saveboxes:
         os.makedirs(boxsaveloc, exist_ok=True)
@@ -615,7 +611,52 @@ def inference_tablecutout(
     print("done")
 
 
+def get_args() -> argparse.Namespace:
+    """Define args."""
+    parser = argparse.ArgumentParser(description="fasterrcnn_eval")
+    parser.add_argument('-f', '--folder', default="test", help="test data folder")
+    parser.add_argument('-m', '--modelname')
+    parser.add_argument('--datasetname', default="BonnData")
+    parser.add_argument('--tablerelative', action='store_true', default=False)
+    parser.add_argument('--no-tablerelative', dest='tablerelative', action='store_false')
+    parser.add_argument('--tableareaonly', action='store_true', default=False)
+    parser.add_argument('--no-tableareaonly', dest='tableareaonly', action='store_false')
+    parser.add_argument('--filter', action='store_true', default=False)
+    parser.add_argument('--no-filter', dest='filter', action='store_false')
+    parser.add_argument('--valid_filter', action='store_true', default=False)
+    parser.add_argument('--no-valid_filter', dest='valid_filter', action='store_false')
+
+    parser.add_argument('--tablecutout', action='store_true', default=False)
+    parser.add_argument('--no-tablecutout', dest='tablecutout', action='store_false')
+
+    parser.add_argument('--per_category', action='store_true', default=False)
+    parser.add_argument('--no-per_category', dest='per_category', action='store_false')
+    parser.add_argument('--catfolder', default="testsubclasses")
+
+    parser.add_argument('--iou_thresholds', nargs='*', type=float, default=[0.5, 0.6, 0.7, 0.8, 0.9])
+
+    return parser.parse_args()
+
+
 if __name__ == "__main__":
+    args = get_args()
+    dpath = f"{Path(__file__).parent.absolute()}/../../data/{args.datasetname}/{args.folder}"
+    mpath = f"{Path(__file__).parent.absolute()}/../../checkpoints/fasterrcnn/{args.modelname}"
+    if args.tablecutout:
+        inference_tablecutout(datapath=dpath, modelpath=mpath, datasetname=args.datasetname, iou_thresholds=args.iou_thresholds, filtering=args.filter)
+    else:
+        if args.per_category:
+            for cat in glob.glob(f"{Path(__file__).parent.absolute()}/../../data/{args.datasetname}/{args.catfolder}/*"):
+                print(cat)
+                inference_fullimg(targetloc=cat, modelpath=mpath, datasetname=f"{args.datasetname}/{cat.split('/')[-1]}",
+                                  iou_thresholds=args.iou_thresholds, filter=args.filter,
+                                  tablerelative=args.tablerelative, tableareaonly=args.tableareaonly,
+                                  valid=args.valid_filter)
+        else:
+            inference_fullimg(targetloc=args.datapath, modelpath=args.modelpath, datasetname=args.datasetname, iou_thresholds=args.iou_thresholds, filter=args.filter, tablerelative=args.tablerelative, tableareaonly=args.tableareaonly, valid=args.valid_filter)
+
+    exit()
+
     """
     inference_fullimg(
         modelpath=f"{Path(__file__).parent.absolute()}/../../checkpoints/fasterrcnn/testseveralcalls_no_valid_random_init_e_250_end.pt"
@@ -673,8 +714,6 @@ if __name__ == "__main__":
         tablerelative=True,
         tableareaonly=False,
     )
-
-    """
     inference_fullimg(
         targetloc=f"{Path(__file__).parent.absolute()}/../../data/BonnData/test",
         datasetname="BonnData",
@@ -852,8 +891,6 @@ if __name__ == "__main__":
         tablerelative=True,
         tableareaonly=False,
     )
-    """
-
     # inference_fullimg(targetloc=f"{Path(__file__).parent.absolute()}/../../data/Tablesinthewild/preprocessed/simple", datasetname='simple')
     inference_tablecutout()
     # inference_tablecutout(filtering=True)

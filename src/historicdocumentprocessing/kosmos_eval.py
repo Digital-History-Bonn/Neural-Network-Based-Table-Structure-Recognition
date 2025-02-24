@@ -1,400 +1,55 @@
+"""Evaluation for Kosmos 2.5."""
+
 import glob
 import json
 import os
-import warnings
 from pathlib import Path
 from typing import List, Tuple
 
 import pandas
 import torch
-from torchvision.ops import box_area, box_iou
-from torchvision.ops.boxes import _box_inter_union
 from tqdm import tqdm
 
-
-def remove_invalid_bbox(box, impath: str = "") -> torch.Tensor:
-    newbox = []
-    for b in box:
-        if b[0] < b[2] and b[1] < b[3]:
-            newbox.append(b)
-        else:
-            print(f"Invalid bounding box in image {impath.split('/')[-1]}", b)
-    return torch.vstack(newbox) if newbox else torch.empty(0, 4)
-
-
-def reversetablerelativebboxes_inner(
-    tablebbox: torch.Tensor, cellbboxes: torch.Tensor
-) -> torch.Tensor:
-    """Returns bounding boxes relative to image rather than relative to table so that evaluation of bounding box accuracy is possible on whole image.
-
-    inner function for one bounding box
-
-    Args:
-        tablebbox: table coordinates
-        cellbboxes: cell coordinates relative to table
-
-    Returns:
-
-    """
-    return cellbboxes + torch.tensor(
-        data=[tablebbox[0], tablebbox[1], tablebbox[0], tablebbox[1]]
-    )
-
-
-def reversetablerelativebboxes_outer(fpath: str) -> torch.Tensor:
-    """Returns bounding boxes relative to image rather than relative to table so that evaluation of bounding box accuracy is possible on whole image.
-
-    Args:
-        fpath: path to folder with preprocessed BBox files
-
-    Returns:
-        tensor with all BBoxes in image relative to image
-    """
-    tablebboxes = torch.load(glob.glob(f"{fpath}/*tables.pt")[0])
-    newcoords = torch.zeros((0, 4))
-    for table in glob.glob(f"{fpath}/*_cell_*.pt"):
-        n = int(table.split(".")[-2].split("_")[-1])
-        newcell = reversetablerelativebboxes_inner(tablebboxes[n], torch.load(table))
-        newcoords = torch.vstack((newcoords, newcell))
-    return newcoords
-
-
-def extractboundingbox(bbox: dict) -> Tuple[int, int, int, int]:
-    """Get singular bounding box from dict.
-
-    Args:
-        bbox: dict of bounding box coordinates
-
-    Returns: Tuple of bounding box coordinates in format x_min, y_min, x_max, y_max
-
-    """
-    return int(bbox["x0"]), int(bbox["y0"]), int(bbox["x1"]), int(bbox["y1"])
-
-
-def boxoverlap(
-    bbox: Tuple[int, int, int, int],
-    tablebox: Tuple[int, int, int, int],
-    fuzzy: int = 25,
-) -> bool:
-    """
-    Checks if bbox lies in tablebox
-    Args:
-        bbox: the Bounding Box
-        tablebox: the Bounding Box that bbox should lie in
-        fuzzy: fuzzyness of tablebox boundaries
-    Returns:
-
-    """
-    return (
-        bbox[0] >= (tablebox[0] - fuzzy)
-        and bbox[1] >= (tablebox[1] - fuzzy)
-        and bbox[2] <= (tablebox[2] + fuzzy)
-        and bbox[3] <= (tablebox[3] + fuzzy)
-    )
-
-
-def boxoverlap1(
-    bbox: Tuple[int, int, int, int], tablebox: Tuple[int, int, int, int], fuzzy: int = 0
-) -> bool:
-    iou = box_iou(torch.Tensor(bbox), torch.Tensor(tablebox))
-    print(iou)
-    if iou[0] > 0:
-        return True
-    else:
-        return False
-
-
-def extractboxes(boxdict: dict, fpath: str = None) -> torch.Tensor:
-    """Takes a Kosmos2.5-Output-Style Dict and extracts the bounding boxes.
-
-    Args:
-        fpath: path to table folder (if only bboxes in a table wanted)
-        boxdict(dict): dictionary in style of kosmos output (from json)
-
-    Returns:
-        bounding boxes as torch tensor
-
-    """
-    boxlist = []
-    tablebboxes = None
-    if fpath:
-        tablebboxes = torch.load(glob.glob(f"{fpath}/*tables.pt")[0])
-        # print(tablebboxes)
-        # print(tablebboxes)
-    for box in boxdict["results"]:
-        bbox = extractboundingbox(box["bounding box"])
-        # print(bbox)
-        if fpath:
-            for table in tablebboxes:
-                if boxoverlap(bbox, table):
-                    boxlist.append(bbox)
-        else:
-            boxlist.append(bbox)
-    # print(boxlist)
-    return torch.tensor(boxlist) if boxlist else torch.empty(0, 4)
-
-
-def calcstats_iodt(
-    predbox: torch.tensor,
-    targetbox: torch.tensor,
-    imname: str = None,
-    iou_thresholds: List[float] = [0.5, 0.6, 0.7, 0.8, 0.9],
-) -> Tuple[torch.Tensor, torch.Tensor, torch.Tensor, torch.Tensor, torch.Tensor]:
-    """
-    Calculate tp, tp, fn based on IoDT (Intersection over Detection) at given IoU Thresholds
-    Args:
-        predbox:
-        targetbox:
-        imname:
-        iou_thresholds:
-
-    Returns:
-
-    """
-    threshold_tensor = torch.tensor(iou_thresholds)
-    if not predbox.numel():
-        # print(predbox.shape)
-        warnings.warn(
-            f"A Prediction Bounding Box Tensor in {imname} is empty. (no predicitons)"
-        )
-        return (
-            torch.zeros(predbox.shape[0]),
-            torch.zeros(targetbox.shape[0]),
-            torch.zeros(threshold_tensor.shape),
-            torch.zeros(threshold_tensor.shape),
-            torch.full(threshold_tensor.shape, fill_value=targetbox.shape[0]),
-        )
-    iodt = torch.nan_to_num(intersection_over_detection(predbox, targetbox))
-    # print(IoDT, IoDT.shape)
-    prediodt = iodt.amax(dim=1)
-    targetiodt = iodt.amax(dim=0)
-    # print(predbox.shape, prediodt.shape, prediodt)
-    # print(targetbox.shape, targetiodt.shape, targetiodt)
-    # print(imname)
-    assert len(prediodt) == predbox.shape[0]
-    assert len(targetiodt) == targetbox.shape[0]
-    tp = torch.sum(
-        prediodt.unsqueeze(-1).expand(-1, len(threshold_tensor)) >= threshold_tensor,
-        dim=0,
-    )
-    # print(tp, prediodt.unsqueeze(-1).expand(-1, len(threshold_tensor)))
-    fp = iodt.shape[0] - tp
-    fn = torch.sum(
-        targetiodt.unsqueeze(-1).expand(-1, len(threshold_tensor)) < threshold_tensor,
-        dim=0,
-    )
-    assert torch.equal(
-        fp,
-        torch.sum(
-            prediodt.unsqueeze(-1).expand(-1, len(threshold_tensor)) < threshold_tensor,
-            dim=0,
-        ),
-    )
-    # print(tp, fp, fn)
-    return prediodt, targetiodt, tp, fp, fn
-
-
-def intersection_over_detection(predbox, targetbox):
-    """
-    Calculate the IoDT (Intersection over Detection Metric): Intersection of prediction and target over the total prediction area
-    Args:
-        predbox:
-        targetbox:
-
-    Returns:
-
-    """
-    inter, union = _box_inter_union(targetbox, predbox)
-    predarea = box_area(predbox)
-    # print(inter, inter.shape)
-    # print(predarea, predarea.shape)
-    iodt = torch.div(inter, predarea)
-    # print(IoDT, IoDT.shape)
-    iodt = iodt.T
-    return iodt
-
-
-def calcstats_overlap(
-    predbox: torch.tensor, targetbox: torch.tensor, imname: str = None, fuzzy: int = 25
-) -> Tuple[torch.Tensor, torch.Tensor, torch.Tensor]:
-    """
-    Calculates stats based on wether a prediciton box fully overlaps with a target box instead of IoU
-    tp = prediciton lies fully within a target box
-    fp = prediciton does not lie fully within a target box
-    fn = target boxes that do not have a prediciton lying fully within them
-    Args:
-        fuzzy:
-        predbox:
-        targetbox:
-        imname:
-
-    Returns:
-
-
-    """
-    # print(predbox.shape, targetbox.shape)
-    if not predbox.numel():
-        # print(predbox.shape)
-        warnings.warn(
-            f"A Prediction Bounding Box Tensor in {imname} is empty. (no predicitons)"
-        )
-        return (
-            torch.zeros(1),
-            torch.zeros(1),
-            torch.full([1], fill_value=targetbox.shape[0]),
-        )
-    overlapmat = torch.zeros((predbox.shape[0], targetbox.shape[0]))
-    for i, pred in enumerate(predbox):
-        for j, target in enumerate(targetbox):
-            if boxoverlap(bbox=pred, tablebox=target, fuzzy=fuzzy):
-                # print(imname, pred,target)
-                overlapmat[i, j] = 1
-    predious = overlapmat.amax(dim=1)
-    targetious = overlapmat.amax(dim=0)
-    tp = torch.sum(predious.unsqueeze(-1), dim=0)
-    # print(tp, predious.unsqueeze(-1).expand(-1, len(threshold_tensor)))
-    fp = overlapmat.shape[0] - tp
-    # print(targetious)
-    # print(torch.where((targetious.unsqueeze(-1)==0), 1.0, 0.0).flatten())
-    fn = torch.sum(targetious.unsqueeze(-1) < 1, dim=0)
-    # print(overlapmat.shape, predbox.shape, targetbox.shape)
-    # print(tp, fp, fn)
-    # print(type(tp))
-    # print(tp.shape)
-    return tp, fp, fn
-
-
-def calcmetric_overlap(
-    tp: torch.Tensor, fp: torch.Tensor, fn: torch.Tensor
-) -> Tuple[torch.Tensor, torch.Tensor, torch.Tensor]:
-    """
-    Calculate Metrics from true positives, false positives, false negatives based on wether a prediciton box fully
-    overlaps with a target box
-
-    Args:
-        tp: true positives
-        fp: false positives
-        fn: false negatives
-
-    Returns:
-
-
-    """
-    precision = torch.nan_to_num(tp / (tp + fp))
-    recall = torch.nan_to_num(tp / (tp + fn))
-    f1 = torch.nan_to_num(2 * (precision * recall) / (precision + recall))
-    return precision, recall, f1
-
-
-def calcstats_iou(
-    predbox: torch.tensor,
-    targetbox: torch.tensor,
-    iou_thresholds: List[float] = [0.5, 0.6, 0.7, 0.8, 0.9],
-    imname: str = None,
-) -> Tuple[torch.Tensor, torch.Tensor, torch.Tensor, torch.Tensor, torch.Tensor]:
-    """Calculates IoU and resulting tp, fp, fn.
-
-    Calculates the intersection over union as well as resulting tp, fp, fn at given IoU Thresholds for the bounding boxes
-    of a target and prediciton given as torch tensor with bounding box
-    coordinates in format x_min, y_min, x_max, y_max
-
-    Args:
-        predbox: predictions
-        targetbox: targets
-        iou_thresholds: List of IoU Thresholds
-
-    Returns:
-        tuple of predious, targetious, tp, fp, fn
-
-    """
-    threshold_tensor = torch.tensor(iou_thresholds)
-    if not predbox.numel():
-        warnings.warn(
-            f"A Prediction Bounding Box Tensor in {imname} is empty. (no predicitons)"
-        )
-        return (
-            torch.zeros(predbox.shape[0]),
-            torch.zeros(targetbox.shape[0]),
-            torch.zeros(threshold_tensor.shape),
-            torch.zeros(threshold_tensor.shape),
-            torch.full(threshold_tensor.shape, fill_value=targetbox.shape[0]),
-        )
-    ioumat = torch.nan_to_num(box_iou(predbox, targetbox))
-    predious = ioumat.amax(dim=1)
-    targetious = ioumat.amax(dim=0)
-    assert len(predious) == predbox.shape[0]
-    assert len(targetious) == targetbox.shape[0]
-
-    tp = torch.sum(
-        predious.unsqueeze(-1).expand(-1, len(threshold_tensor)) >= threshold_tensor,
-        dim=0,
-    )
-
-    fp = ioumat.shape[0] - tp
-    fn = torch.sum(
-        targetious.unsqueeze(-1).expand(-1, len(threshold_tensor)) < threshold_tensor,
-        dim=0,
-    )
-    assert torch.equal(
-        fp,
-        torch.sum(
-            predious.unsqueeze(-1).expand(-1, len(threshold_tensor)) < threshold_tensor,
-            dim=0,
-        ),
-    )
-    return predious, targetious, tp, fp, fn
-
-
-def calcmetric(
-    tp: torch.Tensor,
-    fp: torch.Tensor,
-    fn: torch.Tensor,
-    iou_thresholds: List[float] = [0.5, 0.6, 0.7, 0.8, 0.9],
-) -> Tuple[torch.Tensor, torch.Tensor, torch.Tensor, torch.Tensor]:
-    """ Calculate Metrics from true positives, false positives, false negatives at given iou thresholds.
-
-    Args:
-        tp: True Positives
-        fp: False Positives
-        fn: False Negatives
-        iou_thresholds: List of IoU Thresholds
-
-    Returns:
-        precision, recall, f1, wf1
-
-    """
-    threshold_tensor = torch.tensor(iou_thresholds)
-    precision = torch.nan_to_num(tp / (tp + fp))
-    recall = torch.nan_to_num(tp / (tp + fn))
-    f1 = torch.nan_to_num(2 * (precision * recall) / (precision + recall))
-    wf1 = f1 @ threshold_tensor / torch.sum(threshold_tensor)
-    return precision, recall, f1, wf1
+from src.historicdocumentprocessing.util.metricsutil import calcstats_iodt, calcstats_overlap, calcmetric_overlap, \
+    calcstats_iou, calcmetric, get_dataframe
+from src.historicdocumentprocessing.util.tablesutil import reversetablerelativebboxes_outer, extractboxes
 
 
 def calcmetrics_tables(
     targetloc: str = f"{Path(__file__).parent.absolute()}/../../data/BonnData/test",
     predloc: str = f"{Path(__file__).parent.absolute()}/../../results/kosmos25/BonnData"
     f"/Tabellen/test",
-    iou_thresholds: List[float] = [0.5, 0.6, 0.7, 0.8, 0.9],
-    saveloc: str = f"{Path(__file__).parent.absolute()}/../../results/kosmos25/BonnData/Tabellen"
-    f"/testevalfinal1/fullimg",
+    iou_thresholds: List[float] = None,
+    saveloc: str = None,
     tablerelative: bool = True,
     tableareaonly: bool = True,
+    datasetname: str = None
 ) -> Tuple[List[torch.Tensor], List[torch.Tensor], List[torch.Tensor]]:
-    """
-    Calculates metrics for all predictions and corresponding targets in a given location (pred Bboxes given as json
-    files, targets as torch.Tensor) Args: targetloc: target location predloc: prediction location
+    """Calculates metrics for all predictions and corresponding targets in a given location (pred Bboxes given as json
+    files, targets as torch.Tensor)
 
-    Returns: nested list of all ious
-
+    Args:
+        targetloc: target location
+        predloc: prediction location
+        iou_thresholds: iou thresholds
+        saveloc: save location
+        tablerelative: wether to use tablerelative groundtruth BBoxes (since GloSAT and BonnData do not have image relative)
+        tableareaonly: wether to calculate results only for BBox-Predicitions in table area or for all predictions
+        datasetname: name of the dataset (for save locations)
+    Returns:
+        tuple of lists with iou, f1, wf1 values
     """
     # tableareaonly= False
+    if iou_thresholds is None:
+        iou_thresholds = [0.5, 0.6, 0.7, 0.8, 0.9]
     predfolder = glob.glob(f"{predloc}/*")
+    if saveloc is None:
+        saveloc = f"{Path(__file__).parent.absolute()}/../../results/kosmos25/eval/fullimg/{datasetname}"
+    if tableareaonly:
+        saveloc = f"{saveloc}/tableareaonly"
     saveloc = (
         f"{saveloc}/iou_{'_'.join([str(iou_thresholds[0]), str(iou_thresholds[-1])])}"
     )
-    if tableareaonly:
-        saveloc = f"{saveloc}/tableareaonly"
     # fullimagevars
     fullioulist = []
     fullf1list = []
@@ -805,50 +460,6 @@ def calcmetrics_tables(
     iodtdf.to_csv(f"{saveloc}/fullimageiodt.csv")
     conclusiondf.to_csv(f"{saveloc}/overview.csv")
     return fullioulist, fullf1list, fullwf1list
-
-
-def get_dataframe(
-    fnsum,
-    fpsum,
-    tpsum,
-    nopredcount: int = None,
-    imnum: int = None,
-    iou_thresholds: List[float] = [0.5, 0.6, 0.7, 0.8, 0.9],
-):
-    totalfullprec, totalfullrec, totalfullf1, totalfullwf1 = calcmetric(
-        tpsum, fpsum, fnsum, iou_thresholds=iou_thresholds
-    )
-    totalfullmetrics = {"wf1": totalfullwf1.item()}
-    totalfullmetrics.update({f"Number of evaluated files": imnum})
-    totalfullmetrics.update({f"Evaluated files without predictions:": nopredcount})
-    totalfullmetrics.update(
-        {
-            f"f1@{iou_thresholds[i]}": totalfullf1[i].item()
-            for i in range(len(iou_thresholds))
-        }
-    )
-    totalfullmetrics.update(
-        {
-            f"prec@{iou_thresholds[i]}": totalfullprec[i].item()
-            for i in range(len(iou_thresholds))
-        }
-    )
-    totalfullmetrics.update(
-        {
-            f"recall@{iou_thresholds[i]}": totalfullrec[i].item()
-            for i in range(len(iou_thresholds))
-        }
-    )
-    totalfullmetrics.update(
-        {f"tp@{iou_thresholds[i]}": tpsum[i].item() for i in range(len(iou_thresholds))}
-    )
-    totalfullmetrics.update(
-        {f"fp@{iou_thresholds[i]}": fpsum[i].item() for i in range(len(iou_thresholds))}
-    )
-    totalfullmetrics.update(
-        {f"fn@{iou_thresholds[i]}": fnsum[i].item() for i in range(len(iou_thresholds))}
-    )
-    return totalfullmetrics
 
 
 if __name__ == "__main__":
