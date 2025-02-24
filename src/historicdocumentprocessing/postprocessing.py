@@ -498,10 +498,10 @@ def postprocess_eval_tablesep(
         fullimagepredbox: cell predictions
         imname: image name
         includeoutlier: wether to include outliers while clustering
-        epsprefactorchange:
-        minsamples:
-        targetloc:
-        iou_thresholds:
+        iou_thresholds: iou threshold
+        epsprefactorchange: prefactor for DBSCAN parameter eps
+        minsamples: DBSCAN parameter minsamples
+        targetloc: ground truth file location
 
     Returns:
 
@@ -539,6 +539,18 @@ def postprocess_eval_cellsep(
     iou_thresholds: List[float] = None,  # [0.5, 0.6, 0.7, 0.8, 0.9]
     tablerelative: bool = True,
 ):
+    """Evaluate GloSAT Cell Postprocessing using ground truth tables.
+
+    Args:
+        fullimagepredbox: image predictions
+        imname: image names
+        targetloc: target folder
+        iou_thresholds: iou thresholds
+        tablerelative: wether groundtruth coordinates are table relative
+
+    Returns:
+
+    """
     if iou_thresholds is None:
         iou_thresholds = [0.5, 0.6, 0.7, 0.8, 0.9]
     tablepath = f"{targetloc}/{imname}/{imname}_tables.pt"
@@ -555,12 +567,9 @@ def postprocess_eval_cellsep(
             )
             cells = reconstruct_bboxes(rows, colls, table.tolist())
             finalcells += cells.tolist()
-    # print(finalcells)
-    print(finalcells)
     finalcells = (
         torch.tensor(finalcells).squeeze() if finalcells else torch.empty((0, 4))
     )
-    # print(finalcells.shape)
     if finalcells.dim() == 1:
         finalcells = torch.unsqueeze(finalcells, 0)
     groundfolder = f"{targetloc}/{imname}"
@@ -570,12 +579,6 @@ def postprocess_eval_cellsep(
         fullimagegroundbox = torch.load(
             glob.glob(f"{groundfolder}/{groundfolder.split('/')[-1]}.pt")[0]
         )
-    if imname == "I_HA_Rep_89_Nr_16160_0170":
-        impath = f"{Path(__file__).parent.absolute()}/../../data/BonnData/test/I_HA_Rep_89_Nr_16160_0170/I_HA_Rep_89_Nr_16160_0170.jpg"
-        savepath = f"{Path(__file__).parent.absolute()}/../../images/testseperate/cell"
-        drawimg_varformat_inner(box=finalcells, impath=impath, savepath=savepath)
-    print(finalcells)
-    # print(fullimagegroundbox)
     return calcstats_iou(
         predbox=finalcells,
         targetbox=fullimagegroundbox,
@@ -585,6 +588,16 @@ def postprocess_eval_cellsep(
 
 
 def reconstruct_bboxes(rows: list, colls: list, tablecoords: list) -> torch.Tensor:
+    """Reconstruct BBoxes from output of GloSAT postprocessing.
+
+    Args:
+        rows: rows
+        colls: columns
+        tablecoords: table coordinates
+
+    Returns:
+
+    """
     rows = rows + [tablecoords[1], tablecoords[3]]
     colls = colls + [tablecoords[0], tablecoords[2]]
     rows = list(set(rows))
@@ -597,7 +610,6 @@ def reconstruct_bboxes(rows: list, colls: list, tablecoords: list) -> torch.Tens
         for j in range(len(colls) - 1):
             newbox = [colls[j], rows[i], colls[j + 1], rows[i + 1]]
             boxes.append(newbox)
-    # print(rows, colls)
     return torch.tensor(boxes)
 
 
@@ -607,6 +619,14 @@ def postprocess_kosmos(
     f"/Tabellen/test",
     datasetname: str = "BonnData",
 ):
+    """Postprocess kosmos.
+
+    Args:
+        targetloc: target folder
+        predloc: prediction folder
+        datasetname: name of dataset
+
+    """
     saveloc = f"{Path(__file__).parent.absolute()}/../../results/kosmos25/postprocessed/fullimg/{datasetname}"
     for n, targets in tqdm(enumerate(glob.glob(f"{targetloc}/*"))):
         preds = glob.glob(f"{predloc}/{targets.split('/')[-1]}")[0]
@@ -638,9 +658,21 @@ def postprocess(
     epsprefactorchange=None,
     minsamples: List[int] = None,  # [2, 3],  # [4, 5]
 ):
+    """Inner method for postprocessing, cluster tables and apply GloSAT postprocessing.
+
+    Args:
+        fullimagepredbox: prediction
+        imname: image name
+        saveloc: location to save to
+        includeoutlier: wether to include outliers while clustering tables
+        includeoutliers_cellsearch: wether to include outliers in GloSAT postprocessing
+        saveempty: wether to save empty result files
+        epsprefactorchange: prefactor for DBSCAN parameter eps
+        minsamples: DBSCAN parameter minsamples
+
+    """
     if minsamples is None:
         minsamples = [2, 3]
-    # for epsprefactor in [tuple([3.0,1.5]), tuple([4.0,1.5])]:
     epsprefactor = tuple([3.0, 1.5]) if not epsprefactorchange else epsprefactorchange
     clusteredtables = clustertablesseperately(
         fullimagepredbox,
@@ -648,12 +680,6 @@ def postprocess(
         includeoutlier=includeoutlier,
         minsamples=minsamples,
     )
-    # print(len(clusteredtables))
-    # if tableavail and clusteredtables:
-    #    tablenum = len(glob.glob(f"{targets}/*cell*"))
-    #    fullimagegroundbox = reversetablerelativebboxes_outer(targets)
-    #    if tablenum != len(clusteredtables):
-    #        print("imname: ", imname, epsprefactor, tablenum, len(clusteredtables))
     boxes = []
     saveloc = f"{saveloc}/eps_{epsprefactor[0]}_{epsprefactor[1]}/minsamples_{minsamples[0]}_{minsamples[1]}"
     if not includeoutlier:
@@ -662,14 +688,11 @@ def postprocess(
         saveloc = f"{saveloc}/withoutlier"
     saveloc = f"{f'{saveloc}_includeoutliers_glosat' if includeoutliers_cellsearch else f'{saveloc}_excludeoutliers_glosat'}"
     saveloc = f"{saveloc}/{imname}"
-    print(saveloc)
-    # img = read_image(glob.glob(f"{targets}/*jpg")[0])
     for i, t in enumerate(clusteredtables):
         tablecoord = getsurroundingtable(t).tolist()
         rows, colls = reconstruct_table(
             t.tolist(), tablecoord, eps=4, include_outliers=includeoutliers_cellsearch
         )
-        # print(imname, rows, colls)
         tbboxes = reconstruct_bboxes(rows, colls, tablecoord)
         boxes.append(tbboxes)
         # img = read_image(glob.glob(f"{targets}/*jpg")[0])
@@ -678,33 +701,17 @@ def postprocess(
         # res = Image.fromarray(res.permute(1, 2, 0).numpy())
         #                # print(f"{savepath}/{identifier}.jpg")
         # res.save(f"{Path(__file__).parent.absolute()}/../../images/test/test_complete_{imname}_{i}.jpg")
-    # print(boxes)
-    # print(len(boxes))
     if len(boxes) > 0:
-        # print(saveloc)
         bboxes = torch.vstack(boxes)
-        # print(saveloc)
         os.makedirs(saveloc, exist_ok=True)
         torch.save(bboxes, f"{saveloc}/{imname}.pt")
         return bboxes
-        # print(f"{saveloc}/{imname}.pt")
     else:
-        # print(imname)
-        # print(clusteredtables)
-        # print(boxes)
-        # print(fullimagepredbox)
         print(f"no valid predictions for image {imname}")
         if saveempty:
             os.makedirs(saveloc, exist_ok=True)
             torch.save(torch.empty((0, 4)), f"{saveloc}/{imname}.pt")
         return torch.empty((0, 4))
-    # print(boxes)
-    # colors = ["green" for i in range(boxes.shape[0])]
-    # res = draw_bounding_boxes(image=img, boxes=boxes, colors=colors)
-    # res = Image.fromarray(res.permute(1, 2, 0).numpy())
-    #                # print(f"{savepath}/{identifier}.jpg")
-    # res.save(f"{Path(__file__).parent.absolute()}/../../images/test/test_complete_{imname}.jpg")
-
     #            if t.shape[0]>1:
     #                img = read_image(glob.glob(f"{targets}/*jpg")[0])
     #                colors = ["green" for i in range(t.shape[0])]
@@ -720,6 +727,16 @@ def postprocess(
 def postprocess_rcnn(
     modelpath=None, targetloc=None, datasetname=None, filter: bool = False, valid=True
 ):
+    """Postprocess rcnn.
+
+    Args:
+        modelpath: path to model
+        targetloc: ground truth location
+        datasetname: name of dataset
+        filter: wether to filer rcnn output
+        valid: wether to use valid filter threshold
+
+    """
     saveloc = f"{Path(__file__).parent.absolute()}/../../results/fasterrcnn/postprocessed/fullimg/{datasetname}"
     model = fasterrcnn_resnet50_fpn(
         weights=FasterRCNN_ResNet50_FPN_Weights.DEFAULT,
@@ -743,13 +760,11 @@ def postprocess_rcnn(
             filtering = float(f.read())
         saveloc = f"{saveloc}_filtering_{filtering}{'_valid' if valid else ''}"
     for n, folder in tqdm(enumerate(glob.glob(f"{targetloc}/*"))):
-        # print(folder)
         impath = f"{folder}/{folder.split('/')[-1]}.jpg"
         imname = folder.split("/")[-1]
         img = (read_image(impath) / 255).to(device)
         output = model([img])
         output = {k: v.detach().cpu() for k, v in output[0].items()}
-        # print(output['boxes'], output['boxes'][output['scores']>0.8])
         if filter:
             output["boxes"] = output["boxes"][output["scores"] > filtering]
         fullimagepredbox = remove_invalid_bbox(output["boxes"])
@@ -763,11 +778,22 @@ def postprocess_tabletransformer(
     filter: bool = False,
     valid=True,
 ):
+    """Postprocess tabletransformer.
+
+    Args:
+        modelname: model name
+        targetloc: ground truth folder
+        datasetname: name of dataset
+        filter: wether to filter results
+        valid: wether to use valid filter threshold
+
+    Returns:
+
+    """
     saveloc = f"{Path(__file__).parent.absolute()}/../../results/tabletransformer/postprocessed/fullimg/{datasetname}"
     model = AutoModelForObjectDetection.from_pretrained(
         "microsoft/table-transformer-structure-recognition"
     )
-    # model.load_state_dict(torch.load(f"{Path(__file__).parent.absolute()}/../../checkpoints/tabletransformer/{modelname}"))
     modelpath = f"{Path(__file__).parent.absolute()}/../../checkpoints/tabletransformer/{modelname}"
     if "aachen" in modelname:
         model.load_state_dict(torch.load(modelpath, map_location="cuda:0"))
@@ -831,13 +857,29 @@ def postprocess_eval(
     modelpath: str = None,
     tablerelative=True,
     iou_thresholds: List[float] = None,  # [0.5, 0.6, 0.7, 0.8, 0.9]
-    tableareaonly=False,
+    # tableareaonly=False,
     includeoutliers_cellsearch=False,
     filter: bool = False,
     valid: bool = True,
     epsprefactor=tuple([3.0, 1.5]),
     minsamples: List[int] = None,  # [2, 3],  # [4, 5]
 ):
+    """Evaluate postprocessing results.
+
+    Args:
+        datasetname: datasetname
+        modeltype: type of model
+        targetloc: ground truth folder
+        modelpath: modelpath (for fasterrcnn and tabletransformer)
+        tablerelative: wether ground truth is table relative
+        iou_thresholds: iou thresholds
+        includeoutliers_cellsearch: wether to include outliers in GloSAT postprocessing
+        filter: wether to filter results
+        valid: wether to use valid filter threshold
+        epsprefactor: prefactor for DBSCAN parameter eps
+        minsamples: DBSCAN parameter minsamples
+
+    """
     if iou_thresholds is None:
         iou_thresholds = [0.5, 0.6, 0.7, 0.8, 0.9]
     if minsamples is None:
@@ -864,8 +906,6 @@ def postprocess_eval(
         saveloc = f"{saveloc}_filtering_optimal_{filtering}"
     predloc = f"{predloc}/eps_{epsprefactor[0]}_{epsprefactor[1]}/minsamples_{minsamples[0]}_{minsamples[1]}/withoutoutlier"
     predloc = f"{f'{predloc}' if includeoutliers_cellsearch else f'{predloc}_excludeoutliers_glosat'}"
-    print(saveloc)
-    print(predloc)
     # saveloc = f"{Path(__file__).parent.absolute()}/../../results/{modeltype}/testevalfinal1/fullimg/{datasetname}/{modelname}/iou_{'_'.join([str(iou_thresholds[0]), str(iou_thresholds[-1])])}/postprocessed"
     ### initializing variables ###
     fullioulist = []
@@ -920,11 +960,9 @@ def postprocess_eval(
             imname=imname,
             iou_thresholds=iou_thresholds,
         )
-        # print(IoDT_tp, IoDT_fp, IoDT_fn)
         iodt_prec, iodt_rec, iodt_f1, iodt_wf1 = calcmetric(
             iodt_tp, iodt_fp, iodt_fn, iou_thresholds=iou_thresholds
         )
-        # print(IoDT_prec, IoDT_rec, IoDT_f1, IoDT_wf1)
         tpsum_iodt += iodt_tp
         fpsum_iodt += iodt_fp
         fnsum_iodt += iodt_fn
@@ -1079,12 +1117,9 @@ def postprocess_eval(
             fnsum_iodt_predonly += iodt_fn
             predcount += 1
 
-            # print("here",fullimagepredbox)
-        # print(fullfp, fullimagemetrics)
         fullimagedf = pandas.concat(
             [fullimagedf, pandas.DataFrame(fullimagemetrics, index=[n])]
         )
-        # print(fullimagedf.loc[n])
 
     totalfullmetrics = get_dataframe(
         fnsum=fullfnsum,
@@ -1100,13 +1135,9 @@ def postprocess_eval(
         tpsum=fulltpsum_predonly,
         iou_thresholds=iou_thresholds,
     )
-    # print(totalfullmetrics)
     overlapprec, overlaprec, overlapf1 = calcmetric_overlap(
         tp=tpsum_overlap, fp=fpsum_overlap, fn=fnsum_overlap
     )
-    # totaloverlapdf = pandas.DataFrame(
-    #    {"f1": overlapf1, "prec": overlaprec, "recall": overlaprec}, index=["overlap"]
-    # )
     overlapprec_predonly, overlaprec_predonly, overlapf1_predonly = calcmetric_overlap(
         tp=tpsum_overlap_predonly, fp=fpsum_overlap_predonly, fn=fnsum_overlap_predonly
     )
@@ -1153,12 +1184,10 @@ def postprocess_eval(
             pandas.DataFrame(predonlyiodt, index=[" full image IoDt with valid preds"]),
         ]
     )
-
-    # print(conclusiondf)
     # save results
     os.makedirs(saveloc, exist_ok=True)
-    print(conclusiondf)
-    print(saveloc)
+    # print(conclusiondf)
+    # print(saveloc)
     overlapdf.to_csv(f"{saveloc}/fullimageoverlapeval.csv")
     fullimagedf.to_csv(f"{saveloc}/fullimageiou.csv")
     iodtdf.to_csv(f"{saveloc}/fullimageiodt.csv")

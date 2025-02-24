@@ -1,5 +1,5 @@
 """Evaluation for Kosmos 2.5."""
-
+import argparse
 import glob
 import json
 import os
@@ -16,9 +16,8 @@ from src.historicdocumentprocessing.util.tablesutil import reversetablerelativeb
 
 
 def calcmetrics_tables(
-    targetloc: str = f"{Path(__file__).parent.absolute()}/../../data/BonnData/test",
-    predloc: str = f"{Path(__file__).parent.absolute()}/../../results/kosmos25/BonnData"
-    f"/Tabellen/test",
+    targetloc: str,  # f"{Path(__file__).parent.absolute()}/../../data/BonnData/test"
+    predloc: str,  # f"{Path(__file__).parent.absolute()}/../../results/kosmos25/BonnData/Tabellen/test"
     iou_thresholds: List[float] = None,
     saveloc: str = None,
     tablerelative: bool = True,
@@ -89,14 +88,9 @@ def calcmetrics_tables(
     tabledf = pandas.DataFrame(
         columns=["img", "mean pred iou", "mean tar iou", "wf1", "prednum"]
     )
-    # for n, preds in tqdm(enumerate(predfolder)):
-    #    targets = glob.glob(f"{targetloc}/{preds.split('/')[-1]}")
     for n, targets in tqdm(enumerate(glob.glob(f"{targetloc}/*"))):
         preds = glob.glob(f"{predloc}/{targets.split('/')[-1]}")[0]
-        # imagepred = [file for file in glob.glob(f"{preds}/*.json") if "_table_" not in file][0]
         # bboxes on full image
-        # fullimagepred = glob.glob(f"{preds}/(?!.*_table_)^.*$")[0]
-        # print(preds, targets)
         fullimagepred = [
             file for file in glob.glob(f"{preds}/*") if "_table_" not in file
         ][0]
@@ -105,7 +99,6 @@ def calcmetrics_tables(
             fullimagepredbox = extractboxes(
                 json.load(p), fpath=targets if tableareaonly else None
             )
-            # print(targets[0])
 
         if tablerelative:
             fullimagegroundbox = reversetablerelativebboxes_outer(targets)
@@ -285,27 +278,18 @@ def calcmetrics_tables(
             fpsum_iodt_predonly += iodt_fp
             fnsum_iodt_predonly += iodt_fn
             predcount += 1
-
-            # print("here",fullimagepredbox)
-        # print(fullfp, fullimagemetrics)
         fullimagedf = pandas.concat(
             [fullimagedf, pandas.DataFrame(fullimagemetrics, index=[n])]
         )
-        # print(fullimagedf.loc[n])
-
         # ...........................
         # bboxes on tables
         # ...........................
         tablesground = glob.glob(f"{targets}/*_cell_*.pt")
-        # print(tablesground)
-        # print(f"{targets[0]}/*_cell_*.pt")
         for tableground in tablesground:
             num = tableground.split(".")[-2].split("_")[-1]
-            # print(num, glob.glob(f"{preds}/*_table_{num}*.json"), f"{preds}/*_table_{num}*.json")
             if glob.glob(f"{preds}/*_table_{num}*.json"):
                 tablepred = glob.glob(f"{preds}/*_table_{num}*.json")[0]
                 tablebox = extractboxes(json.load(open(tablepred)))
-                # print(tablebox)
                 prediou, targetiou, tp, fp, fn = calcstats_iou(
                     tablebox,
                     torch.load(tableground),
@@ -315,7 +299,6 @@ def calcmetrics_tables(
                 prec, rec, f1, wf1 = calcmetric(
                     tp=tp, fp=fp, fn=fn, iou_thresholds=iou_thresholds
                 )
-                # print(wf1)
                 tpsum += tp
                 fpsum += fp
                 fnsum += fn
@@ -368,11 +351,6 @@ def calcmetrics_tables(
                 tabledf = pandas.concat(
                     [tabledf, pandas.DataFrame(tablemetrics, index=[f"{n}.{num}"])]
                 )
-                # print(tablebox.shape, tablemetrics)
-                # print(tablemetrics)
-    # print(fullimagedf)
-    # print(tabledf)
-    # totalprec, totalrec, totalf1, totalwf1 = calcmetric(tpsum, fpsum, fnsum)
     totalfullmetrics = get_dataframe(
         fnsum=fullfnsum,
         fpsum=fullfpsum,
@@ -390,7 +368,6 @@ def calcmetrics_tables(
     totalmetrics = get_dataframe(
         fnsum=fnsum, fpsum=fpsum, tpsum=tpsum, iou_thresholds=iou_thresholds
     )
-    # print(totalfullmetrics)
     overlapprec, overlaprec, overlapf1 = calcmetric_overlap(
         tp=tpsum_overlap, fp=fpsum_overlap, fn=fnsum_overlap
     )
@@ -402,8 +379,8 @@ def calcmetrics_tables(
     )
     predonlyoverlapdf = pandas.DataFrame(
         {
-            f"Number of evaluated files": overlapdf.shape[0],
-            f"Evaluated files without predictions:": overlapdf.shape[0] - predcount,
+            "Number of evaluated files": overlapdf.shape[0],
+            "Evaluated files without predictions:": overlapdf.shape[0] - predcount,
             "f1": overlapf1_predonly,
             "prec": overlapprec_predonly,
             "recall": overlaprec_predonly,
@@ -426,13 +403,6 @@ def calcmetrics_tables(
     )
 
     conclusiondf = pandas.DataFrame(columns=["wf1"])
-    # totalmetrics = {"wf1": totalwf1.item()}
-    # totalmetrics.update({f"f1_{iou_thresholds[i]}": totalf1[i].item() for i in range(len(iou_thresholds))})
-    # totalmetrics.update({f"prec_{iou_thresholds[i]}": totalprec[i].item() for i in range(len(iou_thresholds))})
-    # totalmetrics.update({f"recall_{iou_thresholds[i]}": totalrec[i].item() for i in range(len(iou_thresholds))})
-    # totalmetrics.update({f"tp_{iou_thresholds[i]}": tpsum[i].item() for i in range(len(iou_thresholds))})
-    # totalmetrics.update({f"fp_{iou_thresholds[i]}": fpsum[i].item() for i in range(len(iou_thresholds))})
-    # totalmetrics.update({f"fn_{iou_thresholds[i]}": fnsum[i].item() for i in range(len(iou_thresholds))})
 
     conclusiondf = pandas.concat(
         [
@@ -448,11 +418,8 @@ def calcmetrics_tables(
             pandas.DataFrame(predonlyiodt, index=[" full image IoDt with valid preds"]),
         ]
     )
-
-    # print(conclusiondf)
     # save results
     os.makedirs(saveloc, exist_ok=True)
-    # print(fullimagedf.loc[50])
     overlapdf.to_csv(f"{saveloc}/fullimageoverlapeval.csv")
     fullimagedf.to_csv(f"{saveloc}/fullimageiou.csv")
     tabledf.to_csv(f"{saveloc}/tableiou.csv")
@@ -461,8 +428,32 @@ def calcmetrics_tables(
     return fullioulist, fullf1list, fullwf1list
 
 
-if __name__ == "__main__":
+def get_args() -> argparse.Namespace:
+    """Define args."""
+    parser = argparse.ArgumentParser(description="kosmos_eval")
+    parser.add_argument('-t', '--testfolder', default="test", help="test data folder")
+    parser.add_argument('-p', '--predfolder', default='', help="prediction folder")
+    parser.add_argument('--datasetname', default="BonnData")
+    parser.add_argument('--iou_thresholds', nargs='*', type=float, default=[0.5, 0.6, 0.7, 0.8, 0.9])
 
+    parser.add_argument('--tableareaonly', action='store_true', default=False)
+    parser.add_argument('--no-tableareaonly', dest='tableareaonly', action='store_false')
+
+    parser.add_argument('--tablerelative', action='store_true', default=False)
+    parser.add_argument('--no-tablerelative', dest='tablerelative', action='store_false')
+
+    return parser.parse_args()
+
+
+if __name__ == "__main__":
+    args = get_args()
+    targetpath = f"{Path(__file__).parent.absolute()}/../../data/{args.datasetname}/{args.folder}"
+    predpath = f"{Path(__file__).parent.absolute()}/../../results/kosmos25/{args.datasetname}/{args.predfolder if args.predfolder else ''}"
+    saveloc = f"{Path(__file__).parent.absolute()}/../../results/kosmos25/eval/fullimg/{args.datasetname}"
+
+    calcmetrics_tables(targetloc=targetpath, predloc=predpath, iou_thresholds=args.iou_thresholds, saveloc=saveloc, tablerelative=args.tablerelative, tableareaonly=args.tableareaonly, datasetname=args.datasetname)
+
+    exit()
     calcmetrics_tables(
         targetloc=f"{Path(__file__).parent.absolute()}/../../data/Tablesinthewild/test",
         predloc=f"{Path(__file__).parent.absolute()}/../../results/kosmos25/Tablesinthewild/complete",

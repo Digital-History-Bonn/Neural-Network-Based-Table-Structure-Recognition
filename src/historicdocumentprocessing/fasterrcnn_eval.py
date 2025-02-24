@@ -617,12 +617,16 @@ def get_args() -> argparse.Namespace:
     parser.add_argument('-f', '--folder', default="test", help="test data folder")
     parser.add_argument('-m', '--modelname')
     parser.add_argument('--datasetname', default="BonnData")
+
     parser.add_argument('--tablerelative', action='store_true', default=False)
     parser.add_argument('--no-tablerelative', dest='tablerelative', action='store_false')
+
     parser.add_argument('--tableareaonly', action='store_true', default=False)
     parser.add_argument('--no-tableareaonly', dest='tableareaonly', action='store_false')
+
     parser.add_argument('--filter', action='store_true', default=False)
     parser.add_argument('--no-filter', dest='filter', action='store_false')
+
     parser.add_argument('--valid_filter', action='store_true', default=False)
     parser.add_argument('--no-valid_filter', dest='valid_filter', action='store_false')
 

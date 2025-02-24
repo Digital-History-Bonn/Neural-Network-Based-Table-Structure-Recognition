@@ -1,4 +1,4 @@
-"""Module to train models on table datasets. Code  modified from https://github.com/Digital-History-Bonn/HistorischeTabellenSemanticExtraction/blob/main/src/TableExtraction/trainer.py"""
+"""Module to train models on table datasets. Code  modified from https://github.com/Digital-History-Bonn/HistorischeTabellenSemanticExtraction/blob/main/src/TableExtraction/trainer.py ."""
 
 import argparse
 import os
@@ -50,6 +50,8 @@ class Trainer:
             optimizer: optimizer to use
             name: name of the model in save-files and tensorboard
             cuda: number of used cuda device
+            startepoch: start epoch
+            datasetname: name of dataset (BonnData, Tablesinthewild, GloSAT)
         """
         self.device = (
             torch.device(f"cuda:{cuda}")
