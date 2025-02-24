@@ -1,6 +1,4 @@
-"""Module to train models on table datasets. Code  modified from
-https://github.com/Digital-History-Bonn/HistorischeTabellenSemanticExtraction/blob/main/src/TableExtraction/trainer
-.py"""
+"""Module to train models on table datasets. Code  modified from https://github.com/Digital-History-Bonn/HistorischeTabellenSemanticExtraction/blob/main/src/TableExtraction/trainer.py"""
 
 import argparse
 import os
@@ -11,7 +9,7 @@ from typing import Optional, Union
 
 import numpy as np
 import torch
-from sympy.physics.units import action
+
 from torch.optim import AdamW, Optimizer
 from torch.utils.data import DataLoader
 from torch.utils.tensorboard import SummaryWriter  # type: ignore
@@ -22,7 +20,7 @@ from torchvision.models.detection import (
 )
 from torchvision.utils import draw_bounding_boxes
 from tqdm import tqdm
-from triton.language import dtype
+
 
 from src.historicdocumentprocessing.fasterrcnn_dataset import CustomDataset
 
@@ -43,8 +41,7 @@ class Trainer:
         startepoch: int = 1,
         datasetname: str = "BonnData",
     ) -> None:
-        """
-        Trainer class to train models.
+        """Trainer class to train models.
 
         Args:
             model: model to train
@@ -60,7 +57,7 @@ class Trainer:
             else torch.device("cpu")
         )
         print(f"using {self.device}")
-        print(f"Cuda is available: ", torch.cuda.is_available())
+        print("Cuda is available: ", torch.cuda.is_available())
         if not torch.cuda.is_available():
             torch.zeros(1).cuda()
 
@@ -100,8 +97,7 @@ class Trainer:
         self.train_example_image = (self.train_example_image * 255).to(torch.uint8)
 
     def save(self, name: str = "") -> None:
-        """
-        Save the model in models folder.
+        """Save the model checkpoint in checkpoints folder.
 
         Args:
             name: name of the model
@@ -116,19 +112,17 @@ class Trainer:
         )
 
     def load(self, name: str = "") -> None:
-        """
-        Load the given model.
+        """Load the given model.
 
         Args:
             name: name of the model
         """
         self.model.load_state_dict(
-            torch.load(f"{Path(__file__).parent.absolute()}/../../models/{name}.pt")
+            torch.load(f"{Path(__file__).parent.absolute()}/../../checkpoints/{name}.pt")
         )
 
     def train(self, epoch: int) -> None:
-        """
-        Train model for given number of epochs.
+        """Train model for given number of epochs.
 
         Args:
             epoch: number of epochs
@@ -211,8 +205,7 @@ class Trainer:
         )
 
     def valid(self) -> float:
-        """
-        Validates current model on validation set.
+        """Validates current model on validation set.
 
         Returns:
             current loss
@@ -320,14 +313,14 @@ class Trainer:
 
 
 def get_model(
-    objective: str, load_weights: Optional[str] = None, randominit: bool = False
+    objective: str = "fullimage", load_model: Optional[str] = None, randominit: bool = False
 ) -> FasterRCNN:
-    """
-    Creates a FasterRCNN model for training, using the specified objective parameter.
+    """Creates a FasterRCNN model for training.
 
     Args:
-        objective: objective of the model (should be 'tables', 'cell', 'row' or 'col')
-        load_weights: name of the model to load
+        objective: objective of the model (here: 'fullimage')
+        load_model: name of the model to load
+        randominit: wether to initialize with random model weights
 
     Returns:
         FasterRCNN model
@@ -345,11 +338,11 @@ def get_model(
             weights=FasterRCNN_ResNet50_FPN_Weights.DEFAULT, **params[objective]
         )
 
-    if load_weights:
+    if load_model:
         model.load_state_dict(
             torch.load(
                 f"{Path(__file__).parent.absolute()}/../../checkpoints/fasterrcnn/"
-                f"{load_weights}.pt"
+                f"{load_model}.pt"
             )
         )
 
@@ -358,7 +351,7 @@ def get_model(
 
 def get_args() -> argparse.Namespace:
     """Defines arguments."""
-    parser = argparse.ArgumentParser(description="training")
+    parser = argparse.ArgumentParser(description="fasterrcnn_training")
 
     parser.add_argument(
         "--name",
@@ -434,15 +427,15 @@ if __name__ == "__main__":
         raise ValueError("Please enter a valid model name!")
 
     if args.objective not in ["fullimage"]:
-        raise ValueError("Please enter a valid objective must be 'fullimage'!")
+        raise ValueError("objective must be 'fullimage'!")
 
     if args.dataset not in ["BonnData", "GloSat", "Tablesinthewild", "GloSAT"]:
         raise ValueError(
-            "Please enter a valid dataset must be 'BonnData' or 'GloSAT' or 'Tablesinthewild'!"
+            "Please enter a valid dataset, must be 'BonnData' or 'GloSAT' or 'Tablesinthewild'!"
         )
 
     if args.epochs <= 0:
-        raise ValueError("Please enter a valid number of epochs must be >= 0!")
+        raise ValueError("Please enter a valid number of epochs, must be >= 0!")
 
     print("start training:")
     print(f"\tname: {args.name}")
@@ -461,7 +454,7 @@ if __name__ == "__main__":
     if args.identicalname:
         name = args.name
     model = get_model(
-        args.objective, load_weights=args.load, randominit=args.randominit
+        args.objective, load_model=args.load, randominit=args.randominit
     )
 
     transform = None

@@ -1,3 +1,4 @@
+"""Postprocessing."""
 import glob
 import json
 import os
@@ -41,10 +42,28 @@ def postprocess_rcnn_sep(
     targetloc=None,
     datasetname=None,
     filter: bool = False,
-    iou_thresholds: List[float] = [0.5, 0.6, 0.7, 0.8, 0.9],
+    iou_thresholds: List[float] = None,  # [0.5, 0.6, 0.7, 0.8, 0.9]
     epsprefactor=tuple([3.0, 1.5]),
-    minsamples: List[int] = [2, 3],
+    minsamples: List[int] = None,  # [2, 3]
 ):
+    """Seperately calculate metrics for table coords by DBSCAN clustering image cells into tables and for GloSAT Cell Postprocessing using ground truth tables.
+
+    Args:
+        modelpath: model path
+        targetloc: ground truth file location
+        datasetname: name of dataset
+        filter: wether to filter results
+        iou_thresholds: iou threshold
+        epsprefactor: prefactor for DBSCAN parameter eps
+        minsamples: DBSCAN parameter minsamples
+
+    Returns:
+
+    """
+    if iou_thresholds is None:
+        iou_thresholds = [0.5, 0.6, 0.7, 0.8, 0.9]
+    if minsamples is None:
+        minsamples = [2, 3]
     saveloc = f"{Path(__file__).parent.absolute()}/../../results/fasterrcnn/testevalfinal1/fullimg/{datasetname}"
     tableioulist = []
     tablef1list = []
@@ -251,14 +270,29 @@ def postprocess_rcnn_sep(
 
 
 def postprocess_kosmos_sep(
-    targetloc: str = f"{Path(__file__).parent.absolute()}/../../data/BonnData/test",
-    predloc: str = f"{Path(__file__).parent.absolute()}/../../results/kosmos25/BonnData"
-    f"/Tabellen/test",
+    targetloc: str = None,  # f"{Path(__file__).parent.absolute()}/../../data/BonnData/test"
+    predloc: str = None,  # f"{Path(__file__).parent.absolute()}/../../results/kosmos25/BonnData/Tabellen/test"
     datasetname: str = "BonnData",
-    iou_thresholds: List[float] = [0.5, 0.6, 0.7, 0.8, 0.9],
+    iou_thresholds: List[float] = None,  # [0.5, 0.6, 0.7, 0.8, 0.9]
     epsprefactorchange=tuple([3.0, 1.5]),
-    minsamples: List[int] = [2, 3],  # [4, 5],
+    minsamples: List[int] = None,  # [2, 3]  # [4, 5]
 ):
+    """Seperately calculate metrics for table coords by DBSCAN clustering image cells into tables and for GloSAT Cell Postprocessing using ground truth tables.
+
+    Args:
+        targetloc: ground truth file location
+        datasetname: name of dataset
+        iou_thresholds: iou threshold
+        epsprefactorchange: prefactor for DBSCAN parameter eps
+        minsamples: DBSCAN parameter minsamples
+
+    Returns:
+
+    """
+    if iou_thresholds is None:
+        iou_thresholds = [0.5, 0.6, 0.7, 0.8, 0.9]
+    if minsamples is None:
+        minsamples = [2, 3]
     saveloc = f"{Path(__file__).parent.absolute()}/../../results/kosmos25/testevalfinal1/fullimg/{datasetname}"
     saveloc = f"{saveloc}/iou_{'_'.join([str(iou_thresholds[0]), str(iou_thresholds[-1])])}/postprocessed/eps_{epsprefactorchange[0]}_{epsprefactorchange[1]}/minsamples_{minsamples[0]}_{minsamples[1]}/seperateeval"
     tableioulist = []
@@ -454,10 +488,28 @@ def postprocess_eval_tablesep(
     imname: str,
     includeoutlier: bool = False,
     epsprefactorchange=None,
-    minsamples: List[int] = [2, 3],  # [4, 5],
+    minsamples: List[int] = None,  # [2, 3]  # [4, 5]
     targetloc: str = None,
-    iou_thresholds: List[float] = [0.5, 0.6, 0.7, 0.8, 0.9],
+    iou_thresholds: List[float] = None,  # [0.5, 0.6, 0.7, 0.8, 0.9]
 ):
+    """Evaluation for table coords extracted by DBSCAN clustering image cells into tables.
+
+    Args:
+        fullimagepredbox: cell predictions
+        imname: image name
+        includeoutlier: wether to include outliers while clustering
+        epsprefactorchange:
+        minsamples:
+        targetloc:
+        iou_thresholds:
+
+    Returns:
+
+    """
+    if iou_thresholds is None:
+        iou_thresholds = [0.5, 0.6, 0.7, 0.8, 0.9]
+    if minsamples is None:
+        minsamples = [2, 3]
     epsprefactor = tuple([3.0, 1.5]) if not epsprefactorchange else epsprefactorchange
     clusteredtables = clustertablesseperately(
         fullimagepredbox,
@@ -472,10 +524,6 @@ def postprocess_eval_tablesep(
     tablecoords = torch.tensor(tablecoords)
     tablepath = f"{targetloc}/{imname}/{imname}_tables.pt"
     tablebboxes = torch.load(tablepath)
-    if imname == "I_HA_Rep_89_Nr_16160_0170":
-        impath = f"{Path(__file__).parent.absolute()}/../../data/BonnData/test/I_HA_Rep_89_Nr_16160_0170/I_HA_Rep_89_Nr_16160_0170.jpg"
-        savepath = f"{Path(__file__).parent.absolute()}/../../images/testseperate/table"
-        drawimg_varformat_inner(box=tablecoords, impath=impath, savepath=savepath)
     return calcstats_iou(
         predbox=tablecoords,
         targetbox=tablebboxes,
@@ -488,9 +536,11 @@ def postprocess_eval_cellsep(
     fullimagepredbox: torch.Tensor,
     imname: str,
     targetloc: str = None,
-    iou_thresholds: List[float] = [0.5, 0.6, 0.7, 0.8, 0.9],
+    iou_thresholds: List[float] = None,  # [0.5, 0.6, 0.7, 0.8, 0.9]
     tablerelative: bool = True,
 ):
+    if iou_thresholds is None:
+        iou_thresholds = [0.5, 0.6, 0.7, 0.8, 0.9]
     tablepath = f"{targetloc}/{imname}/{imname}_tables.pt"
     tablebboxes = torch.load(tablepath)
     finalcells = []
@@ -586,8 +636,10 @@ def postprocess(
     includeoutliers_cellsearch: bool = False,
     saveempty: bool = False,
     epsprefactorchange=None,
-    minsamples: List[int] = [2, 3],  # [4, 5]
+    minsamples: List[int] = None,  # [2, 3],  # [4, 5]
 ):
+    if minsamples is None:
+        minsamples = [2, 3]
     # for epsprefactor in [tuple([3.0,1.5]), tuple([4.0,1.5])]:
     epsprefactor = tuple([3.0, 1.5]) if not epsprefactorchange else epsprefactorchange
     clusteredtables = clustertablesseperately(
@@ -778,14 +830,18 @@ def postprocess_eval(
     targetloc: str = None,
     modelpath: str = None,
     tablerelative=True,
-    iou_thresholds: List[float] = [0.5, 0.6, 0.7, 0.8, 0.9],
+    iou_thresholds: List[float] = None,  # [0.5, 0.6, 0.7, 0.8, 0.9]
     tableareaonly=False,
     includeoutliers_cellsearch=False,
     filter: bool = False,
     valid: bool = True,
     epsprefactor=tuple([3.0, 1.5]),
-    minsamples: List[int] = [2, 3],  # [4, 5]
+    minsamples: List[int] = None,  # [2, 3],  # [4, 5]
 ):
+    if iou_thresholds is None:
+        iou_thresholds = [0.5, 0.6, 0.7, 0.8, 0.9]
+    if minsamples is None:
+        minsamples = [2, 3]
     predloc = f"{Path(__file__).parent.absolute()}/../../results/{modeltype}/postprocessed/fullimg/{datasetname}"
     saveloc = f"{Path(__file__).parent.absolute()}/../../results/{modeltype}/testevalfinal1/fullimg/{datasetname}"
     if modelpath:

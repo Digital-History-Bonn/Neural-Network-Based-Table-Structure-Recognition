@@ -25,8 +25,7 @@ def calcmetrics_tables(
     tableareaonly: bool = True,
     datasetname: str = None
 ) -> Tuple[List[torch.Tensor], List[torch.Tensor], List[torch.Tensor]]:
-    """Calculates metrics for all predictions and corresponding targets in a given location (pred Bboxes given as json
-    files, targets as torch.Tensor)
+    """Calculates metrics for all predictions and corresponding targets in a given location (pred Bboxes given as json files, targets as torch.Tensor).
 
     Args:
         targetloc: target location
@@ -36,13 +35,13 @@ def calcmetrics_tables(
         tablerelative: wether to use tablerelative groundtruth BBoxes (since GloSAT and BonnData do not have image relative)
         tableareaonly: wether to calculate results only for BBox-Predicitions in table area or for all predictions
         datasetname: name of the dataset (for save locations)
+
     Returns:
         tuple of lists with iou, f1, wf1 values
     """
     # tableareaonly= False
     if iou_thresholds is None:
         iou_thresholds = [0.5, 0.6, 0.7, 0.8, 0.9]
-    predfolder = glob.glob(f"{predloc}/*")
     if saveloc is None:
         saveloc = f"{Path(__file__).parent.absolute()}/../../results/kosmos25/eval/fullimg/{datasetname}"
     if tableareaonly:
@@ -263,9 +262,9 @@ def calcmetrics_tables(
         overlapmetric = {
             "img": imname,
             "prednum": fullimagepredbox.shape[0],
-            f"prec": fullprec_overlap.item(),
-            f"recall": fullrec_overlap.item(),
-            f"f1": fullf1_overlap.item(),
+            "prec": fullprec_overlap.item(),
+            "recall": fullrec_overlap.item(),
+            "f1": fullf1_overlap.item(),
             "tp": fulltp_overlap,
             "fp": fullfp_overlap,
             "fn": fullfn_overlap,
