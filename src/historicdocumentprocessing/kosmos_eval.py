@@ -448,12 +448,13 @@ def get_args() -> argparse.Namespace:
 if __name__ == "__main__":
     args = get_args()
     targetpath = f"{Path(__file__).parent.absolute()}/../../data/{args.datasetname}/{args.folder}"
-    predpath = f"{Path(__file__).parent.absolute()}/../../results/kosmos25/{args.datasetname}/{args.predfolder if args.predfolder else ''}"
+    predpath = f"{Path(__file__).parent.absolute()}/../../results/kosmos25/{args.datasetname}{f'/{args.predfolder}' if args.predfolder else ''}"
     saveloc = f"{Path(__file__).parent.absolute()}/../../results/kosmos25/eval/fullimg/{args.datasetname}"
 
     calcmetrics_tables(targetloc=targetpath, predloc=predpath, iou_thresholds=args.iou_thresholds, saveloc=saveloc, tablerelative=args.tablerelative, tableareaonly=args.tableareaonly, datasetname=args.datasetname)
 
     exit()
+
     calcmetrics_tables(
         targetloc=f"{Path(__file__).parent.absolute()}/../../data/Tablesinthewild/test",
         predloc=f"{Path(__file__).parent.absolute()}/../../results/kosmos25/Tablesinthewild/complete",

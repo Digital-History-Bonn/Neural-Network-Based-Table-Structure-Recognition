@@ -1,9 +1,10 @@
 """Postprocessing."""
+import argparse
 import glob
 import json
 import os
 from pathlib import Path
-from typing import Literal
+from typing import Literal, Tuple
 
 import pandas
 import torch
@@ -13,12 +14,12 @@ from torchvision.models.detection import (
     FasterRCNN_ResNet50_FPN_Weights,
     fasterrcnn_resnet50_fpn,
 )
-from torchvision.utils import draw_bounding_boxes
+
 from tqdm import tqdm
 from transformers import AutoModelForObjectDetection
 from typing_extensions import List
 
-from src.historicdocumentprocessing.fasterrcnn_eval import tableareabboxes
+
 from src.historicdocumentprocessing.util.metricsutil import calcstats_iodt, calcstats_overlap, calcmetric_overlap, \
     calcstats_iou, calcmetric, get_dataframe
 from src.historicdocumentprocessing.tabletransformer_dataset import CustomDataset
@@ -26,14 +27,10 @@ from src.historicdocumentprocessing.util.glosat_paper_postprocessing_method impo
     reconstruct_table,
 )
 from src.historicdocumentprocessing.util.tablesutil import (
-    clustertables,
     clustertablesseperately,
     getcells,
     getsurroundingtable,
     remove_invalid_bbox, reversetablerelativebboxes_outer, boxoverlap, extractboxes,
-)
-from src.historicdocumentprocessing.util.visualisationutil import (
-    drawimg_varformat_inner,
 )
 
 
@@ -56,8 +53,6 @@ def postprocess_rcnn_sep(
         iou_thresholds: iou threshold
         epsprefactor: prefactor for DBSCAN parameter eps
         minsamples: DBSCAN parameter minsamples
-
-    Returns:
 
     """
     if iou_thresholds is None:
@@ -281,12 +276,11 @@ def postprocess_kosmos_sep(
 
     Args:
         targetloc: ground truth file location
+        predloc: location of predictions
         datasetname: name of dataset
         iou_thresholds: iou threshold
         epsprefactorchange: prefactor for DBSCAN parameter eps
         minsamples: DBSCAN parameter minsamples
-
-    Returns:
 
     """
     if iou_thresholds is None:
@@ -491,7 +485,7 @@ def postprocess_eval_tablesep(
     minsamples: List[int] = None,  # [2, 3]  # [4, 5]
     targetloc: str = None,
     iou_thresholds: List[float] = None,  # [0.5, 0.6, 0.7, 0.8, 0.9]
-):
+) -> Tuple[torch.Tensor, torch.Tensor, torch.Tensor, torch.Tensor, torch.Tensor]:
     """Evaluation for table coords extracted by DBSCAN clustering image cells into tables.
 
     Args:
@@ -504,7 +498,7 @@ def postprocess_eval_tablesep(
         targetloc: ground truth file location
 
     Returns:
-
+        iou stats
     """
     if iou_thresholds is None:
         iou_thresholds = [0.5, 0.6, 0.7, 0.8, 0.9]
@@ -518,7 +512,7 @@ def postprocess_eval_tablesep(
         minsamples=minsamples,
     )
     tablecoords = []
-    for i, t in enumerate(clusteredtables):
+    for _i, t in enumerate(clusteredtables):
         tablecoord = getsurroundingtable(t).tolist()
         tablecoords.append(tablecoord)
     tablecoords = torch.tensor(tablecoords)
@@ -538,7 +532,7 @@ def postprocess_eval_cellsep(
     targetloc: str = None,
     iou_thresholds: List[float] = None,  # [0.5, 0.6, 0.7, 0.8, 0.9]
     tablerelative: bool = True,
-):
+) -> Tuple[torch.Tensor, torch.Tensor, torch.Tensor, torch.Tensor, torch.Tensor]:
     """Evaluate GloSAT Cell Postprocessing using ground truth tables.
 
     Args:
@@ -549,7 +543,7 @@ def postprocess_eval_cellsep(
         tablerelative: wether groundtruth coordinates are table relative
 
     Returns:
-
+        iou stats
     """
     if iou_thresholds is None:
         iou_thresholds = [0.5, 0.6, 0.7, 0.8, 0.9]
@@ -596,6 +590,7 @@ def reconstruct_bboxes(rows: list, colls: list, tablecoords: list) -> torch.Tens
         tablecoords: table coordinates
 
     Returns:
+        reconstructed BBoxes
 
     """
     rows = rows + [tablecoords[1], tablecoords[3]]
@@ -614,10 +609,9 @@ def reconstruct_bboxes(rows: list, colls: list, tablecoords: list) -> torch.Tens
 
 
 def postprocess_kosmos(
-    targetloc: str = f"{Path(__file__).parent.absolute()}/../../data/BonnData/test",
-    predloc: str = f"{Path(__file__).parent.absolute()}/../../results/kosmos25/BonnData"
-    f"/Tabellen/test",
-    datasetname: str = "BonnData",
+    targetloc: str,  # = f"{Path(__file__).parent.absolute()}/../../data/BonnData/test"
+    predloc: str,  # = f"{Path(__file__).parent.absolute()}/../../results/kosmos25/BonnData/Tabellen/test"
+    datasetname: str,  # = "BonnData"
 ):
     """Postprocess kosmos.
 
@@ -628,23 +622,17 @@ def postprocess_kosmos(
 
     """
     saveloc = f"{Path(__file__).parent.absolute()}/../../results/kosmos25/postprocessed/fullimg/{datasetname}"
-    for n, targets in tqdm(enumerate(glob.glob(f"{targetloc}/*"))):
+    for _n, targets in tqdm(enumerate(glob.glob(f"{targetloc}/*"))):
         preds = glob.glob(f"{predloc}/{targets.split('/')[-1]}")[0]
-        # imagepred = [file for file in glob.glob(f"{preds}/*.json") if "_table_" not in file][0]
         # bboxes on full image
-        # fullimagepred = glob.glob(f"{preds}/(?!.*_table_)^.*$")[0]
-        # print(preds, targets)
         fullimagepred = [
             file for file in glob.glob(f"{preds}/*") if "_table_" not in file
         ][0]
-        # print(fullimagepred)
         imname = preds.split("/")[-1]
         with open(fullimagepred) as p:
             fullimagepredbox = remove_invalid_bbox(
                 extractboxes(json.load(p), fpath=None)
             )
-            # print(targets[0])
-            # print("here")
             postprocess(fullimagepredbox, imname, saveloc)
 
 
@@ -657,7 +645,7 @@ def postprocess(
     saveempty: bool = False,
     epsprefactorchange=None,
     minsamples: List[int] = None,  # [2, 3],  # [4, 5]
-):
+) -> torch.Tensor:
     """Inner method for postprocessing, cluster tables and apply GloSAT postprocessing.
 
     Args:
@@ -669,6 +657,9 @@ def postprocess(
         saveempty: wether to save empty result files
         epsprefactorchange: prefactor for DBSCAN parameter eps
         minsamples: DBSCAN parameter minsamples
+
+    Returns:
+        extracted BBoxes
 
     """
     if minsamples is None:
@@ -688,19 +679,13 @@ def postprocess(
         saveloc = f"{saveloc}/withoutlier"
     saveloc = f"{f'{saveloc}_includeoutliers_glosat' if includeoutliers_cellsearch else f'{saveloc}_excludeoutliers_glosat'}"
     saveloc = f"{saveloc}/{imname}"
-    for i, t in enumerate(clusteredtables):
+    for _i, t in enumerate(clusteredtables):
         tablecoord = getsurroundingtable(t).tolist()
         rows, colls = reconstruct_table(
             t.tolist(), tablecoord, eps=4, include_outliers=includeoutliers_cellsearch
         )
         tbboxes = reconstruct_bboxes(rows, colls, tablecoord)
         boxes.append(tbboxes)
-        # img = read_image(glob.glob(f"{targets}/*jpg")[0])
-        # colors = ["green" for i in range(t.shape[0])]
-        # res = draw_bounding_boxes(image=img, boxes=t, colors=colors)
-        # res = Image.fromarray(res.permute(1, 2, 0).numpy())
-        #                # print(f"{savepath}/{identifier}.jpg")
-        # res.save(f"{Path(__file__).parent.absolute()}/../../images/test/test_complete_{imname}_{i}.jpg")
     if len(boxes) > 0:
         bboxes = torch.vstack(boxes)
         os.makedirs(saveloc, exist_ok=True)
@@ -712,25 +697,15 @@ def postprocess(
             os.makedirs(saveloc, exist_ok=True)
             torch.save(torch.empty((0, 4)), f"{saveloc}/{imname}.pt")
         return torch.empty((0, 4))
-    #            if t.shape[0]>1:
-    #                img = read_image(glob.glob(f"{targets}/*jpg")[0])
-    #                colors = ["green" for i in range(t.shape[0])]
-    #                res = draw_bounding_boxes(image=img, boxes=t, colors=colors)
-    #                res = Image.fromarray(res.permute(1, 2, 0).numpy())
-    #                # print(f"{savepath}/{identifier}.jpg")
-    #                res.save(f"{Path(__file__).parent.absolute()}/../../images/test/test_kosmos1_{imname}_{i}.jpg")
-    # else:
-    #    fullimagegroundbox = torch.load(
-    #        glob.glob(f"{targetloc}/{preds.split('/')[-1]}/{preds.split('/')[-1]}.pt")[0])
 
 
 def postprocess_rcnn(
-    modelpath=None, targetloc=None, datasetname=None, filter: bool = False, valid=True
+    modelname=None, targetloc=None, datasetname=None, filter: bool = False, valid=True
 ):
     """Postprocess rcnn.
 
     Args:
-        modelpath: path to model
+        modelname: modelname
         targetloc: ground truth location
         datasetname: name of dataset
         filter: wether to filer rcnn output
@@ -738,6 +713,7 @@ def postprocess_rcnn(
 
     """
     saveloc = f"{Path(__file__).parent.absolute()}/../../results/fasterrcnn/postprocessed/fullimg/{datasetname}"
+    modelpath = f"{Path(__file__).parent.absolute()}/../../checkpoints/fasterrcnn/{modelname}"
     model = fasterrcnn_resnet50_fpn(
         weights=FasterRCNN_ResNet50_FPN_Weights.DEFAULT,
         **{"box_detections_per_img": 200},
@@ -759,7 +735,7 @@ def postprocess_rcnn(
         ) as f:
             filtering = float(f.read())
         saveloc = f"{saveloc}_filtering_{filtering}{'_valid' if valid else ''}"
-    for n, folder in tqdm(enumerate(glob.glob(f"{targetloc}/*"))):
+    for _n, folder in tqdm(enumerate(glob.glob(f"{targetloc}/*"))):
         impath = f"{folder}/{folder.split('/')[-1]}.jpg"
         imname = folder.split("/")[-1]
         img = (read_image(impath) / 255).to(device)
@@ -786,8 +762,6 @@ def postprocess_tabletransformer(
         datasetname: name of dataset
         filter: wether to filter results
         valid: wether to use valid filter threshold
-
-    Returns:
 
     """
     saveloc = f"{Path(__file__).parent.absolute()}/../../results/tabletransformer/postprocessed/fullimg/{datasetname}"
@@ -854,7 +828,7 @@ def postprocess_eval(
     datasetname: str,
     modeltype: Literal["kosmos25", "fasterrcnn", "tabletransformer"] = "kosmos25",
     targetloc: str = None,
-    modelpath: str = None,
+    modelname: str = None,
     tablerelative=True,
     iou_thresholds: List[float] = None,  # [0.5, 0.6, 0.7, 0.8, 0.9]
     # tableareaonly=False,
@@ -870,7 +844,7 @@ def postprocess_eval(
         datasetname: datasetname
         modeltype: type of model
         targetloc: ground truth folder
-        modelpath: modelpath (for fasterrcnn and tabletransformer)
+        modelname: modelname (for fasterrcnn and tabletransformer)
         tablerelative: wether ground truth is table relative
         iou_thresholds: iou thresholds
         includeoutliers_cellsearch: wether to include outliers in GloSAT postprocessing
@@ -886,8 +860,7 @@ def postprocess_eval(
         minsamples = [2, 3]
     predloc = f"{Path(__file__).parent.absolute()}/../../results/{modeltype}/postprocessed/fullimg/{datasetname}"
     saveloc = f"{Path(__file__).parent.absolute()}/../../results/{modeltype}/testevalfinal1/fullimg/{datasetname}"
-    if modelpath:
-        modelname = modelpath.split(os.sep)[-1]
+    if modelname:
         predloc = f"{predloc}/{modelname}"
         if filter:
             with open(
@@ -902,12 +875,12 @@ def postprocess_eval(
     else:
         saveloc = f"{saveloc}/iou_{'_'.join([str(iou_thresholds[0]), str(iou_thresholds[-1])])}/postprocessed/eps_{epsprefactor[0]}_{epsprefactor[1]}/minsamples_{minsamples[0]}_{minsamples[1]}/withoutoutlier"
     saveloc = f"{f'{saveloc}/includeoutliers_glosat' if includeoutliers_cellsearch else f'{saveloc}/excludeoutliers_glosat'}"
-    if filter and modelpath:
+    if filter and modelname:
         saveloc = f"{saveloc}_filtering_optimal_{filtering}"
     predloc = f"{predloc}/eps_{epsprefactor[0]}_{epsprefactor[1]}/minsamples_{minsamples[0]}_{minsamples[1]}/withoutoutlier"
     predloc = f"{f'{predloc}' if includeoutliers_cellsearch else f'{predloc}_excludeoutliers_glosat'}"
     # saveloc = f"{Path(__file__).parent.absolute()}/../../results/{modeltype}/testevalfinal1/fullimg/{datasetname}/{modelname}/iou_{'_'.join([str(iou_thresholds[0]), str(iou_thresholds[-1])])}/postprocessed"
-    ### initializing variables ###
+    # ## initializing variables ## #
     fullioulist = []
     fullf1list = []
     fullwf1list = []
@@ -937,7 +910,7 @@ def postprocess_eval(
     iodtdf = pandas.DataFrame(
         columns=["img", "mean pred iod", "mean tar iod", "wf1", "prednum"]
     )
-    ### initializing variables ###
+    # ## initializing variables ## #
     for n, pred in tqdm(enumerate(glob.glob(f"{predloc}/*"))):
         folder = f"{targetloc}/{pred.split('/')[-1]}"
         imname = folder.split("/")[-1]
@@ -1093,9 +1066,9 @@ def postprocess_eval(
         overlapmetric = {
             "img": imname,
             "prednum": fullimagepredbox.shape[0],
-            f"prec": fullprec_overlap.item(),
-            f"recall": fullrec_overlap.item(),
-            f"f1": fullf1_overlap.item(),
+            "prec": fullprec_overlap.item(),
+            "recall": fullrec_overlap.item(),
+            "f1": fullf1_overlap.item(),
             "tp": fulltp_overlap,
             "fp": fullfp_overlap,
             "fn": fullfn_overlap,
@@ -1143,8 +1116,8 @@ def postprocess_eval(
     )
     predonlyoverlapdf = pandas.DataFrame(
         {
-            f"Number of evaluated files": overlapdf.shape[0],
-            f"Evaluated files without predictions:": overlapdf.shape[0] - predcount,
+            "Number of evaluated files": overlapdf.shape[0],
+            "Evaluated files without predictions:": overlapdf.shape[0] - predcount,
             "f1": overlapf1_predonly,
             "prec": overlapprec_predonly,
             "recall": overlaprec_predonly,
@@ -1194,7 +1167,47 @@ def postprocess_eval(
     conclusiondf.to_csv(f"{saveloc}/overview.csv")
 
 
+def get_args() -> argparse.Namespace:
+    """Define args."""
+    parser = argparse.ArgumentParser(description="postprocess")
+    parser.add_argument('-f', '--folder', default="test", help="test data folder")
+    parser.add_argument('-p', '--predfolder', default='', help="prediction folder (kosmos25)")
+    parser.add_argument('-m', '--modeltype', choices=['fasterrcnn', 'kosmos25', 'tabletransformer'], default='kosmos25')
+    parser.add_argument('--modelname')
+    parser.add_argument('--datasetname', default="BonnData")
+
+    parser.add_argument('--tablerelative', action='store_true', default=False)
+    parser.add_argument('--no-tablerelative', dest='tablerelative', action='store_false')
+
+    parser.add_argument('--filter', action='store_true', default=False)
+    parser.add_argument('--no-filter', dest='filter', action='store_false')
+
+    parser.add_argument('--valid_filter', action='store_true', default=False)
+    parser.add_argument('--no-valid_filter', dest='valid_filter', action='store_false')
+
+    parser.add_argument('--eval', action='store_true', default=False)
+    parser.add_argument('--no-eval', dest='eval', action='store_false')
+
+    parser.add_argument('--iou_thresholds', nargs='*', type=float, default=[0.5, 0.6, 0.7, 0.8, 0.9])
+
+    return parser.parse_args()
+
+
 if __name__ == "__main__":
+    args = get_args()
+    dpath = f"{Path(__file__).parent.absolute()}/../../data/{args.datasetname}/{args.folder}"
+    if not args.eval:
+        if args.modeltype == 'fasterrcnn':
+            postprocess_rcnn(modelname=args.modelname, targetloc=dpath, datasetname=args.datasetname, filter=args.filter, valid=args.valid_filter)
+        elif args.modeltype == 'tabletransformer':
+            postprocess_tabletransformer(modelname=args.modelname, targetloc=dpath, datasetname=args.datasetname, filter=args.filter, valid=args.valid_filter)
+        elif args.modeltype == 'kosmos25':
+            predpath = f"{Path(__file__).parent.absolute()}/../../results/kosmos25/{args.datasetname}{f'/{args.predfolder}' if args.predfolder else ''}"
+            postprocess_kosmos(targetloc=dpath, predloc=predpath, datasetname=args.datasetname)
+    else:
+        postprocess_eval(datasetname=args.datasetname, modeltype=args.modeltype, modelname=args.modelname if args.modeltype in ['fasterrcnn', 'tabletransformer'] else None, tablerelative=args.tablerelative, iou_thresholds=args.iou_thresholds,
+                         filter=args.filter, valid=args.valid_filter)
+    exit()
     # postprocess_tabletransformer(modelname="tabletransformer_v0_new_BonnDataFullImage_tabletransformer_estest_BonnData_fullimage_e250_valid_es.pt", targetloc= f"{Path(__file__).parent.absolute()}/../../data/BonnData/test",
     #                             datasetname="BonnData")
     # postprocess_eval(modelpath=f"{Path(__file__).parent.absolute()}/../../checkpoints/tabletransformer/tabletransformer_v0_new_BonnDataFullImage_tabletransformer_estest_BonnData_fullimage_e250_valid_es.pt", targetloc= f"{Path(__file__).parent.absolute()}/../../data/BonnData/test",
@@ -1231,7 +1244,6 @@ if __name__ == "__main__":
             #    modelpath=f"{Path(__file__).parent.absolute()}/../../checkpoints/tabletransformer/titw_severalcalls_2_e250_es.pt",
             #    targetloc=cat,
             #    datasetname=f"Tablesinthewild/{cat.split('/')[-1]}", modeltype="tabletransformer")
-
     """
     postprocess_kosmos_sep(targetloc = f"{Path(__file__).parent.absolute()}/../../data/BonnData/test",
     predloc = f"{Path(__file__).parent.absolute()}/../../results/kosmos25/BonnData"
@@ -1283,8 +1295,6 @@ if __name__ == "__main__":
                          modelpath=f"{Path(__file__).parent.absolute()}/../../checkpoints/fasterrcnn/testseveralcalls_4_with_valid_split_Tablesinthewild_fullimage_e50_es.pt")
         postprocess_rcnn_sep(targetloc=cat, datasetname=f"Tablesinthewild/{cat.split('/')[-1]}",
                          modelpath=f"{Path(__file__).parent.absolute()}/../../checkpoints/fasterrcnn/testseveralcalls_5_without_valid_split_Tablesinthewild_fullimage_e50_end.pt")
-
-
     postprocess_kosmos(targetloc=f"{Path(__file__).parent.absolute()}/../../data/Tablesinthewild/preprocessed/simple",
                        predloc=f"{Path(__file__).parent.absolute()}/../../results/kosmos25/Tablesinthewild/simple",
                        datasetname="Tablesinthewild/simple")
@@ -1308,16 +1318,13 @@ if __name__ == "__main__":
         targetloc=f"{Path(__file__).parent.absolute()}/../../data/Tablesinthewild/preprocessed/muticolorandgrid",
         predloc=f"{Path(__file__).parent.absolute()}/../../results/kosmos25/Tablesinthewild/muticolorandgrid1",
         datasetname="Tablesinthewild/muticolorandgrid")
-
     postprocess_kosmos()
-
     postprocess_kosmos(targetloc=f"{Path(__file__).parent.absolute()}/../../data/GloSat/test",
                        predloc=f"{Path(__file__).parent.absolute()}/../../results/kosmos25/GloSat/test1",
                        datasetname="GloSat")
     # for cat in glob.glob(f"{Path(__file__).parent.absolute()}/../../data/Tablesinthewild/preprocessed/*"):
     #    print(cat)
     #    postprocess_kosmos(targetloc=cat, predloc=f"{Path(__file__).parent.absolute()}/../../results/kosmos25/Tablesinthewild/{cat.split('/')[-1]}", datasetname=f"Tablesinthewild/{cat.split('/')[-1]}")
-
     """
     """
     postprocess_rcnn(
@@ -1339,14 +1346,12 @@ if __name__ == "__main__":
         postprocess_rcnn(targetloc=cat, datasetname=f"Tablesinthewild/{cat.split('/')[-1]}",
                          modelpath=f"{Path(__file__).parent.absolute()}/../../checkpoints/fasterrcnn/testseveralcalls_5_without_valid_split_Tablesinthewild_fullimage_e50_end.pt")
     """
-
     # postprocess_eval(
     #    datasetname="BonnData",
     #    modeltype="kosmos25",
     #    targetloc=f"{Path(__file__).parent.absolute()}/../../data/BonnData/test",
     # )
-
-    """ 
+    """
     postprocess_eval(
         modelpath=f"{Path(__file__).parent.absolute()}/../../checkpoints/fasterrcnn/BonnDataFullImage1_BonnData_fullimage_e250_es.pt",
         targetloc=f"{Path(__file__).parent.absolute()}/../../data/BonnData/test",
@@ -1366,7 +1371,6 @@ if __name__ == "__main__":
         modeltype="fasterrcnn",
     )
     """
-
     # postprocess_eval(
     #    datasetname="GloSat",
     #    modeltype="kosmos25",
@@ -1379,7 +1383,6 @@ if __name__ == "__main__":
         datasetname="GloSat",
         modeltype="fasterrcnn",
     )
-
     """
     """
     postprocess_eval(
@@ -1417,7 +1420,6 @@ if __name__ == "__main__":
         modeltype="kosmos25",
         datasetname="Tablesinthewild/muticolorandgrid",
     )
-
     """
     """
     for cat in glob.glob(
@@ -1436,8 +1438,6 @@ if __name__ == "__main__":
             datasetname=f"Tablesinthewild/{cat.split('/')[-1]}",
             modelpath=f"{Path(__file__).parent.absolute()}/../../checkpoints/fasterrcnn/testseveralcalls_5_without_valid_split_Tablesinthewild_fullimage_e50_end.pt",
         )
-
-
     postprocess_kosmos(targetloc=f"{Path(__file__).parent.absolute()}/../../data/Tablesinthewild/preprocessed/simple",
                        predloc=f"{Path(__file__).parent.absolute()}/../../results/kosmos25/Tablesinthewild/simple",
                        datasetname="Tablesinthewild/simple")
@@ -1461,15 +1461,12 @@ if __name__ == "__main__":
         targetloc=f"{Path(__file__).parent.absolute()}/../../data/Tablesinthewild/preprocessed/muticolorandgrid",
         predloc=f"{Path(__file__).parent.absolute()}/../../results/kosmos25/Tablesinthewild/muticolorandgrid1",
         datasetname="Tablesinthewild/muticolorandgrid")
-    
     postprocess_kosmos()
-
     postprocess_kosmos(targetloc=f"{Path(__file__).parent.absolute()}/../../data/GloSat/test",
                        predloc=f"{Path(__file__).parent.absolute()}/../../results/kosmos25/GloSat/test1", datasetname="GloSat")
     #for cat in glob.glob(f"{Path(__file__).parent.absolute()}/../../data/Tablesinthewild/preprocessed/*"):
     #    print(cat)
     #    postprocess_kosmos(targetloc=cat, predloc=f"{Path(__file__).parent.absolute()}/../../results/kosmos25/Tablesinthewild/{cat.split('/')[-1]}", datasetname=f"Tablesinthewild/{cat.split('/')[-1]}")
-
     """
     """
     postprocess_rcnn(modelpath=f"{Path(__file__).parent.absolute()}/../../checkpoints/fasterrcnn/BonnDataFullImage1_BonnData_fullimage_e250_es.pt", targetloc = f"{Path(__file__).parent.absolute()}/../../data/BonnData/test", datasetname="BonnData")

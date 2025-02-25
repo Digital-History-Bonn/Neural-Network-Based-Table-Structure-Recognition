@@ -40,6 +40,8 @@ class CustomDataset(Dataset):  # type: ignore
         self.objective = objective
         self.transforms = transforms
         self.dataset = path.split(os.sep)[-2]
+        if self.dataset not in ["BonnData", "GloSat", "Tablesinthewild"]:
+            self.dataset = path.split(os.sep)[-3]
 
     def __getitem__(
         self, index: int
