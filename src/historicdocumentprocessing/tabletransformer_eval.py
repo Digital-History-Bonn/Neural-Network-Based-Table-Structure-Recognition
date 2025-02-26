@@ -1,3 +1,5 @@
+"""Evaluation for Tabletransformer."""
+import argparse
 import glob
 import os
 from pathlib import Path
@@ -6,11 +8,8 @@ from typing import List
 import pandas
 import torch
 from lightning.fabric.utilities import move_data_to_device
-from PIL import Image
 from tqdm import tqdm
 from transformers import (
-    AutoModelForObjectDetection,
-    DetrImageProcessor,
     TableTransformerForObjectDetection,
 )
 
@@ -18,25 +17,39 @@ from src.historicdocumentprocessing.fasterrcnn_eval import tableareabboxes
 from src.historicdocumentprocessing.util.metricsutil import calcstats_iodt, calcstats_overlap, calcmetric_overlap, \
     calcstats_iou, calcmetric, get_dataframe
 from src.historicdocumentprocessing.tabletransformer_dataset import CustomDataset
-from src.historicdocumentprocessing.util.tablesutil import getcells, reversetablerelativebboxes_outer
+from src.historicdocumentprocessing.util.tablesutil import getcells
 
 
 def inference(
     modelpath: str = None,
     targetloc=None,
-    iou_thresholds: List[float] = [0.5, 0.6, 0.7, 0.8, 0.9],
+    iou_thresholds: List[float] = None,
     tableareaonly=False,
     filtering: bool = False,
     valid: bool = True,
     datasetname: str = "BonnData",
     celleval: bool = False,
 ):
+    """Inference and eval with Tabletransformer.
+
+    Args:
+        modelpath: path to model checkpoint
+        targetloc: path to folder with data
+        iou_thresholds: iou threshold list
+        tableareaonly: wether to calculate results only for BBox-Predicitions in table area or for all predictions
+        filtering: wether to filter the results
+        valid: wether to use valid filter value for filtering
+        datasetname: name of dataset
+        celleval: wether to evaluate on cells instead of row/columns
+
+    """
+    if not iou_thresholds:
+        iou_thresholds = [0.5, 0.6, 0.7, 0.8, 0.9]
     modelname = "base_table-transformer-structure-recognition"
     model = TableTransformerForObjectDetection.from_pretrained(
         "microsoft/table-transformer-structure-recognition"
     )
     if modelpath:
-        # model.load_state_dict(torch.load(modelpath))
         modelname = modelpath.split("/")[-1]
         if "aachen" in modelname:
             model.load_state_dict(torch.load(modelpath, map_location="cuda:0"))
@@ -71,7 +84,7 @@ def inference(
     saveloc = f"{saveloc}{'/cells' if celleval else ''}"
     os.makedirs(saveloc, exist_ok=True)
 
-    ### initializing variables ###
+    # ## initializing variables ## #
     fullioulist = []
     fullf1list = []
     fullwf1list = []
@@ -101,7 +114,7 @@ def inference(
     iodtdf = pandas.DataFrame(
         columns=["img", "mean pred iod", "mean tar iod", "wf1", "prednum"]
     )
-    ### initializing variables ###
+    # ## initializing variables ## #
 
     dataset = CustomDataset(
         targetloc,
@@ -142,11 +155,9 @@ def inference(
                     output["boxes"][output["labels"] == 1],
                 ]
             )
-        # print(boxes.shape)
         if tableareaonly:
             boxes = tableareabboxes(boxes, folder)
         fullimagepredbox = boxes.to(device="cpu")
-        # print(boxes.shape)
 
         # .......................................
         # fullimagemetrics with IoDT
@@ -157,11 +168,9 @@ def inference(
             imname=imname,
             iou_thresholds=iou_thresholds,
         )
-        # print(IoDT_tp, IoDT_fp, IoDT_fn)
         iodt_prec, iodt_rec, iodt_f1, iodt_wf1 = calcmetric(
             iodt_tp, iodt_fp, iodt_fn, iou_thresholds=iou_thresholds
         )
-        # print(IoDT_prec, IoDT_rec, IoDT_f1, IoDT_wf1)
         tpsum_iodt += iodt_tp
         fpsum_iodt += iodt_fp
         fnsum_iodt += iodt_fn
@@ -220,10 +229,6 @@ def inference(
             iou_thresholds=iou_thresholds,
             imname=imname,
         )
-        # print(fullfn)
-        # print(fullimagegroundbox)
-        # print(calcstats(fullimagepredbox, fullimagegroundbox,
-        #                                                               iou_thresholds=iou_thresholds, imname=preds.split('/')[-1]), fullfp, targets[0])
         fullprec, fullrec, fullf1, fullwf1 = calcmetric(
             fulltp, fullfp, fullfn, iou_thresholds=iou_thresholds
         )
@@ -277,13 +282,9 @@ def inference(
                 for i in range(len(iou_thresholds))
             }
         )
-        # print(fullimagemetrics)
         if imname == "000d210d0f9b4101af2006b4aab33c42":
             print(fullfn)
             print(fullimagegroundbox)
-
-        #    exit()
-
         # ........................................
         # fullimagemetrics with alternate metric
         # ........................................
@@ -300,9 +301,9 @@ def inference(
         overlapmetric = {
             "img": imname,
             "prednum": fullimagepredbox.shape[0],
-            f"prec": fullprec_overlap.item(),
-            f"recall": fullrec_overlap.item(),
-            f"f1": fullf1_overlap.item(),
+            "prec": fullprec_overlap.item(),
+            "recall": fullrec_overlap.item(),
+            "f1": fullf1_overlap.item(),
             "tp": fulltp_overlap,
             "fp": fullfp_overlap,
             "fn": fullfn_overlap,
@@ -324,12 +325,9 @@ def inference(
             fnsum_iodt_predonly += iodt_fn
             predcount += 1
 
-            # print("here",fullimagepredbox)
-        # print(fullfp, fullimagemetrics)
         fullimagedf = pandas.concat(
             [fullimagedf, pandas.DataFrame(fullimagemetrics, index=[i])]
         )
-        # print(fullimagedf.loc[n])
     totalfullmetrics = get_dataframe(
         fnsum=fullfnsum,
         fpsum=fullfpsum,
@@ -344,20 +342,16 @@ def inference(
         tpsum=fulltpsum_predonly,
         iou_thresholds=iou_thresholds,
     )
-    # print(totalfullmetrics)
     overlapprec, overlaprec, overlapf1 = calcmetric_overlap(
         tp=tpsum_overlap, fp=fpsum_overlap, fn=fnsum_overlap
-    )
-    totaloverlapdf = pandas.DataFrame(
-        {"f1": overlapf1, "prec": overlaprec, "recall": overlaprec}, index=["overlap"]
     )
     overlapprec_predonly, overlaprec_predonly, overlapf1_predonly = calcmetric_overlap(
         tp=tpsum_overlap_predonly, fp=fpsum_overlap_predonly, fn=fnsum_overlap_predonly
     )
     predonlyoverlapdf = pandas.DataFrame(
         {
-            f"Number of evaluated files": overlapdf.shape[0],
-            f"Evaluated files without predictions:": overlapdf.shape[0] - predcount,
+            "Number of evaluated files": overlapdf.shape[0],
+            "Evaluated files without predictions:": overlapdf.shape[0] - predcount,
             "f1": overlapf1_predonly,
             "prec": overlapprec_predonly,
             "recall": overlaprec_predonly,
@@ -397,246 +391,50 @@ def inference(
             pandas.DataFrame(predonlyiodt, index=[" full image IoDt with valid preds"]),
         ]
     )
-
-    # print(conclusiondf)
-    # save results
-    # os.makedirs(saveloc, exist_ok=True)
-    # print(fullimagedf.loc[50])
-    # print(saveloc)
     overlapdf.to_csv(f"{saveloc}/fullimageoverlapeval.csv")
     fullimagedf.to_csv(f"{saveloc}/fullimageiou.csv")
     iodtdf.to_csv(f"{saveloc}/fullimageiodt.csv")
     conclusiondf.to_csv(f"{saveloc}/overview.csv")
 
 
+def get_args() -> argparse.Namespace:
+    """Define args."""
+    parser = argparse.ArgumentParser(description="tabletransformer_eval")
+    parser.add_argument('-f', '--folder', default="test", help="test data folder")
+    parser.add_argument('-m', '--modelname')
+    parser.add_argument('--datasetname', default="BonnData")
+
+    parser.add_argument('--celleval', action='store_true', default=False)
+    parser.add_argument('--no-celleval', dest='tablerelative', action='store_false')
+
+    parser.add_argument('--tableareaonly', action='store_true', default=False)
+    parser.add_argument('--no-tableareaonly', dest='tableareaonly', action='store_false')
+
+    parser.add_argument('--filter', action='store_true', default=False)
+    parser.add_argument('--no-filter', dest='filter', action='store_false')
+
+    parser.add_argument('--valid_filter', action='store_true', default=False)
+    parser.add_argument('--no-valid_filter', dest='valid_filter', action='store_false')
+
+    parser.add_argument('--per_category', action='store_true', default=False)
+    parser.add_argument('--no-per_category', dest='per_category', action='store_false')
+    parser.add_argument('--catfolder', default="testsubclasses")
+
+    parser.add_argument('--iou_thresholds', nargs='*', type=float, default=[0.5, 0.6, 0.7, 0.8, 0.9])
+
+    return parser.parse_args()
+
+
 if __name__ == "__main__":
-    """
-    inference(
-        modelpath=f"{Path(__file__).parent.absolute()}/../../checkpoints/tabletransformer/titw_call_aachen_e250_es.pt",
-        targetloc=f"{Path(__file__).parent.absolute()}/../../data/Tablesinthewild/test", datasetname=f"Tablesinthewild")
-    inference(
-        modelpath=f"{Path(__file__).parent.absolute()}/../../checkpoints/tabletransformer/titw_call_aachen_e250_es.pt",
-        targetloc=f"{Path(__file__).parent.absolute()}/../../data/Tablesinthewild/test", filtering=True, datasetname=f"Tablesinthewild")
-    inference(
-        modelpath=f"{Path(__file__).parent.absolute()}/../../checkpoints/tabletransformer/titw_call_aachen_e250_es.pt",
-        targetloc=f"{Path(__file__).parent.absolute()}/../../data/Tablesinthewild/test", celleval=True, datasetname=f"Tablesinthewild")
-    inference(
-        modelpath=f"{Path(__file__).parent.absolute()}/../../checkpoints/tabletransformer/titw_call_aachen_e250_es.pt",
-        targetloc=f"{Path(__file__).parent.absolute()}/../../data/Tablesinthewild/test", filtering=True, celleval=True, datasetname=f"Tablesinthewild")
+    args = get_args()
+    dpath = f"{Path(__file__).parent.absolute()}/../../data/{args.datasetname}/{args.folder}"
+    mpath = f"{Path(__file__).parent.absolute()}/../../checkpoints/tabletransformer/{args.modelname}"
 
-    inference(
-        modelpath=f"{Path(__file__).parent.absolute()}/../../checkpoints/tabletransformer/titw_severalcalls_2_e250_es.pt",
-        targetloc=f"{Path(__file__).parent.absolute()}/../../data/Tablesinthewild/test", datasetname=f"Tablesinthewild")
-    inference(
-        modelpath=f"{Path(__file__).parent.absolute()}/../../checkpoints/tabletransformer/titw_severalcalls_2_e250_es.pt",
-        targetloc=f"{Path(__file__).parent.absolute()}/../../data/Tablesinthewild/test", filtering=True, datasetname=f"Tablesinthewild")
-    inference(
-        modelpath=f"{Path(__file__).parent.absolute()}/../../checkpoints/tabletransformer/titw_severalcalls_2_e250_es.pt",
-        targetloc=f"{Path(__file__).parent.absolute()}/../../data/Tablesinthewild/test", celleval=True, datasetname=f"Tablesinthewild")
-    inference(
-        modelpath=f"{Path(__file__).parent.absolute()}/../../checkpoints/tabletransformer/titw_severalcalls_2_e250_es.pt",
-        targetloc=f"{Path(__file__).parent.absolute()}/../../data/Tablesinthewild/test", filtering=True, celleval=True, datasetname=f"Tablesinthewild")
-    #####################################################################################################################
-    inference(
-        modelpath=f"{Path(__file__).parent.absolute()}/../../checkpoints/tabletransformer/titw_call_aachen_e250_end.pt",
-        targetloc=f"{Path(__file__).parent.absolute()}/../../data/Tablesinthewild/test", datasetname=f"Tablesinthewild")
-    inference(
-        modelpath=f"{Path(__file__).parent.absolute()}/../../checkpoints/tabletransformer/titw_call_aachen_e250_end.pt",
-        targetloc=f"{Path(__file__).parent.absolute()}/../../data/Tablesinthewild/test", filtering=True, datasetname=f"Tablesinthewild")
-    inference(
-        modelpath=f"{Path(__file__).parent.absolute()}/../../checkpoints/tabletransformer/titw_call_aachen_e250_end.pt",
-        targetloc=f"{Path(__file__).parent.absolute()}/../../data/Tablesinthewild/test", celleval=True, datasetname=f"Tablesinthewild")
-    inference(
-        modelpath=f"{Path(__file__).parent.absolute()}/../../checkpoints/tabletransformer/titw_call_aachen_e250_end.pt",
-        targetloc=f"{Path(__file__).parent.absolute()}/../../data/Tablesinthewild/test", filtering=True, celleval=True, datasetname=f"Tablesinthewild")
-
-    inference(
-        modelpath=f"{Path(__file__).parent.absolute()}/../../checkpoints/tabletransformer/titw_severalcalls_2_e250_end.pt",
-        targetloc=f"{Path(__file__).parent.absolute()}/../../data/Tablesinthewild/test", datasetname=f"Tablesinthewild")
-    inference(
-        modelpath=f"{Path(__file__).parent.absolute()}/../../checkpoints/tabletransformer/titw_severalcalls_2_e250_end.pt",
-        targetloc=f"{Path(__file__).parent.absolute()}/../../data/Tablesinthewild/test", filtering=True, datasetname=f"Tablesinthewild")
-    inference(
-        modelpath=f"{Path(__file__).parent.absolute()}/../../checkpoints/tabletransformer/titw_severalcalls_2_e250_end.pt",
-        targetloc=f"{Path(__file__).parent.absolute()}/../../data/Tablesinthewild/test", celleval=True, datasetname=f"Tablesinthewild")
-    inference(
-        modelpath=f"{Path(__file__).parent.absolute()}/../../checkpoints/tabletransformer/titw_severalcalls_2_e250_end.pt",
-        targetloc=f"{Path(__file__).parent.absolute()}/../../data/Tablesinthewild/test", filtering=True, celleval=True, datasetname=f"Tablesinthewild")
-    """
-    # inference(
-    #    modelpath=f"{Path(__file__).parent.absolute()}/../../checkpoints/tabletransformer/titw_severalcalls_2_e250_es.pt",
-    #    targetloc=f"{Path(__file__).parent.absolute()}/../../data/Tablesinthewild/preprocessed/Inclined", datasetname=f"Tablesinthewild/Inclined", celleval=False)
-
-    for cat in glob.glob(
-        f"{Path(__file__).parent.absolute()}/../../data/Tablesinthewild/preprocessed/*"
-    ):
-        print(cat)
-        inference(
-            modelpath=f"{Path(__file__).parent.absolute()}/../../checkpoints/tabletransformer/titw_call_aachen_e250_es.pt",
-            targetloc=cat,
-            datasetname=f"Tablesinthewild/{cat.split('/')[-1]}",
-        )
-        inference(
-            modelpath=f"{Path(__file__).parent.absolute()}/../../checkpoints/tabletransformer/titw_call_aachen_e250_es.pt",
-            targetloc=cat,
-            filtering=True,
-            datasetname=f"Tablesinthewild/{cat.split('/')[-1]}",
-        )
-        # inference(
-        #    modelpath=f"{Path(__file__).parent.absolute()}/../../checkpoints/tabletransformer/titw_call_aachen_e250_es.pt",
-        #    targetloc=cat, celleval=True, datasetname=f"Tablesinthewild/{cat.split('/')[-1]}")
-        # inference(
-        #    modelpath=f"{Path(__file__).parent.absolute()}/../../checkpoints/tabletransformer/titw_call_aachen_e250_es.pt",
-        #    targetloc=cat, filtering=True, celleval=True, datasetname=f"Tablesinthewild/{cat.split('/')[-1]}")
-
-        inference(
-            modelpath=f"{Path(__file__).parent.absolute()}/../../checkpoints/tabletransformer/titw_severalcalls_2_e250_es.pt",
-            targetloc=cat,
-            datasetname=f"Tablesinthewild/{cat.split('/')[-1]}",
-        )
-        inference(
-            modelpath=f"{Path(__file__).parent.absolute()}/../../checkpoints/tabletransformer/titw_severalcalls_2_e250_es.pt",
-            targetloc=cat,
-            filtering=True,
-            datasetname=f"Tablesinthewild/{cat.split('/')[-1]}",
-        )
-        # inference(
-        #    modelpath=f"{Path(__file__).parent.absolute()}/../../checkpoints/tabletransformer/titw_severalcalls_2_e250_es.pt",
-        #    targetloc=cat, celleval=True, datasetname=f"Tablesinthewild/{cat.split('/')[-1]}")
-        # inference(
-        #    modelpath=f"{Path(__file__).parent.absolute()}/../../checkpoints/tabletransformer/titw_severalcalls_2_e250_es.pt",
-        #    targetloc=cat, filtering=True, celleval=True, datasetname=f"Tablesinthewild/{cat.split('/')[-1]}")
-        #####################################################################################################################
-        inference(
-            modelpath=f"{Path(__file__).parent.absolute()}/../../checkpoints/tabletransformer/titw_call_aachen_e250_end.pt",
-            targetloc=cat,
-            datasetname=f"Tablesinthewild/{cat.split('/')[-1]}",
-        )
-        inference(
-            modelpath=f"{Path(__file__).parent.absolute()}/../../checkpoints/tabletransformer/titw_call_aachen_e250_end.pt",
-            targetloc=cat,
-            filtering=True,
-            datasetname=f"Tablesinthewild/{cat.split('/')[-1]}",
-        )
-        # inference(
-        #    modelpath=f"{Path(__file__).parent.absolute()}/../../checkpoints/tabletransformer/titw_call_aachen_e250_end.pt",
-        #    targetloc=cat, celleval=True, datasetname=f"Tablesinthewild/{cat.split('/')[-1]}")
-        # inference(
-        #    modelpath=f"{Path(__file__).parent.absolute()}/../../checkpoints/tabletransformer/titw_call_aachen_e250_end.pt",
-        #    targetloc=cat, filtering=True, celleval=True, datasetname=f"Tablesinthewild/{cat.split('/')[-1]}")
-
-        inference(
-            modelpath=f"{Path(__file__).parent.absolute()}/../../checkpoints/tabletransformer/titw_severalcalls_2_e250_end.pt",
-            targetloc=cat,
-            datasetname=f"Tablesinthewild/{cat.split('/')[-1]}",
-        )
-        inference(
-            modelpath=f"{Path(__file__).parent.absolute()}/../../checkpoints/tabletransformer/titw_severalcalls_2_e250_end.pt",
-            targetloc=cat,
-            filtering=True,
-            datasetname=f"Tablesinthewild/{cat.split('/')[-1]}",
-        )
-        # inference(
-        #    modelpath=f"{Path(__file__).parent.absolute()}/../../checkpoints/tabletransformer/titw_severalcalls_2_e250_end.pt",
-        #    targetloc=cat, celleval=True, datasetname=f"Tablesinthewild/{cat.split('/')[-1]}")
-        # inference(
-        #    modelpath=f"{Path(__file__).parent.absolute()}/../../checkpoints/tabletransformer/titw_severalcalls_2_e250_end.pt",
-        #    targetloc=cat, filtering=True, celleval=True, datasetname=f"Tablesinthewild/{cat.split('/')[-1]}")
-    """
-    """
-    """
-    #inference(modelpath=f"{Path(__file__).parent.absolute()}/../../checkpoints/tabletransformer/tabletransformer_v0_new_BonnDataFullImage_tabletransformer_loadtest_BonnData_fullimage_e250_init_tabletransformer_v0_new_GloSatFullImage_tabletransformer_newenv_fixed_GloSat_fullimage_e250_valid_es.pt_valid_es.pt", targetloc=f"{Path(__file__).parent.absolute()}/../../data/BonnData/test")
-    #inference(
-    #    modelpath=f"{Path(__file__).parent.absolute()}/../../checkpoints/tabletransformer/tabletransformer_v0_new_BonnDataFullImage_tabletransformer_loadtest_BonnData_fullimage_e250_init_tabletransformer_v0_new_GloSatFullImage_tabletransformer_newenv_fixed_GloSat_fullimage_e250_valid_es.pt_valid_es.pt",
-    #    targetloc=f"{Path(__file__).parent.absolute()}/../../data/BonnData/test", filtering=True)
-    #inference(
-    #    modelpath=f"{Path(__file__).parent.absolute()}/../../checkpoints/tabletransformer/tabletransformer_v0_new_BonnDataFullImage_tabletransformer_loadtest_BonnData_fullimage_e250_init_tabletransformer_v0_new_GloSatFullImage_tabletransformer_newenv_fixed_GloSat_fullimage_e250_valid_es.pt_valid_es.pt",
-    #    targetloc=f"{Path(__file__).parent.absolute()}/../../data/BonnData/test", celleval=True)
-    #inference(
-    #    modelpath=f"{Path(__file__).parent.absolute()}/../../checkpoints/tabletransformer/tabletransformer_v0_new_BonnDataFullImage_tabletransformer_loadtest_BonnData_fullimage_e250_init_tabletransformer_v0_new_GloSatFullImage_tabletransformer_newenv_fixed_GloSat_fullimage_e250_valid_es.pt_valid_es.pt",
-    #    targetloc=f"{Path(__file__).parent.absolute()}/../../data/BonnData/test", filtering=True, celleval=True)
-    """
-    """
-    """
-    """
-    #inference(modelpath=f"{Path(__file__).parent.absolute()}/../../checkpoints/tabletransformer/tabletransformer_v0_new_BonnDataFullImage_tabletransformer_estest_BonnData_fullimage_e1_init_tabletransformer_v0_new_GloSatFullImage_tabletransformer_newenv_fixed_GloSat_fullimage_e250_valid_es.pt_valid_es.pt", targetloc=f"{Path(__file__).parent.absolute()}/../../data/BonnData/test")
-    #inference(
-    #    modelpath=f"{Path(__file__).parent.absolute()}/../../checkpoints/tabletransformer/tabletransformer_v0_new_BonnDataFullImage_tabletransformer_estest_BonnData_fullimage_e1_init_tabletransformer_v0_new_GloSatFullImage_tabletransformer_newenv_fixed_GloSat_fullimage_e250_valid_es.pt_valid_end.pt",
-    #    targetloc=f"{Path(__file__).parent.absolute()}/../../data/BonnData/test")
-    #inference(modelpath=f"{Path(__file__).parent.absolute()}/../../checkpoints/tabletransformer/tabletransformer_v0_new_BonnDataFullImage_tabletransformer_v0_bbox_xywh_BonnData_fullimage_e250_valid_end.pt",
-    #          targetloc=f"{Path(__file__).parent.absolute()}/../../data/BonnData/test")
-    
-    inference(
-        modelpath=f"{Path(__file__).parent.absolute()}/../../checkpoints/tabletransformer/tabletransformer_v0_new_BonnDataFullImage_tabletransformer_estest_BonnData_fullimage_e250_valid_es.pt",
-        targetloc=f"{Path(__file__).parent.absolute()}/../../data/BonnData/test")
-    inference(
-        modelpath=f"{Path(__file__).parent.absolute()}/../../checkpoints/tabletransformer/tabletransformer_v0_new_BonnDataFullImage_tabletransformer_estest_BonnData_fullimage_e250_valid_end.pt",
-        targetloc=f"{Path(__file__).parent.absolute()}/../../data/BonnData/test")
-    inference(
-        modelpath=f"{Path(__file__).parent.absolute()}/../../checkpoints/tabletransformer/tabletransformer_v0_new_GloSatFullImage_tabletransformer_newenv_fixed_GloSat_fullimage_e250_valid_es.pt",
-        targetloc=f"{Path(__file__).parent.absolute()}/../../data/GloSat/test", datasetname="GloSat")
-    inference(
-        modelpath=f"{Path(__file__).parent.absolute()}/../../checkpoints/tabletransformer/tabletransformer_v0_new_GloSatFullImage_tabletransformer_newenv_fixed_GloSat_fullimage_e250_valid_end.pt",
-        targetloc=f"{Path(__file__).parent.absolute()}/../../data/GloSat/test", datasetname="GloSat")
-    #inference(
-    #    modelpath=f"{Path(__file__).parent.absolute()}/../../checkpoints/tabletransformer/tabletransformer_v0_new_BonnDataFullImage_tabletransformer_v0_bbox_xywh_BonnData_fullimage_e250_valid_end.pt",
-    #    targetloc=f"{Path(__file__).parent.absolute()}/../../data/BonnData/test", celleval=True)
-    inference(
-        modelpath=f"{Path(__file__).parent.absolute()}/../../checkpoints/tabletransformer/tabletransformer_v0_new_BonnDataFullImage_tabletransformer_estest_BonnData_fullimage_e250_valid_es.pt",
-        targetloc=f"{Path(__file__).parent.absolute()}/../../data/BonnData/test", celleval=True)
-    inference(
-        modelpath=f"{Path(__file__).parent.absolute()}/../../checkpoints/tabletransformer/tabletransformer_v0_new_BonnDataFullImage_tabletransformer_estest_BonnData_fullimage_e250_valid_end.pt",
-        targetloc=f"{Path(__file__).parent.absolute()}/../../data/BonnData/test", celleval=True)
-    inference(
-        modelpath=f"{Path(__file__).parent.absolute()}/../../checkpoints/tabletransformer/tabletransformer_v0_new_GloSatFullImage_tabletransformer_newenv_fixed_GloSat_fullimage_e250_valid_es.pt",
-        targetloc=f"{Path(__file__).parent.absolute()}/../../data/GloSat/test", datasetname="GloSat", celleval=True)
-    inference(
-        modelpath=f"{Path(__file__).parent.absolute()}/../../checkpoints/tabletransformer/tabletransformer_v0_new_GloSatFullImage_tabletransformer_newenv_fixed_GloSat_fullimage_e250_valid_end.pt",
-        targetloc=f"{Path(__file__).parent.absolute()}/../../data/GloSat/test", datasetname="GloSat", celleval=True)
-    """
-    ##################################################################################################################
-    """
-    print("with filtering")
-    inference(
-        modelpath=f"{Path(__file__).parent.absolute()}/../../checkpoints/tabletransformer/tabletransformer_v0_new_BonnDataFullImage_tabletransformer_estest_BonnData_fullimage_e1_init_tabletransformer_v0_new_GloSatFullImage_tabletransformer_newenv_fixed_GloSat_fullimage_e250_valid_es.pt_valid_es.pt",
-        targetloc=f"{Path(__file__).parent.absolute()}/../../data/BonnData/test", filtering=True)
-    inference(
-        modelpath=f"{Path(__file__).parent.absolute()}/../../checkpoints/tabletransformer/tabletransformer_v0_new_BonnDataFullImage_tabletransformer_estest_BonnData_fullimage_e1_init_tabletransformer_v0_new_GloSatFullImage_tabletransformer_newenv_fixed_GloSat_fullimage_e250_valid_es.pt_valid_end.pt",
-        targetloc=f"{Path(__file__).parent.absolute()}/../../data/BonnData/test", filtering=True)
-    #inference(
-    #    modelpath=f"{Path(__file__).parent.absolute()}/../../checkpoints/tabletransformer/tabletransformer_v0_new_BonnDataFullImage_tabletransformer_v0_bbox_xywh_BonnData_fullimage_e250_valid_end.pt",
-    #    targetloc=f"{Path(__file__).parent.absolute()}/../../data/BonnData/test", filtering=True)
-    inference(
-        modelpath=f"{Path(__file__).parent.absolute()}/../../checkpoints/tabletransformer/tabletransformer_v0_new_BonnDataFullImage_tabletransformer_estest_BonnData_fullimage_e250_valid_es.pt",
-        targetloc=f"{Path(__file__).parent.absolute()}/../../data/BonnData/test", filtering=True)
-    inference(
-        modelpath=f"{Path(__file__).parent.absolute()}/../../checkpoints/tabletransformer/tabletransformer_v0_new_BonnDataFullImage_tabletransformer_estest_BonnData_fullimage_e250_valid_end.pt",
-        targetloc=f"{Path(__file__).parent.absolute()}/../../data/BonnData/test", filtering=True)
-    """
-    """
-    inference(
-        modelpath=f"{Path(__file__).parent.absolute()}/../../checkpoints/tabletransformer/tabletransformer_v0_new_GloSatFullImage_tabletransformer_newenv_fixed_GloSat_fullimage_e250_valid_es.pt",
-        targetloc=f"{Path(__file__).parent.absolute()}/../../data/GloSat/test", datasetname="GloSat", filtering=True)
-    inference(
-        modelpath=f"{Path(__file__).parent.absolute()}/../../checkpoints/tabletransformer/tabletransformer_v0_new_GloSatFullImage_tabletransformer_newenv_fixed_GloSat_fullimage_e250_valid_end.pt",
-        targetloc=f"{Path(__file__).parent.absolute()}/../../data/GloSat/test", datasetname="GloSat", filtering=True)
-    """
-    # inference(
-    #    modelpath=f"{Path(__file__).parent.absolute()}/../../checkpoints/tabletransformer/tabletransformer_v0_new_BonnDataFullImage_tabletransformer_v0_bbox_xywh_BonnData_fullimage_e250_valid_end.pt",
-    #    targetloc=f"{Path(__file__).parent.absolute()}/../../data/BonnData/test", celleval=True, filtering=True)
-    """
-    inference(
-        modelpath=f"{Path(__file__).parent.absolute()}/../../checkpoints/tabletransformer/tabletransformer_v0_new_BonnDataFullImage_tabletransformer_estest_BonnData_fullimage_e250_valid_es.pt",
-        targetloc=f"{Path(__file__).parent.absolute()}/../../data/BonnData/test", celleval=True, filtering=True)
-    inference(
-        modelpath=f"{Path(__file__).parent.absolute()}/../../checkpoints/tabletransformer/tabletransformer_v0_new_BonnDataFullImage_tabletransformer_estest_BonnData_fullimage_e250_valid_end.pt",
-        targetloc=f"{Path(__file__).parent.absolute()}/../../data/BonnData/test", celleval=True, filtering=True)
-    """
-    """
-    inference(
-        modelpath=f"{Path(__file__).parent.absolute()}/../../checkpoints/tabletransformer/tabletransformer_v0_new_GloSatFullImage_tabletransformer_newenv_fixed_GloSat_fullimage_e250_valid_es.pt",
-        targetloc=f"{Path(__file__).parent.absolute()}/../../data/GloSat/test", datasetname="GloSat", celleval=True, filtering=True)
-    inference(
-        modelpath=f"{Path(__file__).parent.absolute()}/../../checkpoints/tabletransformer/tabletransformer_v0_new_GloSatFullImage_tabletransformer_newenv_fixed_GloSat_fullimage_e250_valid_end.pt",
-        targetloc=f"{Path(__file__).parent.absolute()}/../../data/GloSat/test", datasetname="GloSat", celleval=True, filtering=True)
-    """
+    if args.per_category:
+        for cat in glob.glob(
+                f"{Path(__file__).parent.absolute()}/../../data/{args.datasetname}/{args.catfolder}/*"
+        ):
+            print(cat)
+            inference(modelpath=mpath, targetloc=dpath, tableareaonly=args.tableareaonly, filtering=args.filter, valid=args.valid_filter, celleval=args.celleval, iou_thresholds=args.iou_thresholds)
+    else:
+        inference(modelpath=mpath, targetloc=dpath, iou_thresholds=args.iou_thresholds, tableareaonly=args.tableareaonly, filtering=args.filter, valid=args.valid_filter, datasetname=args.datasetname, celleval=args.celleval)
