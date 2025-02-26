@@ -1,3 +1,5 @@
+"""Various functions for splitting and combining data."""
+import argparse
 import glob
 import json
 import os
@@ -20,17 +22,21 @@ from src.historicdocumentprocessing.dataprocessing import (
 )
 
 
-def validsplit(path: str = f"{Path(__file__).parent.absolute()}/../../data/BonnData"):
+def validsplit(path: str):  # f"{Path(__file__).parent.absolute()}/../../data/BonnData")
+    """Split train dataset into train and valid data (with valid data same size as test data).
+
+    Args:
+        path: path to dataset
+
+    """
     total = glob.glob(f"{path}/preprocessed/*")
     test = glob.glob(f"{path}/test/*")
     validlen = len(test)
     newtotal = [t for t in total if f"{path}/test/{t.split('/')[-1]}" not in test]
-    # print(len(newtotal), len(test), len(total))
     assert len(newtotal) + len(test) == len(total)
     random.shuffle(newtotal)
     valid = newtotal[:validlen]
     train = newtotal[validlen:]
-    # print(train)
     assert len(valid) + len(train) == len(newtotal)
     for cats, names in ((train, "train"), (valid, "valid")):
         os.makedirs(f"{path}/{names}")
@@ -39,28 +45,27 @@ def validsplit(path: str = f"{Path(__file__).parent.absolute()}/../../data/BonnD
 
 
 def wildtablesvalidsplit(
-    path: str = f"{Path(__file__).parent.absolute()}/../../data/Tablesinthewild/train",
-    ratio: List[float] = [0.7, 0.3],
+    path: str,  # = f"{Path(__file__).parent.absolute()}/../../data/Tablesinthewild/train",
+    ratio: List[float] = None,
     validfile: str = None,
 ):
-    """create train/valid split for tables in the wild dataset
+    """Create train/valid split for tables in the wild dataset.
+
     Args:
         path: path to preprocessed train data
-        ratio: ratio of split, default chosen to keep test and valid set roughly the same size, also used in
-    https://conferences.computer.org/icdar/2019/pdfs/ICDAR2019-5vPIU32iQjjaLtHlc8g8pO/6MI7Y73lJOE71Gh1fhZUQh
-    /1lFyKkB62yWFXMh1YoqJmC.pdf competition paper which was used as reference for train/test split in Wired Tables in
-    the Wild Dataset
-
-    Returns:
+        ratio: ratio of split, default chosen to keep test and valid set roughly the same size, also used in https://conferences.computer.org/icdar/2019/pdfs/ICDAR2019-5vPIU32iQjjaLtHlc8g8pO/6MI7Y73lJOE71Gh1fhZUQh/1lFyKkB62yWFXMh1YoqJmC.pdf competition paper which was used as reference for train/test split in Wired Tables in the Wild Dataset
+        validfile: valid file (json)
 
     """
+    if not ratio:
+        ratio = [0.7, 0.3]
     dst = f"{'/'.join(path.split('/')[:-1])}/valid"
     trainlist = glob.glob(f"{path}/*")
     if not validfile:
         random.shuffle(trainlist)
         train = trainlist[: round(len(trainlist) * ratio[0])]
         valid = trainlist[
-            round(len(trainlist) * ratio[0]) : round(
+            round(len(trainlist) * ratio[0]): round(
                 len(trainlist) * (ratio[1] + ratio[0])
             )
         ]
@@ -70,9 +75,7 @@ def wildtablesvalidsplit(
         valid = [f"{path}/{im}" for im in imnames]
         print(valid)
         pass
-    # print(len(valid))
     os.makedirs(dst, exist_ok=True)
-    # print(dst)
     for v in valid:
         shutil.move(v, f"{dst}/{v.split('/')[-1]}")
         print(v, f"{dst}/{v.split('/')[-1]}")
@@ -80,13 +83,12 @@ def wildtablesvalidsplit(
 
 
 def reversewildtablesvalidsplit(
-    path: str = f"{Path(__file__).parent.absolute()}/../../data/Tablesinthewild",
+    path: str  # f"{Path(__file__).parent.absolute()}/../../data/Tablesinthewild"
 ):
-    """
-    reverse train/valid split for tables in the wild dataset
+    """Reverse train/valid split for tables in the wild dataset.
+
     Args:
-        path:
-    Returns:
+        path: path to dataset
 
     """
     validpath = glob.glob(f"{path}/valid/*")
@@ -101,46 +103,54 @@ def reversewildtablesvalidsplit(
 
 
 def subclassjoinwildtables(
-    path: str = f"{Path(__file__).parent.absolute()}/../../data/Tablesinthewild/testsubclasses",
-    dst: str = f"{Path(__file__).parent.absolute()}/../../data/Tablesinthewild/test",
+    path: str,  # f"{Path(__file__).parent.absolute()}/../../data/Tablesinthewild/testsubclasses"
+    dst: str,  # f"{Path(__file__).parent.absolute()}/../../data/Tablesinthewild/test"
 ):
+    """Join subclassfolders into one test folder.
+
+    Args:
+        path: path to folder with subclassfolders
+        dst: destination folder
+
+    """
     for folder in glob.glob(f"{path}/*"):
         # print(folder, dst)
         shutil.copytree(src=folder, dst=dst, dirs_exist_ok=True)
 
 
 def subclasssplitwildtables(
-    impath: str = f"{Path(__file__).parent.absolute()}/../../data/Tablesinthewild/rawdata/test/images",
-    xmlpath: str = f"{Path(__file__).parent.absolute()}/../../data/Tablesinthewild/rawdata/test/test-xml-revise/test-xml-revise",
-    txtfolder: str = f"{Path(__file__).parent.absolute()}/../../data/Tablesinthewild/rawdata/test/sub_classes",
+    impath: str,  # f"{Path(__file__).parent.absolute()}/../../data/Tablesinthewild/rawdata/test/images"
+    xmlpath: str,  # f"{Path(__file__).parent.absolute()}/../../data/Tablesinthewild/rawdata/test/test-xml-revise/test-xml-revise"
+    txtfolder: str,  # f"{Path(__file__).parent.absolute()}/../../data/Tablesinthewild/rawdata/test/sub_classes"
     tablerelative=False,
     rowcol=False,
 ):
-    """split wildtables test into subclasses and do preprocessing"""
+    """Split wildtables test into subclasses and do preprocessing.
+
+    Args:
+        impath: path to images
+        xmlpath: path to xml files
+        txtfolder: path to folder with txt files with subclass lists
+        tablerelative: wether tablerelative BBoxes are needed
+        rowcol: wether row and column BBoxes are needed
+
+    """
     txts = glob.glob(f"{txtfolder}/*txt")
     for txt in txts:
         with open(txt) as f:
             foldername = txt.split("/")[-1].split(".")[-2]
-            # print(foldername)
             destfolder = (
                 f"{'/'.join(impath.split('/')[:-2])}/../testsubclasses/{foldername}"
             )
-            # print(destfolder)
             for line in tqdm(f):
-                # print(line)
-                # print(f"{impath}/{line}")
-
                 im = glob.glob(f"{impath}/{line.rstrip()}")[0]
-                # print(f"{impath}/{line.rstrip()}")
                 xml = glob.glob(f"{xmlpath}/{line.split('.')[-2]}.xml")[0]
                 processedpt = processdata_wildtable_inner(xml)
                 imfolder = f"{destfolder}/{line.split('.')[-2]}"
                 if processedpt.numel():
                     if read_image(im).shape[0] == 3:
                         os.makedirs(imfolder, exist_ok=True)
-                        # print(f"{imfolder}/{line.split('.')[-2]}.pt",  f"{imfolder}/{line.rstrip()}")
                         shutil.copy(im, f"{imfolder}/{line.rstrip()}")
-                        # print(f"{imfolder}/{line.split('.')[-2]}.pt")
                         torch.save(processedpt, f"{imfolder}/{line.split('.')[-2]}.pt")
                     else:
                         print(f"Wrong image dim at {im}")
@@ -149,14 +159,10 @@ def subclasssplitwildtables(
                         "empty bbox, image not added to preprocessed test data"
                     )
 
-                if (
-                    rowcol
-                    and processedpt.numel()
-                    and (read_image(im) / 255).shape[0] == 3
-                ):
+                if rowcol and processedpt.numel() and (read_image(im) / 255).shape[0] == 3:
                     tables = processdata_wildtable_rowcoll(xml)
                     tablelist = []
-                    for n, table in enumerate(tables):
+                    for n, _table in enumerate(tables):
                         tab = tables[n]["table"]
                         tablelist += [tab]
                         img = Image.open(im)
@@ -178,8 +184,6 @@ def subclasssplitwildtables(
                             f"{imfolder}/{line.split('.')[-2]}_col_{n}.pt",
                         )
                     tablefile = torch.vstack(tablelist)
-                    # if len(tablelist) > 1: print(impath)
-                    # print(tablefile)
                     torch.save(tablefile, f"{imfolder}/{line.split('.')[-2]}_tables.pt")
 
                 if tablerelative and read_image(im).shape[0] == 3:
@@ -187,7 +191,6 @@ def subclasssplitwildtables(
                     if tablelist and celllist:
                         assert len(tablelist) == len(celllist)
                         for idx in range(0, len(tablelist)):
-                            # print(f"{imfolder}/{line.split('.')[-2]}_cell_{idx}.pt")
                             torch.save(
                                 celllist[idx],
                                 f"{imfolder}/{line.split('.')[-2]}_cell_{idx}.pt",
@@ -203,53 +206,58 @@ def subclasssplitwildtables(
                             torch.vstack(tablelist),
                             f"{imfolder}/{line.split('.')[-2]}_tables.pt",
                         )
-                        # print(f"{imfolder}/{line.split('.')[-2]}_tables.pt")
-
-                        # if len(tablelist)==1:
-                        #    for i in range(0,len(tablelist)):
-                        #        img = Image.open(im)
-                        #        tableimg = img.crop((tuple(tablelist[i].to(int).tolist())))
-                        #        test = draw_bounding_boxes(image=pil_to_tensor(tableimg), boxes=celllist[i])
-                        #        img = Image.fromarray(test.permute(1, 2, 0).numpy())
-                        #        img.save(f"{Path(__file__).parent.absolute()}/../../images/test/croptest_{i}.jpg")
-                        #    return
 
 
 def recreatetablesplit(
-    datapath: str = f"{Path(__file__).parent.absolute()}/../../data/BonnData/preprocessed",
-    csvpath: str = f"{Path(__file__).parent.absolute()}/../../data/BonnData/Tabellen/run3_BonnData_cell_aug_loadrun_GloSAT_cell_aug_e250_es_e250_es.csv",
+    datapath: str,  # f"{Path(__file__).parent.absolute()}/../../data/BonnData/preprocessed"
+    csvpath: str,  # f"{Path(__file__).parent.absolute()}/../../data/BonnData/Tabellen/run3_BonnData_cell_aug_loadrun_GloSAT_cell_aug_e250_es_e250_es.csv"
 ):
-    """
-    Recreate the Test Split of the Bonn Table Dataset from the csv result file
+    """Recreate the Test Split of the Bonn Table Dataset from the csv result file.
+
     Args:
         datapath: path to preprocessed Bonn Table Data
         csvpath: path to Bonn Table csv result file
 
-    Returns:
     """
     imnames = pd.read_csv(csvpath)["image_number"][1:-1]
     savelocs = "/".join(datapath.split("/")[:-1]) + "/test"
     os.makedirs(savelocs, exist_ok=True)
-    # print(len(imnames))
-    # print(imnames)
-    for i, imname in tqdm(enumerate(imnames)):
+    for _i, imname in tqdm(enumerate(imnames)):
         if isinstance(imname, float):
             imname = int(imname)
         imfolder = glob.glob(f"{datapath}/{str(imname)}")
         saveloc = f"{savelocs}/{imname}"
-        dest = shutil.copytree(src=imfolder[0], dst=saveloc, dirs_exist_ok=True)
+        shutil.copytree(src=imfolder[0], dst=saveloc, dirs_exist_ok=True)
+
+
+def get_args() -> argparse.Namespace:
+    """Define args."""
+    parser = argparse.ArgumentParser(description="split")
+    parser.add_argument('--operation', choices=['recreatesplit, validsplit, subclasssplit'])
+
+    parser.add_argument('--datasetname', default="BonnData", choices=['BonnData', 'GloSat', 'Tablesinthewild'])
+    parser.add_argument('--splitfile', default='', help="filename of file with split file data")
+
+    parser.add_argument('--tablerelative', action='store_true', default=False)
+    parser.add_argument('--no-tablerelative', dest='tablerelative', action='store_false')
+
+    parser.add_argument('--rowcol', action='store_true', default=False)
+    parser.add_argument('--no-rowcol', dest='filter', action='store_false')
+
+    return parser.parse_args()
 
 
 if __name__ == "__main__":
-    # recreatetablesplit(datapath=f"{Path(__file__).parent.absolute()}/../../data/GloSat/preprocessed",
-    #                   csvpath=f"{Path(__file__).parent.absolute()}/../../data/GloSat/run_GloSAT_cell_aug_e250_es.csv")
-    # recreatetablesplit()
-    # recreatenewspapersplit()
-    # newsplit()
-    # subclasssplitwildtables(rowcol=True)
-    subclassjoinwildtables()
-    # wildtablesvalidsplit(validfile=f"{Path(__file__).parent.absolute()}/../../data/Tablesinthewild/split.json")
-    # print(pd.read_json(f"{Path(__file__).parent.absolute()}/../../data/Tablesinthewild/split1.json").equals(pd.read_json(f"{Path(__file__).parent.absolute()}/../../data/Tablesinthewild/split.json")))
-    # validsplit(f"{Path(__file__).parent.absolute()}/../../data/GloSat")
-    # reversewildtablesvalidsplit()
-    pass
+    args = get_args()
+    if args.datasetname == 'tabletransformer':
+        if args.operation == 'subclasssplit':
+            subclasssplitwildtables(impath=f"{Path(__file__).parent.absolute()}/../../data/Tablesinthewild/rawdata/test/images",
+                                    xmlpath=f"{Path(__file__).parent.absolute()}/../../data/Tablesinthewild/rawdata/test/test-xml-revise/test-xml-revise",
+                                    txtfolder=f"{Path(__file__).parent.absolute()}/../../data/Tablesinthewild/rawdata/test/sub_classes", tablerelative=args.tablerelative, rowcol=args.rowcol)
+        else:
+            wildtablesvalidsplit(path=f"{Path(__file__).parent.absolute()}/../../data/Tablesinthewild/train", validfile=None if args.splitfile == '' else f"{Path(__file__).parent.absolute()}/../../data/Tablesinthewild/{args.splitfile}")
+    else:
+        if args.operation == 'validsplit':
+            validsplit(path=f"{Path(__file__).parent.absolute()}/../../data/{args.datasetname}")
+        elif args.operation == 'recreatesplit':
+            recreatetablesplit(datapath=f"{Path(__file__).parent.absolute()}/../../data/{args.datasetname}/preprocessed", csvpath=f"{Path(__file__).parent.absolute()}/../../data/{args.datasetname}/{args.splitfile}")
