@@ -1,5 +1,7 @@
-"""
+"""Training Code for Tabletransformer.
+
 Code modified from https://github.com/NielsRogge/Transformers-Tutorials/blob/master/DETR/Fine_tuning_DetrForObjectDetection_on_custom_dataset_(balloon).ipynb
+
 License:
 MIT License
 
@@ -25,7 +27,6 @@ SOFTWARE.
 """
 
 import argparse
-import os
 import statistics
 from pathlib import Path
 
@@ -39,12 +40,13 @@ from lightning.pytorch.utilities.types import EVAL_DATALOADERS
 from torch.utils.data import DataLoader
 from torchvision.transforms.functional import pil_to_tensor
 from torchvision.utils import draw_bounding_boxes
-from transformers import AutoModelForObjectDetection, TableTransformerForObjectDetection
+from transformers import AutoModelForObjectDetection
 
 from src.historicdocumentprocessing.tabletransformer_dataset import CustomDataset
 
 
 class TableTransformer(pl.LightningModule):
+    """Class to train TableTransformer models."""
     def __init__(
         self,
         lr,
@@ -57,6 +59,19 @@ class TableTransformer(pl.LightningModule):
         savepath: str = None,
         loadmodelcheckpoint: str = None,
     ):
+        """Class to train TableTransformer models.
+
+        Args:
+            lr: Learning Rate
+            lr_backbone: Learning Rate for Backbone Network
+            weight_decay: Weight Decay
+            testdataset: dataset to test on
+            traindataset: dataset to train on
+            valdataset: dataset to validate
+            datasetname: name of dataset (BonnData, Tablesinthewild, GloSAT)
+            savepath: path to model save folder
+            loadmodelcheckpoint: name of model to load
+        """
         super().__init__()
         # self.model = AutoModelForObjectDetection.from_pretrained("microsoft/table-transformer-structure-recognition-v1.1-all").to(self.device)
         self.model = AutoModelForObjectDetection.from_pretrained(
@@ -125,11 +140,31 @@ class TableTransformer(pl.LightningModule):
         self.mean_val_loss = None
 
     def forward(self, pixel_values, pixel_mask):
+        """Forward method.
+
+        Args:
+            pixel_values: pixel values
+            pixel_mask: pixel mask
+
+        Returns:
+            model outputs
+
+        """
         outputs = self.model(pixel_values=pixel_values, pixel_mask=pixel_mask)
 
         return outputs
 
     def common_step(self, batch, batch_idx):
+        """Common parts of train and valid steps.
+
+        Args:
+            batch: output of the dataloader
+            batch_idx: index of the batch
+
+        Returns:
+            training loss and loss_dict
+
+        """
         pixel_values = batch["pixel_values"].to(self.device)
         pixel_mask = batch["pixel_mask"].to(self.device)
         labels = [{k: v.to(self.device) for k, v in t.items()} for t in batch["labels"]]
@@ -144,6 +179,16 @@ class TableTransformer(pl.LightningModule):
         return loss, loss_dict
 
     def training_step(self, batch, batch_idx):
+        """Training step, calculate train loss.
+
+        Args:
+            batch: output of the dataloader
+            batch_idx: index of the batch
+
+        Returns:
+            training loss
+
+        """
         loss, loss_dict = self.common_step(batch, batch_idx)
         # logs metrics for each training_step,
         # and the average across the epoch
@@ -154,6 +199,15 @@ class TableTransformer(pl.LightningModule):
         return loss
 
     def validation_step(self, batch, batch_idx):
+        """Valid step, calculate valid loss.
+
+        Args:
+            batch: output of the dataloader
+            batch_idx: index of the batch
+
+        Returns:
+            valid loss
+        """
         loss, loss_dict = self.common_step(batch, batch_idx)
         self.log("validation_loss", loss, on_epoch=True)
         for k, v in loss_dict.items():
@@ -162,6 +216,7 @@ class TableTransformer(pl.LightningModule):
         return loss
 
     def on_validation_epoch_end(self) -> None:
+        """Record validation metrics and sample images at end of validation epoch, also save model state dict and do early stopping."""
         mean_val_loss = statistics.mean(self.val_losses)
         if not self.mean_val_loss or self.mean_val_loss > mean_val_loss:
             self.mean_val_loss = mean_val_loss
@@ -211,7 +266,7 @@ class TableTransformer(pl.LightningModule):
             "Train/example", result[:, ::2, ::2], global_step=self.global_step
         )
 
-        ##validexampleimg
+        # validexampleimg
         self.model.eval()
         encoding = move_data_to_device(
             self.val_dataset.ImageProcessor(self.example_image, return_tensors="pt"),
@@ -246,6 +301,7 @@ class TableTransformer(pl.LightningModule):
         )
 
     def configure_optimizers(self):
+        """Method to configure the optimizer."""
         param_dicts = [
             {
                 "params": [
@@ -270,6 +326,11 @@ class TableTransformer(pl.LightningModule):
         return optimizer
 
     def train_dataloader(self):
+        """Get train dataloader.
+
+        Returns:
+            train dataloader
+        """
         return DataLoader(
             self.train_dataset,
             batch_size=1,
@@ -278,6 +339,11 @@ class TableTransformer(pl.LightningModule):
         )
 
     def val_dataloader(self):
+        """Get validation dataloader.
+
+        Returns:
+            validation dataloader
+        """
         return DataLoader(
             self.val_dataset,
             batch_size=1,
@@ -286,6 +352,11 @@ class TableTransformer(pl.LightningModule):
         )
 
     def test_dataloader(self) -> EVAL_DATALOADERS:
+        """Get test dataloader.
+
+        Returns:
+            test dataloader
+        """
         return DataLoader(
             self.test_dataset, batch_size=1, collate_fn=self.test_dataset.collate_fn
         )
@@ -293,7 +364,7 @@ class TableTransformer(pl.LightningModule):
 
 def get_args() -> argparse.Namespace:
     """Defines arguments."""
-    parser = argparse.ArgumentParser(description="training")
+    parser = argparse.ArgumentParser(description="tabletransformer_train")
 
     parser.add_argument(
         "--name",
@@ -396,8 +467,8 @@ if __name__ == "__main__":
     print(f"\tload: {args.load}\n")
     # print(f"\trandom initialization: {args.randominit}\n")
     print(f"Use Valid Set: {args.valid}")
-    print(f"Cuda Available:", torch.cuda.is_available())
-    print(f"torch lightning early_stopping:", args.early_stopping)
+    print("Cuda Available:", torch.cuda.is_available())
+    print("torch lightning early_stopping:", args.early_stopping)
 
     if args.valid:
         validdataset = CustomDataset(

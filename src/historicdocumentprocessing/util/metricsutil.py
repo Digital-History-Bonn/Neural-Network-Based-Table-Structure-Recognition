@@ -1,5 +1,8 @@
+"""Utility functions for calculating metrics."""
+
 import glob
 import os
+import typing
 import warnings
 from pathlib import Path
 from typing import List, Literal, Tuple
@@ -25,10 +28,19 @@ from src.historicdocumentprocessing.util.plottotikz import save_plot_as_tikz
 
 def findoptimalfilterpoint_outer(
     modellist: List[str],
-    modelfolder: str = f"{Path(__file__).parent.absolute()}/../../../checkpoints/fasterrcnn",
+    modelfolder: str,  # f"{Path(__file__).parent.absolute()}/../../../checkpoints/fasterrcnn"
     valid: bool = True,
     modeltype: Literal["fasterrcnn", "tabletransformer"] = "fasterrcnn",
 ):
+    """Function to find the optimal filter point.
+
+    Args:
+        modellist: list of models
+        modelfolder: folder to models
+        valid: wether to use valid or test dataset for calculations
+        modeltype: type of model (fasterrcnn, tabletransformer)
+
+    """
     # for modelpath in glob.glob(f"{modelfolder}/*"):
     for modelname in modellist:
         modelpath = f"{modelfolder}/{modelname}"
@@ -36,7 +48,7 @@ def findoptimalfilterpoint_outer(
             if modeltype == "fasterrcnn":
                 findoptimalfilterpoint(
                     modelpath,
-                    testdatasetpath=(
+                    datasetpath=(
                         f"{Path(__file__).parent.absolute()}/../../../data/BonnData/test"
                         if not valid
                         else f"{Path(__file__).parent.absolute()}/../../../data/BonnData/valid"
@@ -49,15 +61,11 @@ def findoptimalfilterpoint_outer(
                     datasetpath=f"{Path(__file__).parent.absolute()}/../../../data/BonnData",
                     valid=valid,
                 )
-        elif (
-            "GloSat" in modelpath
-            and "BonnData" not in modelpath
-            and "run" not in modelpath
-        ):
+        elif ("GloSat" in modelpath and "BonnData" not in modelpath and "run" not in modelpath):
             if modeltype == "fasterrcnn":
                 findoptimalfilterpoint(
                     modelpath,
-                    testdatasetpath=(
+                    datasetpath=(
                         f"{Path(__file__).parent.absolute()}/../../../data/GloSat/test"
                         if not valid
                         else f"{Path(__file__).parent.absolute()}/../../../data/GloSat/valid"
@@ -74,7 +82,7 @@ def findoptimalfilterpoint_outer(
             if modeltype == "fasterrcnn":
                 findoptimalfilterpoint(
                     modelpath,
-                    testdatasetpath=(
+                    datasetpath=(
                         f"{Path(__file__).parent.absolute()}/../../../data/Tablesinthewild/test"
                         if not valid
                         else f"{Path(__file__).parent.absolute()}/../../../data/Tablesinthewild/valid"
@@ -95,7 +103,14 @@ def findoptimalfilterpoint_outer(
 def findoptimalfilterpoint_tabletransformer(
     modelpath: str, datasetpath: str, valid: bool = True
 ):
-    """calculate best filterpoint for tabletransformer (based on row/column iou)"""
+    """Calculate best filterpoint for tabletransformer (based on row/column iou).
+
+    Args:
+        modelpath: path to model
+        datasetpath: path to data
+        valid: wether test or valid data is used for calculation
+
+    """
     modelname = "base_table-transformer-structure-recognition"
     model = TableTransformerForObjectDetection.from_pretrained(
         "microsoft/table-transformer-structure-recognition"
@@ -131,8 +146,6 @@ def findoptimalfilterpoint_tabletransformer(
         encoding = move_data_to_device(
             dataset.ImageProcessor(img, return_tensors="pt"), device=device
         )
-        folder = dataset.getfolder(i)
-        imname = folder.split("/")[-1]
         with torch.no_grad():
             results = model(**encoding)
         width, height = img.size
@@ -202,20 +215,20 @@ def findoptimalfilterpoint_tabletransformer(
         "w",
     ) as f:
         f.write(str(bestpred))
-    pass
 
 
 def findoptimalfilterpoint(
-    modelpath: str, testdatasetpath: str, tablerelative: bool = True, valid: bool = True
+    modelpath: str, datasetpath: str, tablerelative: bool = True, valid: bool = True
 ):
-    """
-    partially based on threshold graph function from https://github.com/Digital-History-Bonn/HistorischeTabellenSemanticExtraction/blob/main/src/TableExtraction/utils/metrics.py
-    Args:
-        modelpath:
-        testdatasetpath:
-        tablerelative:
+    """Function to find the optimal filter point.
 
-    Returns:
+    partially based on threshold graph function from https://github.com/Digital-History-Bonn/HistorischeTabellenSemanticExtraction/blob/main/src/TableExtraction/utils/metrics.py
+
+    Args:
+        modelpath: path to model
+        datasetpath: path to data
+        tablerelative: wether ground truth data is tablerelative
+        valid: wether test or valid data is used for calculation
 
     """
     model = fasterrcnn_resnet50_fpn(
@@ -233,10 +246,9 @@ def findoptimalfilterpoint(
         return
     totaliou = []
     totalscores = []
-    for n, folder in tqdm(enumerate(glob.glob(f"{testdatasetpath}/*"))):
+    for _n, folder in tqdm(enumerate(glob.glob(f"{datasetpath}/*"))):
         # print(folder)
         impath = f"{folder}/{folder.split('/')[-1]}.jpg"
-        imname = folder.split("/")[-1]
         img = (read_image(impath) / 255).to(device)
         if tablerelative:
             fullimagegroundbox = reversetablerelativebboxes_outer(folder)
@@ -253,7 +265,6 @@ def findoptimalfilterpoint(
         assert len(predscores) == len(predious)
         totalscores += predscores
         totaliou += predious
-        # print(predscores)
     print(totaliou)
     print(totalscores)
     bestpred, preds, sum_fp, sum_tp = findoptimalfilterpoint_inner(
@@ -293,11 +304,19 @@ def findoptimalfilterpoint(
         "w",
     ) as f:
         f.write(str(bestpred))
-    # print(bestpred)
 
 
-def findoptimalfilterpoint_inner(totaliou, totalscores):
-    bestpred = 0
+def findoptimalfilterpoint_inner(totaliou: typing.List, totalscores: typing.List) -> Tuple[typing.Union[float, int], torch.Tensor, torch.Tensor, torch.Tensor]:
+    """Inner function to find the optimal filter point.
+
+    Args:
+        totaliou: list of iou of all BBoxes
+        totalscores: list of scores of all BBoxes
+
+    Returns:
+        bestpred, preds, sum_fp, sum_tp
+
+    """
     totalscores = torch.tensor(totalscores)
     totaliou = torch.tensor(totaliou)
     preds, _ = torch.sort(torch.unique(totalscores))
@@ -307,16 +326,12 @@ def findoptimalfilterpoint_inner(totaliou, totalscores):
     # print(totalscores)
     # print(totaliou)
     for idx, pred in enumerate(preds):
-        assert torch.equal(
-            len(totaliou[totalscores >= pred])
-            - torch.sum(totaliou[totalscores >= pred] >= 0.5),
-            torch.sum(totaliou[totalscores >= pred] < 0.5),
-        )
+        assert torch.equal(len(totaliou[totalscores >= pred]) - torch.sum(totaliou[totalscores >= pred] >= 0.5), torch.sum(totaliou[totalscores >= pred] < 0.5))
         # bestpred += pred * (torch.sum(totaliou[totalscores == pred] >= 0.5) / totaliou[totalscores == pred])
         sum_tp[idx] = torch.sum(totaliou[totalscores >= pred] >= 0.5)
         sum_fp[idx] = torch.sum(totaliou[totalscores >= pred] < 0.5)
     bestpred = round(torch.min(preds[torch.argmax(sum_tp - sum_fp)]).item(), 2)
-    ###edge cases#######
+    # edge cases
     if bestpred == 0.0:
         bestpred = 0.01
     elif bestpred == 1.0:
@@ -324,53 +339,17 @@ def findoptimalfilterpoint_inner(totaliou, totalscores):
     return bestpred, preds, sum_fp, sum_tp
 
 
-if __name__ == "__main__":
-    # findoptimalfilterpoint_outer(valid=True, modellist=['GloSatFullImage1_GloSat_fullimage_e250_es.pt',
-    #                                                                 'GloSatFullImage_random_GloSat_fullimage_e250_random_init_es.pt','BonnDataFullImage1_BonnData_fullimage_e250_es.pt',
-    #                                                                 'BonnDataFullImage_pretrain_GloSatFullImage1_GloSat_fullimage_e250_es_BonnData_fullimage_e250_es.pt', 'testseveralcalls_4_with_valid_split_Tablesinthewild_fullimage_e50_es.pt',
-    #                              'testseveralcalls_valid_random_init_e_250_es.pt'])
-    # findoptimalfilterpoint_outer(valid=False,modellist=['GloSatFullImage1_GloSat_fullimage_e250_es.pt',
-    #                                                                 'GloSatFullImage_random_GloSat_fullimage_e250_random_init_es.pt','BonnDataFullImage1_BonnData_fullimage_e250_es.pt',
-    #                                                                 'BonnDataFullImage_pretrain_GloSatFullImage1_GloSat_fullimage_e250_es_BonnData_fullimage_e250_es.pt', 'testseveralcalls_4_with_valid_split_Tablesinthewild_fullimage_e50_es.pt',
-    #                              'testseveralcalls_valid_random_init_e_250_es.pt'])
-
-    findoptimalfilterpoint_outer(
-        modellist=[
-            # "tabletransformer_v0_new_BonnDataFullImage_tabletransformer_estest_BonnData_fullimage_e1_init_tabletransformer_v0_new_GloSatFullImage_tabletransformer_newenv_fixed_GloSat_fullimage_e250_valid_es.pt_valid_es.pt", "tabletransformer_v0_new_BonnDataFullImage_tabletransformer_estest_BonnData_fullimage_e1_init_tabletransformer_v0_new_GloSatFullImage_tabletransformer_newenv_fixed_GloSat_fullimage_e250_valid_es.pt_valid_end.pt", "tabletransformer_v0_new_BonnDataFullImage_tabletransformer_estest_BonnData_fullimage_e250_valid_es.pt", "tabletransformer_v0_new_BonnDataFullImage_tabletransformer_estest_BonnData_fullimage_e250_valid_end.pt", "tabletransformer_v0_new_GloSatFullImage_tabletransformer_newenv_fixed_GloSat_fullimage_e250_valid_es.pt", "tabletransformer_v0_new_GloSatFullImage_tabletransformer_newenv_fixed_GloSat_fullimage_e250_valid_end.pt", "tabletransformer_v0_new_BonnDataFullImage_tabletransformer_loadtest_BonnData_fullimage_e250_init_tabletransformer_v0_new_GloSatFullImage_tabletransformer_newenv_fixed_GloSat_fullimage_e250_valid_es.pt_valid_es.pt",
-            "titw_severalcalls_2_e250_es.pt",
-            "titw_severalcalls_2_e250_end.pt",
-            "titw_call_aachen_e250_es.pt",
-            "titw_call_aachen_e250_end.pt",
-        ],
-        modelfolder=f"{Path(__file__).parent.absolute()}/../../../checkpoints/tabletransformer",
-        valid=True,
-        modeltype="tabletransformer",
-    )
-    # findoptimalfilterpoint_outer(modellist=[
-    # "tabletransformer_v0_new_BonnDataFullImage_tabletransformer_estest_BonnData_fullimage_e1_init_tabletransformer_v0_new_GloSatFullImage_tabletransformer_newenv_fixed_GloSat_fullimage_e250_valid_es.pt_valid_es.pt",
-    # "tabletransformer_v0_new_BonnDataFullImage_tabletransformer_estest_BonnData_fullimage_e1_init_tabletransformer_v0_new_GloSatFullImage_tabletransformer_newenv_fixed_GloSat_fullimage_e250_valid_es.pt_valid_end.pt",
-    # "tabletransformer_v0_new_BonnDataFullImage_tabletransformer_estest_BonnData_fullimage_e250_valid_es.pt",
-    # "tabletransformer_v0_new_BonnDataFullImage_tabletransformer_estest_BonnData_fullimage_e250_valid_end.pt",
-    # "tabletransformer_v0_new_GloSatFullImage_tabletransformer_newenv_fixed_GloSat_fullimage_e250_valid_es.pt",
-    # "tabletransformer_v0_new_GloSatFullImage_tabletransformer_newenv_fixed_GloSat_fullimage_e250_valid_end.pt", "tabletransformer_v0_new_BonnDataFullImage_tabletransformer_loadtest_BonnData_fullimage_e250_init_tabletransformer_v0_new_GloSatFullImage_tabletransformer_newenv_fixed_GloSat_fullimage_e250_valid_es.pt_valid_es.pt",
-    #    "titw_severalcalls_2_e250_es.pt", "titw_severalcalls_2_e250_end.pt", "titw_call_aachen_e250_es.pt", "titw_call_aachen_e250_end.pt"],
-    #                             modelfolder=f"{Path(__file__).parent.absolute()}/../../../checkpoints/tabletransformer",
-    #                             valid=False, modeltype="tabletransformer")
-    # findoptimalfilterpoint(modelpath=f"{Path(__file__).parent.absolute()}/../../../checkpoints/fasterrcnn/BonnDataFullImage1_BonnData_fullimage_e250_es.pt", testdatasetpath=f"{Path(__file__).parent.absolute()}/../../../data/BonnData/test", valid=True)
-
-
-def BonnTablebyCat(
-    categoryfile: str = f"{Path(__file__).parent.absolute()}/../../../data/BonnData/Tabellen/allinfosubset_manuell_vervollständigt.xlsx",
-    resultfile: str = f"{Path(__file__).parent.absolute()}/../../../results/kosmos25/testevaltotal/BonnData_Tables/fullimageiodt.csv",
+def bonntablebycat(
+    categoryfile: str,  # f"{Path(__file__).parent.absolute()}/../../../data/BonnData/Tabellen/allinfosubset_manuell_vervollständigt.xlsx"
+    resultfile: str,  # f"{Path(__file__).parent.absolute()}/../../../results/kosmos25/testevaltotal/BonnData_Tables/fullimageiodt.csv"
     resultmetric: str = "iodt",
 ):
-    """
-    filter bonntable eval results by category and calculate wf1 over different categories
-    Args:
-        categoryfile:
-        resultfile:
+    """Filter bonntable eval results by category and calculate wf1 over different categories.
 
-    Returns:
+    Args:
+        categoryfile: xlsx file of categories the images belong to
+        resultfile: results for full image
+        resultmetric: metric to calculate
 
     """
     df = pd.read_csv(resultfile)
@@ -399,34 +378,37 @@ def BonnTablebyCat(
             subsetwf1df["category"].append(cat)
             subsetwf1df["len"].append(len(subset))
             # print(subset[subset['prednum'].eq(0) == True])
-            subsetwf1df["nopred"].append(len(subset[subset["prednum"].eq(0) == True]))
+            subsetwf1df["nopred"].append(len(subset[subset["prednum"].eq(0) is True]))
     if len(df1[pd.isna(df1.category)]) > 0:
         subset = df1[pd.isna(df1.category)]
         subsetwf1df["category"].append("no category")
         subsetwf1df["len"].append(len(subset))
         subsetwf1df["wf1"].append(subset.wf1.sum() / len(subset))
-        subsetwf1df["nopred"].append(len(subset[subset["nopred"].eq(0) == True]))
+        subsetwf1df["nopred"].append(len(subset[subset["nopred"].eq(0) is True]))
     saveloc = f"{'/'.join(resultfile.split('/')[:-1])}/{resultmetric}_bycategory.xlsx"
     pd.DataFrame(subsetwf1df).set_index("category").to_excel(saveloc)
 
 
 def calcstats_iodt(
-    predbox: torch.tensor,
-    targetbox: torch.tensor,
+    predbox: torch.Tensor,
+    targetbox: torch.Tensor,
     imname: str = None,
-    iou_thresholds: List[float] = [0.5, 0.6, 0.7, 0.8, 0.9],
+    iou_thresholds: List[float] = None,
 ) -> Tuple[torch.Tensor, torch.Tensor, torch.Tensor, torch.Tensor, torch.Tensor]:
-    """
-    Calculate tp, tp, fn based on IoDT (Intersection over Detection) at given IoU Thresholds
+    """Calculate tp, fp, fn based on IoDT (Intersection over Detection) at given IoU Thresholds.
+
     Args:
-        predbox:
-        targetbox:
-        imname:
-        iou_thresholds:
+        predbox: prediction BBoxes
+        targetbox: target BBoxes
+        imname: image name
+        iou_thresholds: iou thresholds at which to calculate tp, fp, fn
 
     Returns:
+        prediodt, targetiodt, tp, fp, fn
 
     """
+    if iou_thresholds is None:
+        iou_thresholds = [0.5, 0.6, 0.7, 0.8, 0.9]
     threshold_tensor = torch.tensor(iou_thresholds)
     if not predbox.numel():
         # print(predbox.shape)
@@ -470,14 +452,15 @@ def calcstats_iodt(
     return prediodt, targetiodt, tp, fp, fn
 
 
-def intersection_over_detection(predbox, targetbox):
-    """
-    Calculate the IoDT (Intersection over Detection Metric): Intersection of prediction and target over the total prediction area
+def intersection_over_detection(predbox: torch.Tensor, targetbox: torch.Tensor) -> torch.Tensor:
+    """Calculate the IoDT (Intersection over Detection Metric): Intersection of prediction and target over the total prediction area.
+
     Args:
-        predbox:
-        targetbox:
+        predbox: prediction BBoxes
+        targetbox: ground truth BBoxes
 
     Returns:
+        IoDT
 
     """
     inter, union = _box_inter_union(targetbox, predbox)
@@ -491,21 +474,22 @@ def intersection_over_detection(predbox, targetbox):
 
 
 def calcstats_overlap(
-    predbox: torch.tensor, targetbox: torch.tensor, imname: str = None, fuzzy: int = 25
+    predbox: torch.Tensor, targetbox: torch.Tensor, imname: str = None, fuzzy: int = 25
 ) -> Tuple[torch.Tensor, torch.Tensor, torch.Tensor]:
-    """
-    Calculates stats based on wether a prediciton box fully overlaps with a target box instead of IoU
+    """Calculates stats based on wether a prediciton box fully overlaps with a target box instead of IoU.
+
     tp = prediciton lies fully within a target box
     fp = prediciton does not lie fully within a target box
     fn = target boxes that do not have a prediciton lying fully within them
+
     Args:
-        fuzzy:
-        predbox:
-        targetbox:
-        imname:
+        fuzzy: how much difference is allowed where it still counts as full overlap
+        predbox: prediction BBox
+        targetbox: groundtruth BBox
+        imname: image name
 
     Returns:
-
+        tp, fp, fn
 
     """
     # print(predbox.shape, targetbox.shape)
@@ -543,9 +527,7 @@ def calcstats_overlap(
 def calcmetric_overlap(
     tp: torch.Tensor, fp: torch.Tensor, fn: torch.Tensor
 ) -> Tuple[torch.Tensor, torch.Tensor, torch.Tensor]:
-    """
-    Calculate Metrics from true positives, false positives, false negatives based on wether a prediciton box fully
-    overlaps with a target box
+    """Calculate Metrics from true positives, false positives, false negatives based on wether a prediciton box fully overlaps with a target box.
 
     Args:
         tp: true positives
@@ -553,7 +535,7 @@ def calcmetric_overlap(
         fn: false negatives
 
     Returns:
-
+        precision, recall, f1
 
     """
     precision = torch.nan_to_num(tp / (tp + fp))
@@ -563,9 +545,9 @@ def calcmetric_overlap(
 
 
 def calcstats_iou(
-    predbox: torch.tensor,
-    targetbox: torch.tensor,
-    iou_thresholds: List[float] = [0.5, 0.6, 0.7, 0.8, 0.9],
+    predbox: torch.Tensor,
+    targetbox: torch.Tensor,
+    iou_thresholds: List[float] = None,
     imname: str = None,
 ) -> Tuple[torch.Tensor, torch.Tensor, torch.Tensor, torch.Tensor, torch.Tensor]:
     """Calculates IoU and resulting tp, fp, fn.
@@ -578,11 +560,14 @@ def calcstats_iou(
         predbox: predictions
         targetbox: targets
         iou_thresholds: List of IoU Thresholds
+        imname: name of image
 
     Returns:
         tuple of predious, targetious, tp, fp, fn
 
     """
+    if iou_thresholds is None:
+        iou_thresholds = [0.5, 0.6, 0.7, 0.8, 0.9]
     threshold_tensor = torch.tensor(iou_thresholds)
     if not predbox.numel():
         warnings.warn(
@@ -625,9 +610,9 @@ def calcmetric(
     tp: torch.Tensor,
     fp: torch.Tensor,
     fn: torch.Tensor,
-    iou_thresholds: List[float] = [0.5, 0.6, 0.7, 0.8, 0.9],
+    iou_thresholds: List[float] = None,
 ) -> Tuple[torch.Tensor, torch.Tensor, torch.Tensor, torch.Tensor]:
-    """ Calculate Metrics from true positives, false positives, false negatives at given iou thresholds.
+    """Calculate Metrics from true positives, false positives, false negatives at given iou thresholds.
 
     Args:
         tp: True Positives
@@ -639,6 +624,8 @@ def calcmetric(
         precision, recall, f1, wf1
 
     """
+    if iou_thresholds is None:
+        iou_thresholds = [0.5, 0.6, 0.7, 0.8, 0.9]
     threshold_tensor = torch.tensor(iou_thresholds)
     precision = torch.nan_to_num(tp / (tp + fp))
     recall = torch.nan_to_num(tp / (tp + fn))
@@ -648,19 +635,36 @@ def calcmetric(
 
 
 def get_dataframe(
-    fnsum,
-    fpsum,
-    tpsum,
+    fnsum: torch.Tensor,
+    fpsum: torch.Tensor,
+    tpsum: torch.Tensor,
     nopredcount: int = None,
     imnum: int = None,
-    iou_thresholds: List[float] = [0.5, 0.6, 0.7, 0.8, 0.9],
-):
+    iou_thresholds: List[float] = None,
+) -> dict:
+    """Create dataframe from stats.
+
+    Args:
+        fnsum: sum of false negatives
+        fpsum: sum of false positives
+        tpsum: sum of true positives
+        nopredcount: number of images without prediction
+        imnum: number of evaluated files
+        iou_thresholds: iou thresholds
+
+    Returns:
+        dict with metrics
+
+    """
+    if iou_thresholds is None:
+        iou_thresholds = [0.5, 0.6, 0.7, 0.8, 0.9]
+
     totalfullprec, totalfullrec, totalfullf1, totalfullwf1 = calcmetric(
         tpsum, fpsum, fnsum, iou_thresholds=iou_thresholds
     )
     totalfullmetrics = {"wf1": totalfullwf1.item()}
-    totalfullmetrics.update({f"Number of evaluated files": imnum})
-    totalfullmetrics.update({f"Evaluated files without predictions:": nopredcount})
+    totalfullmetrics.update({"Number of evaluated files": imnum})
+    totalfullmetrics.update({"Evaluated files without predictions:": nopredcount})
     totalfullmetrics.update(
         {
             f"f1@{iou_thresholds[i]}": totalfullf1[i].item()
@@ -689,3 +693,42 @@ def get_dataframe(
         {f"fn@{iou_thresholds[i]}": fnsum[i].item() for i in range(len(iou_thresholds))}
     )
     return totalfullmetrics
+
+
+if __name__ == "__main__":
+    # findoptimalfilterpoint_outer(valid=True, modellist=['GloSatFullImage1_GloSat_fullimage_e250_es.pt',
+    #                                                                 'GloSatFullImage_random_GloSat_fullimage_e250_random_init_es.pt','BonnDataFullImage1_BonnData_fullimage_e250_es.pt',
+    #                                                                 'BonnDataFullImage_pretrain_GloSatFullImage1_GloSat_fullimage_e250_es_BonnData_fullimage_e250_es.pt', 'testseveralcalls_4_with_valid_split_Tablesinthewild_fullimage_e50_es.pt',
+    #                              'testseveralcalls_valid_random_init_e_250_es.pt'])
+    # findoptimalfilterpoint_outer(valid=False,modellist=['GloSatFullImage1_GloSat_fullimage_e250_es.pt',
+    #                                                                 'GloSatFullImage_random_GloSat_fullimage_e250_random_init_es.pt','BonnDataFullImage1_BonnData_fullimage_e250_es.pt',
+    #                                                                 'BonnDataFullImage_pretrain_GloSatFullImage1_GloSat_fullimage_e250_es_BonnData_fullimage_e250_es.pt', 'testseveralcalls_4_with_valid_split_Tablesinthewild_fullimage_e50_es.pt',
+    #                              'testseveralcalls_valid_random_init_e_250_es.pt'])
+
+    findoptimalfilterpoint_outer(
+        modellist=[
+            # "tabletransformer_v0_new_BonnDataFullImage_tabletransformer_estest_BonnData_fullimage_e1_init_tabletransformer_v0_new_GloSatFullImage_tabletransformer_newenv_fixed_GloSat_fullimage_e250_valid_es.pt_valid_es.pt",
+            # "tabletransformer_v0_new_BonnDataFullImage_tabletransformer_estest_BonnData_fullimage_e1_init_tabletransformer_v0_new_GloSatFullImage_tabletransformer_newenv_fixed_GloSat_fullimage_e250_valid_es.pt_valid_end.pt",
+            # "tabletransformer_v0_new_BonnDataFullImage_tabletransformer_estest_BonnData_fullimage_e250_valid_es.pt", "tabletransformer_v0_new_BonnDataFullImage_tabletransformer_estest_BonnData_fullimage_e250_valid_end.pt",
+            # "tabletransformer_v0_new_GloSatFullImage_tabletransformer_newenv_fixed_GloSat_fullimage_e250_valid_es.pt", "tabletransformer_v0_new_GloSatFullImage_tabletransformer_newenv_fixed_GloSat_fullimage_e250_valid_end.pt",
+            # "tabletransformer_v0_new_BonnDataFullImage_tabletransformer_loadtest_BonnData_fullimage_e250_init_tabletransformer_v0_new_GloSatFullImage_tabletransformer_newenv_fixed_GloSat_fullimage_e250_valid_es.pt_valid_es.pt",
+            "titw_severalcalls_2_e250_es.pt",
+            "titw_severalcalls_2_e250_end.pt",
+            "titw_call_aachen_e250_es.pt",
+            "titw_call_aachen_e250_end.pt",
+        ],
+        modelfolder=f"{Path(__file__).parent.absolute()}/../../../checkpoints/tabletransformer",
+        valid=True,
+        modeltype="tabletransformer",
+    )
+    # findoptimalfilterpoint_outer(modellist=[
+    # "tabletransformer_v0_new_BonnDataFullImage_tabletransformer_estest_BonnData_fullimage_e1_init_tabletransformer_v0_new_GloSatFullImage_tabletransformer_newenv_fixed_GloSat_fullimage_e250_valid_es.pt_valid_es.pt",
+    # "tabletransformer_v0_new_BonnDataFullImage_tabletransformer_estest_BonnData_fullimage_e1_init_tabletransformer_v0_new_GloSatFullImage_tabletransformer_newenv_fixed_GloSat_fullimage_e250_valid_es.pt_valid_end.pt",
+    # "tabletransformer_v0_new_BonnDataFullImage_tabletransformer_estest_BonnData_fullimage_e250_valid_es.pt",
+    # "tabletransformer_v0_new_BonnDataFullImage_tabletransformer_estest_BonnData_fullimage_e250_valid_end.pt",
+    # "tabletransformer_v0_new_GloSatFullImage_tabletransformer_newenv_fixed_GloSat_fullimage_e250_valid_es.pt",
+    # "tabletransformer_v0_new_GloSatFullImage_tabletransformer_newenv_fixed_GloSat_fullimage_e250_valid_end.pt", "tabletransformer_v0_new_BonnDataFullImage_tabletransformer_loadtest_BonnData_fullimage_e250_init_tabletransformer_v0_new_GloSatFullImage_tabletransformer_newenv_fixed_GloSat_fullimage_e250_valid_es.pt_valid_es.pt",
+    #    "titw_severalcalls_2_e250_es.pt", "titw_severalcalls_2_e250_end.pt", "titw_call_aachen_e250_es.pt", "titw_call_aachen_e250_end.pt"],
+    #                             modelfolder=f"{Path(__file__).parent.absolute()}/../../../checkpoints/tabletransformer",
+    #                             valid=False, modeltype="tabletransformer")
+    # findoptimalfilterpoint(modelpath=f"{Path(__file__).parent.absolute()}/../../../checkpoints/fasterrcnn/BonnDataFullImage1_BonnData_fullimage_e250_es.pt", testdatasetpath=f"{Path(__file__).parent.absolute()}/../../../data/BonnData/test", valid=True)

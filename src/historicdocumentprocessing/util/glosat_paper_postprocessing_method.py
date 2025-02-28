@@ -1,3 +1,5 @@
+"""Postprocessing from GloSAT."""
+
 # Copyright (c) 2021, University of Southampton
 # All rights reserved.
 

@@ -28,10 +28,13 @@ def run_small_test(session):
     session.install("tqdm")
     session.install("scikit-learn")
     session.install("lxml")
+    session.install("lightning")
+    session.install("transformers")
+    session.install("tikzplotlib")
     if session.posargs:
         test_files = session.posargs
     else:
-        test_files = ["tests/ioucalc_test.py"]
+        test_files = ["tests/split_test.py", "tests/ioucalc_test.py"]
     session.run("pytest", *test_files)
 
 

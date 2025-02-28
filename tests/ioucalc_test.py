@@ -1,3 +1,4 @@
+"""Tests for IoU calculation."""
 from pathlib import Path
 
 import pandas
@@ -6,15 +7,12 @@ from bs4 import BeautifulSoup
 from torchvision.ops import box_iou
 
 from src.historicdocumentprocessing.dataprocessing import processdata_wildtable_inner
-from src.historicdocumentprocessing.kosmos_eval import (
-    calcstats_IoU,
-)
-from src.historicdocumentprocessing.util.metricsutil import calcmetric, get_dataframe
+from src.historicdocumentprocessing.util.metricsutil import calcmetric, get_dataframe, calcstats_iou
 from src.historicdocumentprocessing.util.tablesutil import reversetablerelativebboxes_outer
 
 
 def test_ioumetrics():
-
+    """Test for IoU calculation."""
     testpred = torch.tensor([[0, 0, 2, 2], [1, 0, 2, 2], [5, 5, 5.5, 6.5]])
     testground = torch.tensor([[0, 0, 2, 2], [0, 0, 1, 1], [0, 0, 2, 1], [7, 7, 9, 8]])
     # print("predboxes:", testpred)
@@ -56,7 +54,7 @@ def test_ioumetrics():
     # print("tp,fp,fn with pg calc:", tpg, fpg, fng)
     # print("precision, recall with pg calc:", precisiong, recallg)
     # print("f1, wf1: with pg calc", f1g, wf1g)
-    predious, targetious, tp, fp, fn = calcstats_IoU(testpred, testground)
+    predious, targetious, tp, fp, fn = calcstats_iou(testpred, testground)
     precision, recall, f1, wf1 = calcmetric(tp, fp, fn)
     # print("predious:", predious)
     # print("targetious:", targetious)
@@ -91,11 +89,7 @@ def test_ioumetrics():
 
 
 def test_iousum():
-    """
-    wf1 über summe aller tp,fp,fn berechnen nicht als mittel der wf1 werte????
-    Returns:
-
-    """
+    """Test to make sure results are consistent between dataframes."""
     df = pandas.read_csv(
         f"{Path(__file__).parent.absolute()}/../results/fasterrcnn/testevalfinal1/fullimg/Tablesinthewild/testseveralcalls_5_without_valid_split_Tablesinthewild_fullimage_e50_es.pt/iou_0.5_0.9/fullimageiou.csv"
     )
@@ -112,6 +106,7 @@ def test_iousum():
 
 
 def test_inputdata():
+    """Test that input methods and transformations are working correctly."""
     full = torch.load(
         f"{Path(__file__).parent.absolute()}/../data/Tablesinthewild/preprocessed/curved/table_spider_00909/table_spider_00909.pt"
     )
@@ -158,6 +153,6 @@ def test_inputdata():
 
 
 if __name__ == "__main__":
-    # test_inputdata()
-    # test_iousum()
+    test_inputdata()
+    test_iousum()
     test_ioumetrics()

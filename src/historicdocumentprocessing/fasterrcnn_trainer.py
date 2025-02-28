@@ -151,7 +151,7 @@ class Trainer:
         loss_objectness_lst = []
         loss_rpn_box_reg_lst = []
 
-        for img, target in tqdm(self.trainloader, desc="training"):
+        for img, target in tqdm(self.trainloader, desc="fasterrcnn_train"):
             img = img.to(self.device)
             target["boxes"] = target["boxes"][0].to(self.device)
             target["labels"] = target["labels"][0].to(self.device)

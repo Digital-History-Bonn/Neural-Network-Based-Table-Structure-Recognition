@@ -1,3 +1,5 @@
+"""Visualise predictions on image."""
+import argparse
 import glob
 import json
 from pathlib import Path
@@ -15,7 +17,6 @@ from tqdm import tqdm
 from transformers import AutoImageProcessor, TableTransformerForObjectDetection
 
 from src.historicdocumentprocessing.postprocessing import postprocess
-from src.historicdocumentprocessing.tabletransformer_dataset import CustomDataset
 from src.historicdocumentprocessing.util.tablesutil import getcells, remove_invalid_bbox, \
     reversetablerelativebboxes_outer, extractboxes
 from src.historicdocumentprocessing.util.visualisationutil import (
@@ -26,12 +27,26 @@ from src.historicdocumentprocessing.util.visualisationutil import (
 def drawimg_allmodels(
     datasetname: str,
     imgpath: str,
-    rcnnmodels: List[str] = [],
-    tabletransformermodels: List[str] = [],
-    datasetaddon_pred: str = None,
-    datasetaddon_additional: str = "",
+    rcnnmodels: List[str] = None,
+    tabletransformermodels: List[str] = None,
+    predfolder: str = None,
     valid: bool = True,
 ):
+    """Method to draw image for all models.
+
+    Args:
+        datasetname: name of dataset
+        imgpath: path to image
+        rcnnmodels: list of RCNN model names
+        tabletransformermodels: list of Tabletransformer model names
+        predfolder: folder of kosmos predictions (if any)
+        valid: wether to use valid filter thresholds
+
+    """
+    if rcnnmodels is None:
+        rcnnmodels = []
+    if tabletransformermodels is None:
+        tabletransformermodels = []
     imname = imgpath.split("/")[-1].split(".")[-2]
     groundpath = (
         f"{Path(__file__).parent.absolute()}/../../data/{datasetname.split('/')[-2]}/preprocessed/{datasetname.split('/')[-1]}"
@@ -39,7 +54,7 @@ def drawimg_allmodels(
         else f"{Path(__file__).parent.absolute()}/../../data/{datasetname}/test"
     )
     groundpath = f"{groundpath}/{imname}"
-    predpath_kosmos = f'{f"{Path(__file__).parent.absolute()}/../../results/kosmos25/{datasetname}{datasetaddon_additional}/{imname}/{imname}" if not datasetaddon_pred else f"{Path(__file__).parent.absolute()}/../../results/kosmos25/{datasetname}/{datasetaddon_pred}/{imname}/{imname}"}.jpg.json'
+    predpath_kosmos = f'{f"{Path(__file__).parent.absolute()}/../../results/kosmos25/{datasetname}/{imname}/{imname}" if not predfolder else f"{Path(__file__).parent.absolute()}/../../results/kosmos25/{datasetname}/{predfolder}/{imname}/{imname}"}.jpg.json'
     predpath_kosmos_postprocessed = f"{Path(__file__).parent.absolute()}/../../results/kosmos25/postprocessed/fullimg/{datasetname}/eps_3.0_1.5/withoutoutlier_excludeoutliers_glosat/{imname}/{imname}.pt"
     predpath_rcnn_postprocessed = f"{Path(__file__).parent.absolute()}/../../results/fasterrcnn/postprocessed/fullimg/{datasetname}"
     for name, path in zip(
@@ -158,16 +173,16 @@ def drawimg_allmodels(
             filterthreshold = 0.7
         # print(filterthreshold)
         img = Image.open(imgpath).convert("RGB")
-        ImageProcessor = AutoImageProcessor.from_pretrained(
+        image_processor = AutoImageProcessor.from_pretrained(
             "microsoft/table-transformer-structure-recognition"
         )
         encoding = move_data_to_device(
-            ImageProcessor(img, return_tensors="pt"), device=device
+            image_processor(img, return_tensors="pt"), device=device
         )
         with torch.no_grad():
             results = model(**encoding)
         width, height = img.size
-        output = ImageProcessor.post_process_object_detection(
+        output = image_processor.post_process_object_detection(
             results, threshold=0.0, target_sizes=[(height, width)]
         )[0]
         cellboxes = getcells(
@@ -180,7 +195,7 @@ def drawimg_allmodels(
                 output["boxes"][output["labels"] == 1],
             ]
         ).to(device="cpu")
-        outputfiltered = ImageProcessor.post_process_object_detection(
+        outputfiltered = image_processor.post_process_object_detection(
             results, threshold=filterthreshold, target_sizes=[(height, width)]
         )[0]
         cellboxesfiltered = getcells(
@@ -246,16 +261,22 @@ def drawimg_allmodels(
 
 
 def drawimg_varformat(
-    impath: str = f"{Path(__file__).parent.absolute()}/../../data/BonnData/test/Konflikttabelle.jpg",
-    predpath: str = f"{Path(__file__).parent.absolute()}/../../results/kosmos25/Konflikttabelle.jpg.json",
+    impath: str,  # f"{Path(__file__).parent.absolute()}/../../data/BonnData/test/Konflikttabelle.jpg"
+    predpath: str,  # f"{Path(__file__).parent.absolute()}/../../results/kosmos25/Konflikttabelle.jpg.json"
     groundpath: str = None,
     savepath: str = None,
     tableonly: bool = True,
 ):
-    # img = plt.imread(impath)
-    # img.setflags(write=1)
-    # img = img.copy()
-    # print(img.flags)
+    """Draw prediction (and ground truth) on image (when prediciton has been saved to file).
+
+    Args:
+        impath: image path
+        predpath: prediction path
+        groundpath: ground truth path
+        savepath: where to save image
+        tableonly: wether to draw all predictions or only predictions in table area
+
+    """
     print(groundpath)
     if "json" in predpath:
         with open(predpath) as s:
@@ -266,67 +287,70 @@ def drawimg_varformat(
         box = torch.load(predpath)
     else:
         box = reversetablerelativebboxes_outer(predpath)
-
-    labels = ["Pred" for i in range(box.shape[0])]
-    colors = ["green" for i in range(box.shape[0])]
-    # with open(predpath) as s:
-    #    box = extractboxes(json.load(s))
-    # print(img.shape)
-    # print(box, box.numel())
     if not box.numel():
         print(predpath.split("/")[-1])
 
     drawimg_varformat_inner(
         box=box, groundpath=groundpath, impath=impath, savepath=savepath
     )
-    # plt.show()
 
 
 def drawimages(
-    impath: str = f"{Path(__file__).parent.absolute()}/../../data/BonnData/test",
-    jsonpath: str = f"{Path(__file__).parent.absolute()}/../../results/kosmos25/BonnData/test",
+    impath: str,  # f"{Path(__file__).parent.absolute()}/../../data/BonnData/test"
+    jsonpath: str,  # f"{Path(__file__).parent.absolute()}/../../results/kosmos25/BonnData/test"
     savepath: str = None,
     groundpath: str = None,
 ):
+    """Draw images with prediction and groundtruth for all json files in a folder (kosmos).
+
+    Args:
+        impath: path to image folder
+        jsonpath: path to json files
+        savepath: where to save image
+        groundpath: path to ground truth files
+
+    """
     jsons = glob.glob(f"{jsonpath}/*.json")
-    for json in tqdm(jsons):
-        signifier = json.split("/")[-1].split(".")[-3]
+    for j in tqdm(jsons):
+        signifier = j.split("/")[-1].split(".")[-3]
         img = glob.glob(f"{impath}/{signifier}.jpg")
         drawimg_varformat(
-            impath=img[0], predpath=json, savepath=savepath, groundpath=groundpath
+            impath=img[0], predpath=j, savepath=savepath, groundpath=groundpath
         )
 
 
 def drawimages_var(
-    impath: str = f"{Path(__file__).parent.absolute()}/../../data/BonnData/test",
-    jsonpath: str = f"{Path(__file__).parent.absolute()}/../../results/kosmos25/BonnData/test",
+    impath: str,  # f"{Path(__file__).parent.absolute()}/../../data/BonnData/test"
+    jsonpath: str,  # f"{Path(__file__).parent.absolute()}/../../results/kosmos25/BonnData/test"
     savepath: str = None,
     groundpath: str = None,
     tableonly: bool = True,
     range: int = None,
 ):
+    """Draw all images in folder of saved json/pt predictions.
+
+    Args:
+        impath: image folder
+        jsonpath: path to json/pt files or subfolders
+        savepath: where to save
+        groundpath: path to groundtruth files
+        tableonly:  wether to draw all predictions or only predictions in table area
+        range: max number of images to draw
+
+    """
     jsons = glob.glob(f"{jsonpath}/*.json")
     if len(jsons) == 0:
         jsons = glob.glob(f"{jsonpath}/*")
-        # print(len(jsons), jsons)
-    for json in tqdm(jsons):
-        # print(json)
-        if "json" in json:
-            signifier = json.split("/")[-1].split(".")[-3]
-            # img = glob.glob(f"{impath}/{signifier}.jpg")
-            imgpred = json
+    for j in tqdm(jsons):
+        if "json" in j:
+            signifier = j.split("/")[-1].split(".")[-3]
+            imgpred = j
         else:
-            signifier = json.split("/")[-1]
-            # print(glob.glob(f"{json}/*"),glob.glob(f"{json}/(?!.*_table_)*$"))
-            # imgpred = glob.glob(f"{json}/(?!.*_table_)^.*$")[0]
+            signifier = j.split("/")[-1]
             imgpred = [
-                file for file in glob.glob(f"{json}/*") if "_table_" not in file
+                file for file in glob.glob(f"{j}/*") if "_table_" not in file
             ][0]
-        # signifier = json.split("/")[-1].split(".")[-3]
-        # print(signifier, imgpred)
         img = glob.glob(f"{impath}/{signifier}/{signifier}.jpg")
-        # print(glob.glob(f"{impath}/{signifier}/*"))
-        # print(signifier, img)
         drawimg_varformat(
             impath=img[0],
             predpath=imgpred,
@@ -342,110 +366,29 @@ def drawimages_var(
             range -= 1
             if range <= 0:
                 return
-        # if groundpath:
-        #    groundpathfiner = glob.glob(f"{groundpath}/{signifier}")[0]
-        #    #print(glob.glob(groundpathfiner), groundpathfiner)
-        #    #print(f"{groundpath}/{signifier}", groundpath)
-        #    drawimg_varformat(impath=img[0], predpath=imgpred, savepath=savepath, groundpath=groundpathfiner)
-        # else:
-        #    drawimg_varformat(impath=img[0], predpath=imgpred, savepath=savepath, groundpath=groundpath)
 
 
-def main():
-    pass
+def get_args() -> argparse.Namespace:
+    """Define args."""
+    parser = argparse.ArgumentParser(description="visualisation")
+    parser.add_argument('i', '--imname', default="test", help="name of image")
+    parser.add_argument('-p', '--predfolder', default='', help="prediction folder or folders")
+    parser.add_argument('--datasetname', default="BonnData")
+    parser.add_argument('--rcnnmodels', nargs='*', type=str, default=[])
+    parser.add_argument('--tabletransformermodels', nargs='*', type=str, default=[])
+
+    parser.add_argument('--valid', action='store_true', default=False)
+    parser.add_argument('--no-valid', dest='tableareaonly', action='store_false')
+
+    return parser.parse_args()
 
 
 if __name__ == "__main__":
-    drawimg_allmodels(
-        datasetname="Tablesinthewild/Inclined",
-        imgpath=f"{Path(__file__).parent.absolute()}/../../data/Tablesinthewild/preprocessed/Inclined/000d210d0f9b4101af2006b4aab33c42/000d210d0f9b4101af2006b4aab33c42.jpg",
-        rcnnmodels=[],
-        tabletransformermodels=[
-            "titw_severalcalls_2_e250_es.pt",
-            "titw_severalcalls_2_e250_end.pt",
-            "titw_call_aachen_e250_es.pt",
-            "titw_call_aachen_e250_end.pt",
-        ],
-        datasetaddon_additional="1",
-    )
-    """
-    drawimg_allmodels(datasetname="GloSat",
-                                        imgpath=f"{Path(__file__).parent.absolute()}/../../data/GloSat/preprocessed/471/471.jpg",
-                                        datasetaddon_pred="test1",
-                      #rcnnmodels=['GloSatFullImage1_GloSat_fullimage_e250_es.pt','GloSatFullImage_random_GloSat_fullimage_e250_random_init_es.pt'],
-                      tabletransformermodels=["tabletransformer_v0_new_GloSatFullImage_tabletransformer_newenv_fixed_GloSat_fullimage_e250_valid_es.pt"])
+    args = get_args()
+    impath = f"{Path(__file__).parent.absolute()}/../../data/{args.datasetname}/{args.predfolder}/{args.imname}/{args.imname}.pt"
+    drawimg_allmodels(datasetname=args.datasetname, imgpath=impath, rcnnmodels=args.rcnnmodels, tabletransformermodels=args.tabletransformermodels, predfolder=args.predfolder, valid=args.valid)
+    exit()
 
-    drawimg_allmodels(datasetname="Tablesinthewild/curved", imgpath=f'{Path(__file__).parent.absolute()}/../../data/Tablesinthewild/preprocessed/curved/mit_google_image_search-10918758-7f5f72bb8440c9caf8b07b28ffdc54d33bd370ab/mit_google_image_search-10918758-7f5f72bb8440c9caf8b07b28ffdc54d33bd370ab.jpg', rcnnmodels=[],
-                      tabletransformermodels=["titw_severalcalls_2_e250_es.pt", "titw_severalcalls_2_e250_end.pt",
-        "titw_call_aachen_e250_es.pt", "titw_call_aachen_e250_end.pt"])
-    drawimg_allmodels(datasetname="Tablesinthewild/extremeratio",
-                      imgpath=f'{Path(__file__).parent.absolute()}/../../data/Tablesinthewild/preprocessed/extremeratio/customs-declaration-12039/customs-declaration-12039.jpg', rcnnmodels=[], tabletransformermodels=["titw_severalcalls_2_e250_es.pt", "titw_severalcalls_2_e250_end.pt",
-        "titw_call_aachen_e250_es.pt", "titw_call_aachen_e250_end.pt"], datasetaddon_additional="1")
-    drawimg_allmodels(datasetname="Tablesinthewild/Inclined",
-                      imgpath=f'{Path(__file__).parent.absolute()}/../../data/Tablesinthewild/preprocessed/Inclined/car-invoice-img03807/car-invoice-img03807.jpg', rcnnmodels=[], tabletransformermodels=["titw_severalcalls_2_e250_es.pt", "titw_severalcalls_2_e250_end.pt",
-        "titw_call_aachen_e250_es.pt", "titw_call_aachen_e250_end.pt"], datasetaddon_additional="1")
-    drawimg_allmodels(datasetname="Tablesinthewild/muticolorandgrid",
-                      imgpath=f'{Path(__file__).parent.absolute()}/../../data/Tablesinthewild/preprocessed/muticolorandgrid/1023c6c68d37ed3366fe808dc0d4ab56ba98114f/1023c6c68d37ed3366fe808dc0d4ab56ba98114f.jpg', rcnnmodels=[], tabletransformermodels=["titw_severalcalls_2_e250_es.pt", "titw_severalcalls_2_e250_end.pt",
-        "titw_call_aachen_e250_es.pt", "titw_call_aachen_e250_end.pt"], datasetaddon_additional="1")
-    drawimg_allmodels(datasetname="Tablesinthewild/occblu",
-                      imgpath=f'{Path(__file__).parent.absolute()}/../../data/Tablesinthewild/preprocessed/occblu/Commodity_lst_Medical_SciTSRO1CN01bXt1zh20dshY2Fc3f_!!6000000006873-0-lxb/Commodity_lst_Medical_SciTSRO1CN01bXt1zh20dshY2Fc3f_!!6000000006873-0-lxb.jpg', rcnnmodels=[], tabletransformermodels=["titw_severalcalls_2_e250_es.pt", "titw_severalcalls_2_e250_end.pt",
-        "titw_call_aachen_e250_es.pt", "titw_call_aachen_e250_end.pt"])
-    drawimg_allmodels(datasetname="Tablesinthewild/overlaid",
-                      imgpath=f'{Path(__file__).parent.absolute()}/../../data/Tablesinthewild/preprocessed/overlaid/IMG_0437/IMG_0437.jpg', rcnnmodels=[], tabletransformermodels=["titw_severalcalls_2_e250_es.pt", "titw_severalcalls_2_e250_end.pt",
-        "titw_call_aachen_e250_es.pt", "titw_call_aachen_e250_end.pt"])
-    drawimg_allmodels(datasetname="Tablesinthewild/simple",
-                      imgpath=f'{Path(__file__).parent.absolute()}/../../data/Tablesinthewild/preprocessed/simple/dkl-10-4/dkl-10-4.jpg', rcnnmodels=[], tabletransformermodels=["titw_severalcalls_2_e250_es.pt", "titw_severalcalls_2_e250_end.pt",
-        "titw_call_aachen_e250_es.pt", "titw_call_aachen_e250_end.pt"])
-    drawimg_allmodels(datasetname="BonnData", imgpath=f"{Path(__file__).parent.absolute()}/../../data/BonnData/preprocessed/I_HA_Rep_89_Nr_16160_0227/I_HA_Rep_89_Nr_16160_0227.jpg", datasetaddon_pred="Tabellen/test",
-                      #rcnnmodels=['BonnDataFullImage1_BonnData_fullimage_e250_es.pt','BonnDataFullImage_pretrain_GloSatFullImage1_GloSat_fullimage_e250_es_BonnData_fullimage_e250_es.pt'],
-                      tabletransformermodels=["tabletransformer_v0_new_BonnDataFullImage_tabletransformer_estest_BonnData_fullimage_e250_valid_es.pt", "tabletransformer_v0_new_BonnDataFullImage_tabletransformer_estest_BonnData_fullimage_e1_init_tabletransformer_v0_new_GloSatFullImage_tabletransformer_newenv_fixed_GloSat_fullimage_e250_valid_es.pt_valid_es.pt", "tabletransformer_v0_new_BonnDataFullImage_tabletransformer_loadtest_BonnData_fullimage_e250_init_tabletransformer_v0_new_GloSatFullImage_tabletransformer_newenv_fixed_GloSat_fullimage_e250_valid_es.pt_valid_es.pt"])
-    drawimg_allmodels(datasetname="BonnData",
-                      imgpath=f"{Path(__file__).parent.absolute()}/../../data/BonnData/preprocessed/I_HA_Rep_89_Nr_16160_0170/I_HA_Rep_89_Nr_16160_0170.jpg",
-                      datasetaddon_pred="Tabellen/test",
-                      #rcnnmodels=['BonnDataFullImage1_BonnData_fullimage_e250_es.pt', 'BonnDataFullImage_pretrain_GloSatFullImage1_GloSat_fullimage_e250_es_BonnData_fullimage_e250_es.pt'],
-                      tabletransformermodels=["tabletransformer_v0_new_BonnDataFullImage_tabletransformer_estest_BonnData_fullimage_e250_valid_es.pt", "tabletransformer_v0_new_BonnDataFullImage_tabletransformer_estest_BonnData_fullimage_e1_init_tabletransformer_v0_new_GloSatFullImage_tabletransformer_newenv_fixed_GloSat_fullimage_e250_valid_es.pt_valid_es.pt", "tabletransformer_v0_new_BonnDataFullImage_tabletransformer_loadtest_BonnData_fullimage_e250_init_tabletransformer_v0_new_GloSatFullImage_tabletransformer_newenv_fixed_GloSat_fullimage_e250_valid_es.pt_valid_es.pt"])
-    drawimg_allmodels(datasetname="GloSat",
-                      imgpath=f"{Path(__file__).parent.absolute()}/../../data/GloSat/preprocessed/98/98.jpg",
-                      datasetaddon_pred="test1",
-                      #rcnnmodels=['GloSatFullImage1_GloSat_fullimage_e250_es.pt','GloSatFullImage_random_GloSat_fullimage_e250_random_init_es.pt'],
-                      tabletransformermodels=["tabletransformer_v0_new_GloSatFullImage_tabletransformer_newenv_fixed_GloSat_fullimage_e250_valid_es.pt"])
-    #drawimg_allmodels(datasetname="Tablesinthewild/curved", imgpath=f'{Path(__file__).parent.absolute()}/../../data/Tablesinthewild/preprocessed/curved/mit_google_image_search-10918758-7f5f72bb8440c9caf8b07b28ffdc54d33bd370ab/mit_google_image_search-10918758-7f5f72bb8440c9caf8b07b28ffdc54d33bd370ab.jpg',
-    #                  rcnnmodels=['testseveralcalls_4_with_valid_split_Tablesinthewild_fullimage_e50_es.pt', 'testseveralcalls_valid_random_init_e_250_es.pt'])
-    """
-    """
-    drawimg_allmodels(datasetname="Tablesinthewild/extremeratio",
-                      imgpath=f'{Path(__file__).parent.absolute()}/../../data/Tablesinthewild/preprocessed/extremeratio/customs-declaration-12039/customs-declaration-12039.jpg',
-                      rcnnmodels=['testseveralcalls_4_with_valid_split_Tablesinthewild_fullimage_e50_es.pt',
-                                  'testseveralcalls_valid_random_init_e_250_es.pt'], datasetaddon_additional="1")
-    drawimg_allmodels(datasetname="Tablesinthewild/Inclined",
-                      imgpath=f'{Path(__file__).parent.absolute()}/../../data/Tablesinthewild/preprocessed/Inclined/car-invoice-img03807/car-invoice-img03807.jpg',
-                      rcnnmodels=['testseveralcalls_4_with_valid_split_Tablesinthewild_fullimage_e50_es.pt',
-                                  'testseveralcalls_valid_random_init_e_250_es.pt'], datasetaddon_additional="1")
-    drawimg_allmodels(datasetname="Tablesinthewild/muticolorandgrid",
-                      imgpath=f'{Path(__file__).parent.absolute()}/../../data/Tablesinthewild/preprocessed/muticolorandgrid/1023c6c68d37ed3366fe808dc0d4ab56ba98114f/1023c6c68d37ed3366fe808dc0d4ab56ba98114f.jpg',
-                      rcnnmodels=['testseveralcalls_4_with_valid_split_Tablesinthewild_fullimage_e50_es.pt',
-                                  'testseveralcalls_valid_random_init_e_250_es.pt'], datasetaddon_additional="1")
-    drawimg_allmodels(datasetname="Tablesinthewild/occblu",
-                      imgpath=f'{Path(__file__).parent.absolute()}/../../data/Tablesinthewild/preprocessed/occblu/Commodity_lst_Medical_SciTSRO1CN01bXt1zh20dshY2Fc3f_!!6000000006873-0-lxb/Commodity_lst_Medical_SciTSRO1CN01bXt1zh20dshY2Fc3f_!!6000000006873-0-lxb.jpg',
-                      rcnnmodels=['testseveralcalls_4_with_valid_split_Tablesinthewild_fullimage_e50_es.pt',
-                                  'testseveralcalls_valid_random_init_e_250_es.pt'])
-    drawimg_allmodels(datasetname="Tablesinthewild/overlaid",
-                      imgpath=f'{Path(__file__).parent.absolute()}/../../data/Tablesinthewild/preprocessed/overlaid/IMG_0437/IMG_0437.jpg',
-                      rcnnmodels=['testseveralcalls_4_with_valid_split_Tablesinthewild_fullimage_e50_es.pt',
-                                  'testseveralcalls_valid_random_init_e_250_es.pt'])
-    drawimg_allmodels(datasetname="Tablesinthewild/simple",
-                      imgpath=f'{Path(__file__).parent.absolute()}/../../data/Tablesinthewild/preprocessed/simple/dkl-10-4/dkl-10-4.jpg',
-                      rcnnmodels=['testseveralcalls_4_with_valid_split_Tablesinthewild_fullimage_e50_es.pt',
-                                  'testseveralcalls_valid_random_init_e_250_es.pt'])
-    drawimg_allmodels(datasetname="GloSat",
-                      imgpath=f"{Path(__file__).parent.absolute()}/../../data/GloSat/preprocessed/457/457.jpg",
-                      datasetaddon_pred="test1", rcnnmodels=['GloSatFullImage1_GloSat_fullimage_e250_es.pt',
-                                                             'GloSatFullImage_random_GloSat_fullimage_e250_random_init_es.pt'])
-    drawimg_allmodels(datasetname="GloSat",
-                      imgpath=f"{Path(__file__).parent.absolute()}/../../data/GloSat/preprocessed/471/471.jpg",
-                      datasetaddon_pred="test1", rcnnmodels=['GloSatFullImage1_GloSat_fullimage_e250_es.pt',
-                                                             'GloSatFullImage_random_GloSat_fullimage_e250_random_init_es.pt'])
-    """
     # drawimg_varformat(savepath=f"{Path(__file__).parent.absolute()}/../../images/rcnn/BonnTables/test",
     #                  impath=f"{Path(__file__).parent.absolute()}/../../data/BonnData/Tabellen/test/IMG_20190821_132903/IMG_20190821_132903_table_0.jpg",
     #                  groundpath=f"{Path(__file__).parent.absolute()}/../../data/BonnData/Tabellen/test/IMG_20190821_132903/IMG_20190821_132903_cell_0.pt",

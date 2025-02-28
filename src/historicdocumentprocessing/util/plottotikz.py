@@ -1,24 +1,22 @@
+"""script to create tikz plots from tensorboard from https://github.com/Digital-History-Bonn/HistorischeTabellenSemanticExtraction/blob/main/scripts/tensorboard2tikz.py .
+
+since tikzplotlib is not maintained anymore, this will only work with webcolors<=1.13
 """
-script to create tikz plots from tensorboard
-from https://github.com/Digital-History-Bonn/HistorischeTabellenSemanticExtraction/blob/main/scripts/tensorboard2tikz.py
-"""
-
-"""since tikzplotlib is not maintained anymore, this will only work with webcolors<=1.13"""
-
-from csv import reader
-from pathlib import Path
-from typing import List
-
 import matplotlib.figure
 import requests
 import tikzplotlib
+from csv import reader
+from pathlib import Path
+from typing import List
 from matplotlib import pyplot as plt
 
 
 def tikzplotlib_fix_ncols(obj):
-    """
-    workaround for matplotlib 3.6 renamed legend's _ncol to _ncols, which breaks tikzplotlib
-    from https://github.com/nschloe/tikzplotlib/issues/557
+    """Workaround for matplotlib 3.6 renamed legend's _ncol to _ncols, which breaks tikzplotlib from https://github.com/nschloe/tikzplotlib/issues/557.
+
+    Args:
+        obj: matplotlib fig
+
     """
     if hasattr(obj, "_ncols"):
         obj._ncol = obj._ncols
@@ -27,13 +25,15 @@ def tikzplotlib_fix_ncols(obj):
 
 
 def get(run: str, tag: str, metric: str) -> List[float]:
-    """
-    Gets data from tensorboard
-    :param run: name of the run in tensorboard
-    :param tag: 'Valid' or 'Train'
-    :param metric: metric to get
+    """Gets data from tensorboard.
 
-    :return: List of values
+    Args:
+        run: name of the run in tensorboard
+        tag: 'Valid' or 'Train'
+        metric: metric to get
+
+    Returns:
+        List of values
     """
     response = requests.get(
         f"http://localhost:6006/experiment/defaultExperimentId/data/plugin/scalars/scalars?tag={tag}%2F{metric}&run={run}&format=csv"
@@ -46,15 +46,14 @@ def get(run: str, tag: str, metric: str) -> List[float]:
 
 
 def plot(runs: List[str], tag: str, metric: str):
-    """
-    plots data from tensorboard of runs given in list
-    :param runs: name of the run in tensorboard
-    :param tag: 'Valid' or 'Train'
-    :param metric: metric to get
+    """Plots data from tensorboard of runs given in list.
 
-    :return: List of values
-    """
+    Args:
+        runs: name of the run in tensorboard
+        tag: 'Valid' or 'Train'
+        metric: metric to get
 
+    """
     data = [get(r, tag, metric) for r in runs]
 
     fig = plt.figure()
@@ -71,10 +70,17 @@ def plot(runs: List[str], tag: str, metric: str):
 
 
 def save_plot_as_tikz(fig: matplotlib.figure, savepath: str):
+    """Save matplotlib figure as tikz plot.
+
+    Args:
+        fig: matplotlib figure
+        savepath: save location
+
+    """
     assert savepath.endswith(".tex")
     tikzplotlib_fix_ncols(fig)
     tikzplotlib.save(savepath)
 
 
 if __name__ == "__main__":
-    plot(["run_tables1", "run_cols1"], "Valid", "loss")
+    pass
