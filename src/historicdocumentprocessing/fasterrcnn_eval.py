@@ -3,7 +3,7 @@ import argparse
 import glob
 import os
 from pathlib import Path
-from typing import List
+from typing import Optional, List
 
 import pandas
 import torch
@@ -44,7 +44,7 @@ def inference_fullimg(
     targetloc: str,  # f"{Path(__file__).parent.absolute()}/../../data/Tablesinthewild/test"
     modelpath: str,  # f"{Path(__file__).parent.absolute()}/../../checkpoints/fasterrcnn/test4_Tablesinthewild_fullimage_e50_end.pt"
     datasetname: str = "Tablesinthewild",
-    iou_thresholds: List[float] = None,  # [0.5, 0.6, 0.7, 0.8, 0.9]
+    iou_thresholds: Optional[List[float]] = None,  # [0.5, 0.6, 0.7, 0.8, 0.9]
     filter: bool = True,
     tablerelative: bool = False,
     tableareaonly: bool = False,
@@ -389,7 +389,7 @@ def inference_tablecutout(
     datapath: str,  # f"{Path(__file__).parent.absolute()}/../../data/BonnData/test"
     modelpath: str,  # f"{Path(__file__).parent.absolute()}/../../checkpoints/fasterrcnn/run3_BonnData_cell_aug_loadrun_GloSAT_cell_aug_e250_es_e250_es.pt",
     datasetname: str = "BonnData",
-    iou_thresholds: List[float] = None,  # [0.5, 0.6, 0.7, 0.8, 0.9]
+    iou_thresholds: Optional[List[float]] = None,  # [0.5, 0.6, 0.7, 0.8, 0.9]
     filtering=False,
     saveboxes=False,
 ):

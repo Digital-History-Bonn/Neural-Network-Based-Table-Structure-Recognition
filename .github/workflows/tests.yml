@@ -20,7 +20,7 @@ jobs:
         run: pip install nox
       - name: Test with pytest
         run:
-          nox -s limited-test
+          nox -s small-limited-test
   lint:
     name: lint
     runs-on: ubuntu-latest

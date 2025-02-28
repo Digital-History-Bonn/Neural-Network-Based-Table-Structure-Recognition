@@ -43,6 +43,7 @@ from torchvision.utils import draw_bounding_boxes
 from transformers import AutoModelForObjectDetection
 
 from src.historicdocumentprocessing.tabletransformer_dataset import CustomDataset
+from typing import Optional
 
 
 class TableTransformer(pl.LightningModule):
@@ -54,10 +55,10 @@ class TableTransformer(pl.LightningModule):
         weight_decay,
         testdataset: CustomDataset,
         traindataset: CustomDataset,
-        valdataset: CustomDataset = None,
+        valdataset: Optional[CustomDataset] = None,
         datasetname: str = "BonnData",
-        savepath: str = None,
-        loadmodelcheckpoint: str = None,
+        savepath: Optional[str] = None,
+        loadmodelcheckpoint: Optional[str] = None,
     ):
         """Class to train TableTransformer models.
 

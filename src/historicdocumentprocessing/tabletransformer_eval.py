@@ -3,7 +3,7 @@ import argparse
 import glob
 import os
 from pathlib import Path
-from typing import List
+from typing import Optional, List
 
 import pandas
 import torch
@@ -21,9 +21,9 @@ from src.historicdocumentprocessing.util.tablesutil import getcells
 
 
 def inference(
-    modelpath: str = None,
+    modelpath: Optional[str] = None,
     targetloc=None,
-    iou_thresholds: List[float] = None,
+    iou_thresholds: Optional[List[float]] = None,
     tableareaonly=False,
     filtering: bool = False,
     valid: bool = True,

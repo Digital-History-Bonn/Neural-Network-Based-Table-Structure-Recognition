@@ -4,7 +4,7 @@ import glob
 import json
 import os
 from pathlib import Path
-from typing import Literal, Tuple
+from typing import Optional, Literal, Tuple
 
 import pandas
 import torch
@@ -39,9 +39,9 @@ def postprocess_rcnn_sep(
     targetloc=None,
     datasetname=None,
     filter: bool = False,
-    iou_thresholds: List[float] = None,  # [0.5, 0.6, 0.7, 0.8, 0.9]
+    iou_thresholds: Optional[List[float]] = None,  # [0.5, 0.6, 0.7, 0.8, 0.9]
     epsprefactor=tuple([3.0, 1.5]),
-    minsamples: List[int] = None,  # [2, 3]
+    minsamples: Optional[List[int]] = None,  # [2, 3]
 ):
     """Seperately calculate metrics for table coords by DBSCAN clustering image cells into tables and for GloSAT Cell Postprocessing using ground truth tables.
 
@@ -265,12 +265,12 @@ def postprocess_rcnn_sep(
 
 
 def postprocess_kosmos_sep(
-    targetloc: str = None,  # f"{Path(__file__).parent.absolute()}/../../data/BonnData/test"
-    predloc: str = None,  # f"{Path(__file__).parent.absolute()}/../../results/kosmos25/BonnData/Tabellen/test"
+    targetloc: Optional[str] = None,  # f"{Path(__file__).parent.absolute()}/../../data/BonnData/test"
+    predloc: Optional[str] = None,  # f"{Path(__file__).parent.absolute()}/../../results/kosmos25/BonnData/Tabellen/test"
     datasetname: str = "BonnData",
-    iou_thresholds: List[float] = None,  # [0.5, 0.6, 0.7, 0.8, 0.9]
+    iou_thresholds: Optional[List[float]] = None,  # [0.5, 0.6, 0.7, 0.8, 0.9]
     epsprefactorchange=tuple([3.0, 1.5]),
-    minsamples: List[int] = None,  # [2, 3]  # [4, 5]
+    minsamples: Optional[List[int]] = None,  # [2, 3]  # [4, 5]
 ):
     """Seperately calculate metrics for table coords by DBSCAN clustering image cells into tables and for GloSAT Cell Postprocessing using ground truth tables.
 
@@ -482,9 +482,9 @@ def postprocess_eval_tablesep(
     imname: str,
     includeoutlier: bool = False,
     epsprefactorchange=None,
-    minsamples: List[int] = None,  # [2, 3]  # [4, 5]
-    targetloc: str = None,
-    iou_thresholds: List[float] = None,  # [0.5, 0.6, 0.7, 0.8, 0.9]
+    minsamples: Optional[List[int]] = None,  # [2, 3]  # [4, 5]
+    targetloc: Optional[str] = None,
+    iou_thresholds: Optional[List[float]] = None,  # [0.5, 0.6, 0.7, 0.8, 0.9]
 ) -> Tuple[torch.Tensor, torch.Tensor, torch.Tensor, torch.Tensor, torch.Tensor]:
     """Evaluation for table coords extracted by DBSCAN clustering image cells into tables.
 
@@ -529,8 +529,8 @@ def postprocess_eval_tablesep(
 def postprocess_eval_cellsep(
     fullimagepredbox: torch.Tensor,
     imname: str,
-    targetloc: str = None,
-    iou_thresholds: List[float] = None,  # [0.5, 0.6, 0.7, 0.8, 0.9]
+    targetloc: Optional[str] = None,
+    iou_thresholds: Optional[List[float]] = None,  # [0.5, 0.6, 0.7, 0.8, 0.9]
     tablerelative: bool = True,
 ) -> Tuple[torch.Tensor, torch.Tensor, torch.Tensor, torch.Tensor, torch.Tensor]:
     """Evaluate GloSAT Cell Postprocessing using ground truth tables.
@@ -644,7 +644,7 @@ def postprocess(
     includeoutliers_cellsearch: bool = False,
     saveempty: bool = False,
     epsprefactorchange=None,
-    minsamples: List[int] = None,  # [2, 3],  # [4, 5]
+    minsamples: Optional[List[int]] = None,  # [2, 3],  # [4, 5]
 ) -> torch.Tensor:
     """Inner method for postprocessing, cluster tables and apply GloSAT postprocessing.
 
@@ -748,9 +748,9 @@ def postprocess_rcnn(
 
 
 def postprocess_tabletransformer(
-    modelname: str = None,
-    targetloc: str = None,
-    datasetname: str = None,
+    modelname: Optional[str] = None,
+    targetloc: Optional[str] = None,
+    datasetname: Optional[str] = None,
     filter: bool = False,
     valid=True,
 ):
@@ -827,16 +827,16 @@ def postprocess_tabletransformer(
 def postprocess_eval(
     datasetname: str,
     modeltype: Literal["kosmos25", "fasterrcnn", "tabletransformer"] = "kosmos25",
-    targetloc: str = None,
-    modelname: str = None,
+    targetloc: Optional[str] = None,
+    modelname: Optional[str] = None,
     tablerelative=True,
-    iou_thresholds: List[float] = None,  # [0.5, 0.6, 0.7, 0.8, 0.9]
+    iou_thresholds: Optional[List[float]] = None,  # [0.5, 0.6, 0.7, 0.8, 0.9]
     # tableareaonly=False,
     includeoutliers_cellsearch=False,
     filter: bool = False,
     valid: bool = True,
     epsprefactor=tuple([3.0, 1.5]),
-    minsamples: List[int] = None,  # [2, 3],  # [4, 5]
+    minsamples: Optional[List[int]] = None,  # [2, 3],  # [4, 5]
 ):
     """Evaluate postprocessing results.
 

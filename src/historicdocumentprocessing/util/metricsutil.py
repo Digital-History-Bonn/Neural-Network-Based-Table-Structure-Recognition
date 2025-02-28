@@ -5,7 +5,7 @@ import os
 import typing
 import warnings
 from pathlib import Path
-from typing import List, Literal, Tuple
+from typing import Optional, List, Literal, Tuple
 
 import pandas as pd
 import torch
@@ -392,8 +392,8 @@ def bonntablebycat(
 def calcstats_iodt(
     predbox: torch.Tensor,
     targetbox: torch.Tensor,
-    imname: str = None,
-    iou_thresholds: List[float] = None,
+    imname: Optional[str] = None,
+    iou_thresholds: Optional[List[float]] = None,
 ) -> Tuple[torch.Tensor, torch.Tensor, torch.Tensor, torch.Tensor, torch.Tensor]:
     """Calculate tp, fp, fn based on IoDT (Intersection over Detection) at given IoU Thresholds.
 
@@ -474,7 +474,7 @@ def intersection_over_detection(predbox: torch.Tensor, targetbox: torch.Tensor) 
 
 
 def calcstats_overlap(
-    predbox: torch.Tensor, targetbox: torch.Tensor, imname: str = None, fuzzy: int = 25
+    predbox: torch.Tensor, targetbox: torch.Tensor, imname: Optional[str] = None, fuzzy: int = 25
 ) -> Tuple[torch.Tensor, torch.Tensor, torch.Tensor]:
     """Calculates stats based on wether a prediciton box fully overlaps with a target box instead of IoU.
 
@@ -547,8 +547,8 @@ def calcmetric_overlap(
 def calcstats_iou(
     predbox: torch.Tensor,
     targetbox: torch.Tensor,
-    iou_thresholds: List[float] = None,
-    imname: str = None,
+    iou_thresholds: Optional[List[float]] = None,
+    imname: Optional[str] = None,
 ) -> Tuple[torch.Tensor, torch.Tensor, torch.Tensor, torch.Tensor, torch.Tensor]:
     """Calculates IoU and resulting tp, fp, fn.
 
@@ -610,7 +610,7 @@ def calcmetric(
     tp: torch.Tensor,
     fp: torch.Tensor,
     fn: torch.Tensor,
-    iou_thresholds: List[float] = None,
+    iou_thresholds: Optional[List[float]] = None,
 ) -> Tuple[torch.Tensor, torch.Tensor, torch.Tensor, torch.Tensor]:
     """Calculate Metrics from true positives, false positives, false negatives at given iou thresholds.
 
@@ -638,9 +638,9 @@ def get_dataframe(
     fnsum: torch.Tensor,
     fpsum: torch.Tensor,
     tpsum: torch.Tensor,
-    nopredcount: int = None,
-    imnum: int = None,
-    iou_thresholds: List[float] = None,
+    nopredcount: Optional[int] = None,
+    imnum: Optional[int] = None,
+    iou_thresholds: Optional[List[float]] = None,
 ) -> dict:
     """Create dataframe from stats.
 

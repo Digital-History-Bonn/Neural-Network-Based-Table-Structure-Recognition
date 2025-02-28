@@ -3,7 +3,7 @@ import argparse
 import glob
 import json
 from pathlib import Path
-from typing import List
+from typing import Optional, List
 
 import torch
 from lightning_fabric.utilities import move_data_to_device
@@ -27,9 +27,9 @@ from src.historicdocumentprocessing.util.visualisationutil import (
 def drawimg_allmodels(
     datasetname: str,
     imgpath: str,
-    rcnnmodels: List[str] = None,
-    tabletransformermodels: List[str] = None,
-    predfolder: str = None,
+    rcnnmodels: Optional[List[str]] = None,
+    tabletransformermodels: Optional[List[str]] = None,
+    predfolder: Optional[str] = None,
     valid: bool = True,
 ):
     """Method to draw image for all models.
@@ -263,8 +263,8 @@ def drawimg_allmodels(
 def drawimg_varformat(
     impath: str,  # f"{Path(__file__).parent.absolute()}/../../data/BonnData/test/Konflikttabelle.jpg"
     predpath: str,  # f"{Path(__file__).parent.absolute()}/../../results/kosmos25/Konflikttabelle.jpg.json"
-    groundpath: str = None,
-    savepath: str = None,
+    groundpath: Optional[str] = None,
+    savepath: Optional[str] = None,
     tableonly: bool = True,
 ):
     """Draw prediction (and ground truth) on image (when prediciton has been saved to file).
@@ -298,8 +298,8 @@ def drawimg_varformat(
 def drawimages(
     impath: str,  # f"{Path(__file__).parent.absolute()}/../../data/BonnData/test"
     jsonpath: str,  # f"{Path(__file__).parent.absolute()}/../../results/kosmos25/BonnData/test"
-    savepath: str = None,
-    groundpath: str = None,
+    savepath: Optional[str] = None,
+    groundpath: Optional[str] = None,
 ):
     """Draw images with prediction and groundtruth for all json files in a folder (kosmos).
 
@@ -322,10 +322,10 @@ def drawimages(
 def drawimages_var(
     impath: str,  # f"{Path(__file__).parent.absolute()}/../../data/BonnData/test"
     jsonpath: str,  # f"{Path(__file__).parent.absolute()}/../../results/kosmos25/BonnData/test"
-    savepath: str = None,
-    groundpath: str = None,
+    savepath: Optional[str] = None,
+    groundpath: Optional[str] = None,
     tableonly: bool = True,
-    range: int = None,
+    range: Optional[int] = None,
 ):
     """Draw all images in folder of saved json/pt predictions.
 

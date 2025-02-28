@@ -12,9 +12,10 @@ from src.historicdocumentprocessing.tabletransformer_dataset import (
     reversetablerelativebboxes_outer_rowcoll,
 )
 from src.historicdocumentprocessing.util.tablesutil import remove_invalid_bbox, reversetablerelativebboxes_outer, extractboxes
+from typing import Optional
 
 
-def drawimg_varformat_inner(box: torch.Tensor, impath: str, savepath: str, groundpath: str = None, rowcol: bool = False):
+def drawimg_varformat_inner(box: torch.Tensor, impath: str, savepath: str, groundpath: Optional[str] = None, rowcol: bool = False):
     """Inner function for drawing image with predictions.
 
     Args:
@@ -66,7 +67,7 @@ def drawimg_varformat_inner(box: torch.Tensor, impath: str, savepath: str, groun
 def drawimg(
     impath: str,  # f"{Path(__file__).parent.absolute()}/../../data/BonnData/test/Konflikttabelle.jpg"
     jsonpath: str,  # f"{Path(__file__).parent.absolute()}/../../results/kosmos25/Konflikttabelle.jpg.json"
-    savepath: str = None,
+    savepath: Optional[str] = None,
 ):
     """Function to draw bboxes from json file on image.
 

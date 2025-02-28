@@ -20,7 +20,7 @@ def run_test(session):
 
 
 @nox.session(name="limited-test", python='3.8')
-def run_small_test(session):
+def run_limited_test(session):
     """Run ioucalc test.
 
     Args:
@@ -43,6 +43,33 @@ def run_small_test(session):
         test_files = session.posargs
     else:
         test_files = ["tests/split_test.py", "tests/ioucalc_test.py"]
+    session.run("pytest", *test_files)
+
+
+@nox.session(name="small-limited-test", python='3.8')
+def run_small_test(session):
+    """Run ioucalc test.
+
+    Args:
+        session: test with full dependencies
+    """
+    session.install(".")
+    session.install("pytest")
+    session.install("torchvision")
+    session.install("pandas")
+    session.install("bs4")
+    session.install("torch")
+    session.install("pillow")
+    session.install("tqdm")
+    session.install("scikit-learn")
+    session.install("lxml")
+    session.install("lightning")
+    session.install("transformers")
+    session.install("tikzplotlib")
+    if session.posargs:
+        test_files = session.posargs
+    else:
+        test_files = ["tests/ioucalc_test.py"]
     session.run("pytest", *test_files)
 
 

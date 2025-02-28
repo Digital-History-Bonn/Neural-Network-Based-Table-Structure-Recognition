@@ -7,7 +7,7 @@ import random
 import shutil
 import warnings
 from pathlib import Path
-from typing import List
+from typing import Optional, List
 
 import pandas as pd
 import torch
@@ -46,8 +46,8 @@ def validsplit(path: str):  # f"{Path(__file__).parent.absolute()}/../../data/Bo
 
 def wildtablesvalidsplit(
     path: str,  # = f"{Path(__file__).parent.absolute()}/../../data/Tablesinthewild/train",
-    ratio: List[float] = None,
-    validfile: str = None,
+    ratio: Optional[List[float]] = None,
+    validfile: Optional[str] = None,
 ):
     """Create train/valid split for tables in the wild dataset.
 

@@ -88,10 +88,10 @@ def test_ioumetrics():
     # print("dataframe function test: ", df)
 
 
-def test_iousum():
+def iousum():
     """Test to make sure results are consistent between dataframes."""
     df = pandas.read_csv(
-        f"{Path(__file__).parent.absolute()}/../results/fasterrcnn/testevalfinal1/fullimg/Tablesinthewild/testseveralcalls_5_without_valid_split_Tablesinthewild_fullimage_e50_es.pt/iou_0.5_0.9/fullimageiou.csv"
+        f"{Path(__file__).parent.absolute()}/../results/fasterrcnn/eval/fullimg/Tablesinthewild/testseveralcalls_5_without_valid_split_Tablesinthewild_fullimage_e50_es.pt/iou_0.5_0.9/fullimageiou.csv"
     )
     df1 = get_dataframe(
         fnsum=torch.Tensor([df["fn@0.5"].sum()]),
@@ -100,12 +100,12 @@ def test_iousum():
         iou_thresholds=[0.5],
     )
     df2 = pandas.read_csv(
-        f"{Path(__file__).parent.absolute()}/../results/fasterrcnn/testevalfinal1/fullimg/Tablesinthewild/testseveralcalls_5_without_valid_split_Tablesinthewild_fullimage_e50_es.pt/iou_0.5_0.9/overview.csv"
+        f"{Path(__file__).parent.absolute()}/../results/fasterrcnn/eval/fullimg/Tablesinthewild/testseveralcalls_5_without_valid_split_Tablesinthewild_fullimage_e50_es.pt/iou_0.5_0.9/overview.csv"
     )
     assert df2.loc[1, "f1@0.5"] == df1["f1@0.5"], "calculated total  f"
 
 
-def test_inputdata():
+def inputdata():
     """Test that input methods and transformations are working correctly."""
     full = torch.load(
         f"{Path(__file__).parent.absolute()}/../data/Tablesinthewild/preprocessed/curved/table_spider_00909/table_spider_00909.pt"
@@ -153,6 +153,6 @@ def test_inputdata():
 
 
 if __name__ == "__main__":
-    test_inputdata()
-    test_iousum()
+    inputdata()
+    iousum()
     test_ioumetrics()

@@ -2,7 +2,7 @@
 import glob
 import math
 import typing
-from typing import List, Tuple
+from typing import Optional, List, Tuple
 
 import numpy as np
 import torch
@@ -115,7 +115,7 @@ def clustertablesseperately(
     boxes: torch.Tensor,
     epsprefactor: Tuple[float, float] = tuple([3, 1.5]),
     includeoutlier: bool = True,
-    minsamples: List[int] = None,
+    minsamples: Optional[List[int]] = None,
 ) -> List[torch.Tensor]:
     """Clustering Tables by 1d euclidian distance.
 
@@ -311,7 +311,7 @@ def extractboundingbox(bbox: dict) -> Tuple[int, int, int, int]:
     return int(bbox["x0"]), int(bbox["y0"]), int(bbox["x1"]), int(bbox["y1"])
 
 
-def extractboxes(boxdict: dict, fpath: str = None) -> torch.Tensor:
+def extractboxes(boxdict: dict, fpath: Optional[str] = None) -> torch.Tensor:
     """Takes a Kosmos2.5-Output-Style Dict and extracts the bounding boxes.
 
     Args:

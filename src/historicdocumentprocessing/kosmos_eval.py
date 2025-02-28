@@ -4,7 +4,7 @@ import glob
 import json
 import os
 from pathlib import Path
-from typing import List, Tuple
+from typing import Optional, List, Tuple
 
 import pandas
 import torch
@@ -18,11 +18,11 @@ from src.historicdocumentprocessing.util.tablesutil import reversetablerelativeb
 def calcmetrics_tables(
     targetloc: str,  # f"{Path(__file__).parent.absolute()}/../../data/BonnData/test"
     predloc: str,  # f"{Path(__file__).parent.absolute()}/../../results/kosmos25/BonnData/Tabellen/test"
-    iou_thresholds: List[float] = None,
-    saveloc: str = None,
+    iou_thresholds: Optional[List[float]] = None,
+    saveloc: Optional[str] = None,
     tablerelative: bool = True,
     tableareaonly: bool = True,
-    datasetname: str = None
+    datasetname: Optional[str] = None
 ) -> Tuple[List[torch.Tensor], List[torch.Tensor], List[torch.Tensor]]:
     """Calculates metrics for all predictions and corresponding targets in a given location (pred Bboxes given as json files, targets as torch.Tensor).
 
