@@ -19,7 +19,7 @@ def run_test(session):
     session.run("pytest")
 
 
-@nox.session(name="limited-test")
+@nox.session(name="limited-test", python='3.8')
 def run_small_test(session):
     """Run ioucalc test.
 
