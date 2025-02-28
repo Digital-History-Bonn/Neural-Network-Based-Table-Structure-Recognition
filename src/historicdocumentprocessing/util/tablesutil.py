@@ -220,7 +220,7 @@ def gettablerelativebboxes(boxes: torch.Tensor) -> torch.Tensor:
     return torch.vstack(newboxes)
 
 
-def remove_invalid_bbox(box, impath: str = "") -> torch.Tensor:
+def remove_invalid_bbox(box: torch.Tensor, impath: str = "") -> torch.Tensor:
     """Function to remove BoundingBoxes with invalid coordinates.
 
     Args:
@@ -323,7 +323,7 @@ def extractboxes(boxdict: dict, fpath: str = None) -> torch.Tensor:
 
     """
     boxlist = []
-    tablebboxes = None
+    tablebboxes = torch.empty(0, 4)
     if fpath:
         tablebboxes = torch.load(glob.glob(f"{fpath}/*tables.pt")[0])
         # print(tablebboxes)
