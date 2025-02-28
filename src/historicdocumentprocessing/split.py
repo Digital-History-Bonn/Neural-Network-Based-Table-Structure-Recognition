@@ -231,7 +231,7 @@ def recreatetablesplit(
 
 
 def get_args() -> argparse.Namespace:
-    """Define args."""
+    """Define args."""   # noqa: DAR201
     parser = argparse.ArgumentParser(description="split")
     parser.add_argument('--operation', choices=['recreatesplit, validsplit, subclasssplit'])
 

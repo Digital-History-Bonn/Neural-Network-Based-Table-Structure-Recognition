@@ -301,7 +301,11 @@ class TableTransformer(pl.LightningModule):
         )
 
     def configure_optimizers(self):
-        """Method to configure the optimizer."""
+        """Method to configure the optimizer.
+
+        Returns:
+            optimizer
+        """
         param_dicts = [
             {
                 "params": [
@@ -363,7 +367,7 @@ class TableTransformer(pl.LightningModule):
 
 
 def get_args() -> argparse.Namespace:
-    """Defines arguments."""
+    """Defines arguments."""   # noqa: DAR201
     parser = argparse.ArgumentParser(description="tabletransformer_train")
 
     parser.add_argument(

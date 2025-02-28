@@ -1168,7 +1168,7 @@ def postprocess_eval(
 
 
 def get_args() -> argparse.Namespace:
-    """Define args."""
+    """Define args."""   # noqa: DAR201
     parser = argparse.ArgumentParser(description="postprocess")
     parser.add_argument('-f', '--folder', default="test", help="test data folder")
     parser.add_argument('-p', '--predfolder', default='', help="prediction folder (kosmos25)")

@@ -8,7 +8,11 @@ nox.options.sessions = ["lint", "typing", "format"]
 
 @nox.session(name="test")
 def run_test(session):
-    """Run pytest."""
+    """Run pytest.
+
+    Args:
+        session: test
+    """
     session.install(".")
     session.install("pytest")
     session.install("torchvision")
@@ -17,7 +21,11 @@ def run_test(session):
 
 @nox.session(name="limited-test")
 def run_small_test(session):
-    """Run ioucalc test."""
+    """Run ioucalc test.
+
+    Args:
+        session: test with full dependencies
+    """
     session.install(".")
     session.install("pytest")
     session.install("torchvision")
@@ -40,7 +48,11 @@ def run_small_test(session):
 
 @nox.session(name="fast-test")
 def run_test_fast(session):
-    """Run pytest."""
+    """Run pytest.
+
+    Args:
+        session: test
+    """
     session.install(".")
     session.install("pytest")
     session.install("torchvision")
@@ -49,7 +61,11 @@ def run_test_fast(session):
 
 @nox.session(name="lint")
 def lint(session):
-    """Check code conventions."""
+    """Check code conventions.
+
+    Args:
+        session: lint
+    """
     session.install("flake8")
     session.install(
         "flake8-black",
@@ -65,7 +81,11 @@ def lint(session):
 
 @nox.session(name="typing")
 def mypy(session):
-    """Check type hints."""
+    """Check type hints.
+
+    Args:
+        session: typing
+    """
     session.install(".")
     session.install("mypy")
     session.run(
@@ -81,7 +101,11 @@ def mypy(session):
 
 @nox.session(name="format")
 def format(session):
-    """Fix common convention problems automatically."""
+    """Fix common convention problems automatically.
+
+    Args:
+        session: formatting
+    """
     session.install("black")
     session.install("isort")
     session.run("isort", "src", "tests", "noxfile.py")
@@ -90,7 +114,11 @@ def format(session):
 
 @nox.session(name="coverage")
 def check_coverage(session):
-    """Check test coverage and generate a html report."""
+    """Check test coverage and generate a html report.
+
+    Args:
+        session: coverage
+    """
     session.install(".")
     session.install("pytest")
     session.install("coverage")
@@ -102,13 +130,21 @@ def check_coverage(session):
 
 @nox.session(name="coverage-clean")
 def clean_coverage(session):
-    """Remove the code coverage website."""
+    """Remove the code coverage website.
+
+    Args:
+        session: lint
+    """
     session.run("rm", "-r", "htmlcov", external=True)
 
 
 @nox.session(name="build")
 def build(session):
-    """Build a pip package."""
+    """Build a pip package.
+
+    Args:
+        session: build pip package
+    """
     session.install("wheel")
     session.install("setuptools")
     session.run("python", "setup.py", "-q", "sdist", "bdist_wheel")
@@ -116,7 +152,11 @@ def build(session):
 
 @nox.session(name="finish")
 def finish(session):
-    """Finish this version increase the version number and upload to pypi."""
+    """Finish this version increase the version number and upload to pypi.
+
+    Args:
+        session: finish and upload
+    """
     session.install("bump2version")
     session.install("twine")
     session.run("bumpversion", "release", external=True)
@@ -129,6 +169,10 @@ def finish(session):
 
 @nox.session(name="check-package")
 def pyroma(session):
-    """Run pyroma to check if the package is ok."""
+    """Run pyroma to check if the package is ok.
+
+    Args:
+        session: check package
+    """
     session.install("pyroma")
     session.run("pyroma", ".")

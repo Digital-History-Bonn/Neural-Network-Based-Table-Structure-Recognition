@@ -352,7 +352,7 @@ def get_model(
 
 
 def get_args() -> argparse.Namespace:
-    """Defines arguments."""
+    """Defines arguments."""   # noqa: DAR201
     parser = argparse.ArgumentParser(description="fasterrcnn_training")
 
     parser.add_argument(

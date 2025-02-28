@@ -1,4 +1,5 @@
 """Postprocessing from GloSAT."""
+# flake8: noqa
 
 # Copyright (c) 2021, University of Southampton
 # All rights reserved.

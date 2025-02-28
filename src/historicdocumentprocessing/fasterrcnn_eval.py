@@ -612,7 +612,7 @@ def inference_tablecutout(
 
 
 def get_args() -> argparse.Namespace:
-    """Define args."""
+    """Define args."""   # noqa: DAR201
     parser = argparse.ArgumentParser(description="fasterrcnn_eval")
     parser.add_argument('-f', '--folder', default="test", help="test data folder")
     parser.add_argument('-m', '--modelname')

@@ -369,7 +369,7 @@ def drawimages_var(
 
 
 def get_args() -> argparse.Namespace:
-    """Define args."""
+    """Define args."""   # noqa: DAR201
     parser = argparse.ArgumentParser(description="visualisation")
     parser.add_argument('i', '--imname', default="test", help="name of image")
     parser.add_argument('-p', '--predfolder', default='', help="prediction folder or folders")

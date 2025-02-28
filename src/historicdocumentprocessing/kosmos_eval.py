@@ -429,7 +429,7 @@ def calcmetrics_tables(
 
 
 def get_args() -> argparse.Namespace:
-    """Define args."""
+    """Define args."""   # noqa: DAR201
     parser = argparse.ArgumentParser(description="kosmos_eval")
     parser.add_argument('-t', '--testfolder', default="test", help="test data folder")
     parser.add_argument('-p', '--predfolder', default='', help="prediction folder")

@@ -303,7 +303,7 @@ def processdata_wildtable_outer(
 
 
 def get_args() -> argparse.Namespace:
-    """Define args."""
+    """Define args."""   # noqa: DAR201
     parser = argparse.ArgumentParser(description="dataprocessing_wtw")
     parser.add_argument('-p', '--path', default=f"{Path(__file__).parent.absolute()}/../../data/Tablesinthewild/rawdata")
     parser.add_argument('--folder', default="train")
