@@ -219,7 +219,7 @@ def recreatetablesplit(
         csvpath: path to Bonn Table csv result file
 
     """
-    imnames = pd.read_csv(csvpath)["image_number"][1:-1]
+    imnames = pd.read_csv(csvpath)["image_number"].dropna().drop_duplicates()  # [1:-1], because of this previous error, IMG_20190821_164100 is missing in test set
     savelocs = "/".join(datapath.split("/")[:-1]) + "/test"
     os.makedirs(savelocs, exist_ok=True)
     for _i, imname in tqdm(enumerate(imnames)):
