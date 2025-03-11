@@ -45,7 +45,7 @@ class CustomDataset(Dataset):  # type: ignore
 
     def __getitem__(
         self, index: int
-    ) -> Tuple[torch.Tensor, Dict[str, Union[torch.Tensor, str]]]:
+    ) -> Tuple[torch.Tensor, Dict[str, Union[torch.Tensor, str, int]]]:
         """Returns image and target (boxes, labels, img_number) from dataset.
 
         Args:
@@ -143,6 +143,6 @@ if __name__ == "__main__":
 
     img, target = dataset[0]
     print(target['boxes'])
-    result = draw_bounding_boxes(image=(img * 255).to(torch.uint8), boxes=target["boxes"], colors=["red" for i in range(target["boxes"].shape[0])], labels=["Ground" for i in range(target["boxes"].shape[0])])
+    result = draw_bounding_boxes(image=(img * 255).to(torch.uint8), boxes=target["boxes"], colors=["red" for i in range(target["boxes"].shape[0])], labels=["Ground" for i in range(target["boxes"].shape[0])])  # type: ignore
     result = Image.fromarray(result.permute(1, 2, 0).numpy())
     result.save(f"{Path(__file__).parent.absolute()}/../../images/rcnn/test.jpg")

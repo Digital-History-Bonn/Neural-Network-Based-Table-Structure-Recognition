@@ -15,7 +15,7 @@ from src.historicdocumentprocessing.util.tablesutil import remove_invalid_bbox, 
 from typing import Optional
 
 
-def drawimg_varformat_inner(box: torch.Tensor, impath: str, savepath: str, groundpath: Optional[str] = None, rowcol: bool = False):
+def drawimg_varformat_inner(box: torch.Tensor, impath: str, savepath: Optional[str] = None, groundpath: Optional[str] = None, rowcol: bool = False):
     """Inner function for drawing image with predictions.
 
     Args:

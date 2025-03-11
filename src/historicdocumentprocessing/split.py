@@ -197,7 +197,7 @@ def subclasssplitwildtables(
                             )
                             img = Image.open(im)
                             tableimg = img.crop(
-                                (tuple(tablelist[idx].to(int).tolist()))
+                                (tuple(tablelist[idx].to(int).tolist()))  # type: ignore
                             )
                             tableimg.save(
                                 f"{imfolder}/{line.split('.')[-2]}_table_{idx}.jpg"

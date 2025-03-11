@@ -20,7 +20,7 @@ from src.historicdocumentprocessing.util.metricsutil import calcstats_iodt, calc
 from src.historicdocumentprocessing.util.tablesutil import reversetablerelativebboxes_outer, boxoverlap
 
 
-def tableareabboxes(bboxes: torch.tensor, tablepath: str) -> torch.tensor:
+def tableareabboxes(bboxes: torch.Tensor, tablepath: str) -> torch.Tensor:
     """Find the BBoxes that lie within one of the tables of an image.
 
     Args:

@@ -69,19 +69,19 @@ def drawimg_allmodels(
             tableonly=False,
             savepath=savepath,
         )
-    for model in glob.glob(f"{predpath_rcnn_postprocessed}/*"):
-        if "end" not in model:
-            savepath = f"{Path(__file__).parent.absolute()}/../../images/fasterrcnn/{model.split('/')[-1]}/postprocessed"
+    for modelname in glob.glob(f"{predpath_rcnn_postprocessed}/*"):
+        if "end" not in modelname:
+            savepath = f"{Path(__file__).parent.absolute()}/../../images/fasterrcnn/{modelname.split('/')[-1]}/postprocessed"
             try:
                 drawimg_varformat(
                     impath=imgpath,
-                    predpath=f"{model}/eps_3.0_1.5/withoutoutlier_excludeoutliers_glosat/{imname}/{imname}.pt",
+                    predpath=f"{modelname}/eps_3.0_1.5/withoutoutlier_excludeoutliers_glosat/{imname}/{imname}.pt",
                     groundpath=groundpath,
                     tableonly=False,
                     savepath=savepath,
                 )
             except FileNotFoundError:
-                print(f"{imname} has no valid predicitons with model {model}")
+                print(f"{imname} has no valid predicitons with model {modelname}")
                 pass
     for modelname in rcnnmodels:
         modelpath = f"{Path(__file__).parent.absolute()}/../../checkpoints/fasterrcnn/{modelname}"

@@ -139,14 +139,14 @@ class CustomDataset(Dataset):  # type: ignore
             if self.dataset in ["BonnData", "GloSat", "Tablesinthewild"]:
                 for id, cat in zip([2, 1], ["row", "col"]):
                     target = reversetablerelativebboxes_outer_rowcoll(
-                        self.data[index], category=cat
+                        self.data[index], category=cat  # type: ignore
                     )
                     # get bbox area
                     area = ops.box_area(target)
                     # convert bboxes to coco format
                     target = ops.box_convert(target, in_fmt="xyxy", out_fmt="xywh")
                     assert area.shape[0] == target.shape[0]
-                    annotations["annotations"] += [
+                    annotations["annotations"] += [  # type: ignore
                         {
                             "image_id": index,
                             "category_id": id,
@@ -161,7 +161,7 @@ class CustomDataset(Dataset):  # type: ignore
                 # convert bboxes to coco format
                 target = ops.box_convert(tables, in_fmt="xyxy", out_fmt="xywh")
                 assert area.shape[0] == target.shape[0]
-                annotations["annotations"] += [
+                annotations["annotations"] += [  # type: ignore
                     {
                         "image_id": index,
                         "category_id": 0,
@@ -293,7 +293,7 @@ class CustomDataset(Dataset):  # type: ignore
             if self.dataset in ["BonnData", "GloSat", "Tablesinthewild"]:
                 for _id, cat in zip([2, 1], ["row", "col"]):
                     target = reversetablerelativebboxes_outer_rowcoll(
-                        self.data[index], category=cat
+                        self.data[index], category=cat  # type: ignore
                     )
                     bboxes.append(target)
                     labels += [f"{cat}" for i in range(target.shape[0])]
@@ -307,8 +307,8 @@ class CustomDataset(Dataset):  # type: ignore
         else:
             "not yet implemented since there is no need, left in so it can be added in future"
             target = None
-            img = None
-            labels = None
+            img = Image.open(f"{self.data[index]}/{imgnum}.jpg").convert("RGB")
+            labels = []
             pass
         return img, target, labels
 

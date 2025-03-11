@@ -1,3 +1,4 @@
+# type: ignore
 """Postprocessing from GloSAT."""
 # flake8: noqa
 

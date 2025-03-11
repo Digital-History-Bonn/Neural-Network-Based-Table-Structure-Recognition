@@ -122,6 +122,7 @@ def mypy(session):
         "--ignore-missing-imports",
         "--no-warn-return-any",
         "--explicit-package-bases",
+        "--allow-redefinition",
         "src",
     )
 

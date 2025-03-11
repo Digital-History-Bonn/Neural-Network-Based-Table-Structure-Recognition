@@ -5,7 +5,7 @@ import os
 import typing
 import warnings
 from pathlib import Path
-from typing import Optional, List, Literal, Tuple
+from typing import Optional, List, Literal, Tuple, Dict
 
 import pandas as pd
 import torch
@@ -139,7 +139,7 @@ def findoptimalfilterpoint_tabletransformer(
         transforms=None,
     )
     totalscores = []
-    totaliou = []
+    totaliou: List[torch.Tensor] = []
     for i in tqdm(range(len(dataset))):
         print(dataset.getfolder(i))
         img, fullimagegroundbox, labels = dataset.getimgtarget(i, addtables=False)
@@ -244,7 +244,7 @@ def findoptimalfilterpoint(
     else:
         print("Cuda not available")
         return
-    totaliou = []
+    totaliou: List[torch.Tensor] = []
     totalscores = []
     for _n, folder in tqdm(enumerate(glob.glob(f"{datasetpath}/*"))):
         # print(folder)
@@ -270,6 +270,7 @@ def findoptimalfilterpoint(
     bestpred, preds, sum_fp, sum_tp = findoptimalfilterpoint_inner(
         totaliou, totalscores
     )
+    print(bestpred)
     # print(sum_tp/sum_fp)
     # print(torch.argmax(sum_tp-sum_fp))
     fig = plt.figure()
@@ -356,7 +357,7 @@ def bonntablebycat(
     catinfo = pd.read_excel(categoryfile)
     df = df.rename(columns={"img": "Dateiname"})
     df1 = pd.merge(df, catinfo, on="Dateiname")
-    subsetwf1df = {"wf1": [], "category": [], "len": [], "nopred": []}
+    subsetwf1df: Dict[str, List] = {"wf1": [], "category": [], "len": [], "nopred": []}
     # replace category 1 by 2 since there are no images without tables in test dataset
     df1 = df1.replace({"category": 1}, 2)
     # print(df1.category, df1.Dateiname)
@@ -663,8 +664,8 @@ def get_dataframe(
         tpsum, fpsum, fnsum, iou_thresholds=iou_thresholds
     )
     totalfullmetrics = {"wf1": totalfullwf1.item()}
-    totalfullmetrics.update({"Number of evaluated files": imnum})
-    totalfullmetrics.update({"Evaluated files without predictions:": nopredcount})
+    totalfullmetrics.update({"Number of evaluated files": imnum})  # type: ignore
+    totalfullmetrics.update({"Evaluated files without predictions:": nopredcount})  # type: ignore
     totalfullmetrics.update(
         {
             f"f1@{iou_thresholds[i]}": totalfullf1[i].item()
@@ -705,22 +706,22 @@ if __name__ == "__main__":
     #                                                                 'BonnDataFullImage_pretrain_GloSatFullImage1_GloSat_fullimage_e250_es_BonnData_fullimage_e250_es.pt', 'testseveralcalls_4_with_valid_split_Tablesinthewild_fullimage_e50_es.pt',
     #                              'testseveralcalls_valid_random_init_e_250_es.pt'])
 
-    findoptimalfilterpoint_outer(
-        modellist=[
-            # "tabletransformer_v0_new_BonnDataFullImage_tabletransformer_estest_BonnData_fullimage_e1_init_tabletransformer_v0_new_GloSatFullImage_tabletransformer_newenv_fixed_GloSat_fullimage_e250_valid_es.pt_valid_es.pt",
-            # "tabletransformer_v0_new_BonnDataFullImage_tabletransformer_estest_BonnData_fullimage_e1_init_tabletransformer_v0_new_GloSatFullImage_tabletransformer_newenv_fixed_GloSat_fullimage_e250_valid_es.pt_valid_end.pt",
-            # "tabletransformer_v0_new_BonnDataFullImage_tabletransformer_estest_BonnData_fullimage_e250_valid_es.pt", "tabletransformer_v0_new_BonnDataFullImage_tabletransformer_estest_BonnData_fullimage_e250_valid_end.pt",
-            # "tabletransformer_v0_new_GloSatFullImage_tabletransformer_newenv_fixed_GloSat_fullimage_e250_valid_es.pt", "tabletransformer_v0_new_GloSatFullImage_tabletransformer_newenv_fixed_GloSat_fullimage_e250_valid_end.pt",
-            # "tabletransformer_v0_new_BonnDataFullImage_tabletransformer_loadtest_BonnData_fullimage_e250_init_tabletransformer_v0_new_GloSatFullImage_tabletransformer_newenv_fixed_GloSat_fullimage_e250_valid_es.pt_valid_es.pt",
-            "titw_severalcalls_2_e250_es.pt",
-            "titw_severalcalls_2_e250_end.pt",
-            "titw_call_aachen_e250_es.pt",
-            "titw_call_aachen_e250_end.pt",
-        ],
-        modelfolder=f"{Path(__file__).parent.absolute()}/../../../checkpoints/tabletransformer",
-        valid=True,
-        modeltype="tabletransformer",
-    )
+    # findoptimalfilterpoint_outer(
+    #    modellist=[
+    #         "tabletransformer_v0_new_BonnDataFullImage_tabletransformer_estest_BonnData_fullimage_e1_init_tabletransformer_v0_new_GloSatFullImage_tabletransformer_newenv_fixed_GloSat_fullimage_e250_valid_es.pt_valid_es.pt",
+    #         "tabletransformer_v0_new_BonnDataFullImage_tabletransformer_estest_BonnData_fullimage_e1_init_tabletransformer_v0_new_GloSatFullImage_tabletransformer_newenv_fixed_GloSat_fullimage_e250_valid_es.pt_valid_end.pt",
+    #         "tabletransformer_v0_new_BonnDataFullImage_tabletransformer_estest_BonnData_fullimage_e250_valid_es.pt", "tabletransformer_v0_new_BonnDataFullImage_tabletransformer_estest_BonnData_fullimage_e250_valid_end.pt",
+    #         "tabletransformer_v0_new_GloSatFullImage_tabletransformer_newenv_fixed_GloSat_fullimage_e250_valid_es.pt", "tabletransformer_v0_new_GloSatFullImage_tabletransformer_newenv_fixed_GloSat_fullimage_e250_valid_end.pt",
+    #         "tabletransformer_v0_new_BonnDataFullImage_tabletransformer_loadtest_BonnData_fullimage_e250_init_tabletransformer_v0_new_GloSatFullImage_tabletransformer_newenv_fixed_GloSat_fullimage_e250_valid_es.pt_valid_es.pt",
+    #         "titw_severalcalls_2_e250_es.pt",
+    #        "titw_severalcalls_2_e250_end.pt",
+    #         "titw_call_aachen_e250_es.pt",
+    #         "titw_call_aachen_e250_end.pt",
+    #    ],
+    #    modelfolder=f"{Path(__file__).parent.absolute()}/../../../checkpoints/tabletransformer",
+    #    valid=True,
+    #    modeltype="tabletransformer",
+    # )
     # findoptimalfilterpoint_outer(modellist=[
     # "tabletransformer_v0_new_BonnDataFullImage_tabletransformer_estest_BonnData_fullimage_e1_init_tabletransformer_v0_new_GloSatFullImage_tabletransformer_newenv_fixed_GloSat_fullimage_e250_valid_es.pt_valid_es.pt",
     # "tabletransformer_v0_new_BonnDataFullImage_tabletransformer_estest_BonnData_fullimage_e1_init_tabletransformer_v0_new_GloSatFullImage_tabletransformer_newenv_fixed_GloSat_fullimage_e250_valid_es.pt_valid_end.pt",
@@ -731,4 +732,4 @@ if __name__ == "__main__":
     #    "titw_severalcalls_2_e250_es.pt", "titw_severalcalls_2_e250_end.pt", "titw_call_aachen_e250_es.pt", "titw_call_aachen_e250_end.pt"],
     #                             modelfolder=f"{Path(__file__).parent.absolute()}/../../../checkpoints/tabletransformer",
     #                             valid=False, modeltype="tabletransformer")
-    # findoptimalfilterpoint(modelpath=f"{Path(__file__).parent.absolute()}/../../../checkpoints/fasterrcnn/BonnDataFullImage1_BonnData_fullimage_e250_es.pt", testdatasetpath=f"{Path(__file__).parent.absolute()}/../../../data/BonnData/test", valid=True)
+    findoptimalfilterpoint(modelpath=f"{Path(__file__).parent.absolute()}/../../../checkpoints/fasterrcnn/BonnDataFullImage1_BonnData_fullimage_e250_es.pt", datasetpath=f"{Path(__file__).parent.absolute()}/../../../data/BonnData/test", valid=True)

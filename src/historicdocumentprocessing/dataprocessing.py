@@ -9,7 +9,7 @@ import os
 import shutil
 import warnings
 from pathlib import Path
-from typing import Dict, List
+from typing import Dict, List, Tuple
 
 import torch
 from bs4 import BeautifulSoup
@@ -39,10 +39,10 @@ def processdata_wildtable_inner(datapath) -> torch.Tensor:
     for box in xml.find_all("bndbox"):
         new = torch.tensor(
             [
-                int(float(box.xmin.get_text())),
-                int(float(box.ymin.get_text())),
-                int(float(box.xmax.get_text())),
-                int(float(box.ymax.get_text())),
+                int(float(box.xmin.get_text())),  # type: ignore
+                int(float(box.ymin.get_text())),  # type: ignore
+                int(float(box.xmax.get_text())),  # type: ignore
+                int(float(box.ymax.get_text())),  # type: ignore
             ],
             dtype=torch.float,
         )
@@ -59,7 +59,7 @@ def processdata_wildtable_inner(datapath) -> torch.Tensor:
 
 def processdata_wildtable_tablerelative(
     datapath: str,
-) -> (List[torch.Tensor], List[torch.Tensor]):
+) -> Tuple[List[torch.Tensor], List[torch.Tensor]]:
     """Extract cell BBoxes from XML to torch tensor (cell BBox coordinates relative to table, table coords relative to full image).
 
     Args:
@@ -77,15 +77,15 @@ def processdata_wildtable_tablerelative(
     for box in xml.find_all("bndbox"):
         new = torch.tensor(
             [
-                int(float(box.xmin.get_text())),
-                int(float(box.ymin.get_text())),
-                int(float(box.xmax.get_text())),
-                int(float(box.ymax.get_text())),
+                int(float(box.xmin.get_text())),  # type: ignore
+                int(float(box.ymin.get_text())),  # type: ignore
+                int(float(box.xmax.get_text())),  # type: ignore
+                int(float(box.ymax.get_text())),  # type: ignore
             ],
             dtype=torch.float,
         )
         if new[0] < new[2] and new[1] < new[3]:
-            if int(box.tableid.get_text()) == idx:
+            if int(box.tableid.get_text()) == idx:  # type: ignore
                 bboxes.append(new)
             else:
                 tablelist.append(getsurroundingtable(torch.vstack(bboxes)))
@@ -122,40 +122,41 @@ def processdata_wildtable_rowcoll(
     for box in xml.find_all("bndbox"):
         new = torch.tensor(
             [
-                int(float(box.xmin.get_text())),
-                int(float(box.ymin.get_text())),
-                int(float(box.xmax.get_text())),
-                int(float(box.ymax.get_text())),
+                int(float(box.xmin.get_text())),  # type: ignore
+                int(float(box.ymin.get_text())),  # type: ignore
+                int(float(box.xmax.get_text())),  # type: ignore
+                int(float(box.ymax.get_text())),  # type: ignore
             ],
             dtype=torch.float,
         )
         if new[0] < new[2] and new[1] < new[3]:
-            if int(box.tableid.get_text()) in tables.keys():
-                tables[int(box.tableid.get_text())] += [
+            if int(box.tableid.get_text()) in tables.keys():  # type: ignore
+                tables[int(box.tableid.get_text())] += [  # type: ignore
                     {
                         "bbox": new,
-                        "startcol": int(box.startcol.get_text()),
-                        "endcol": int(box.endcol.get_text()),
-                        "startrow": int(box.startrow.get_text()),
-                        "endrow": int(box.endrow.get_text()),
+                        "startcol": int(box.startcol.get_text()),  # type: ignore
+                        "endcol": int(box.endcol.get_text()),  # type: ignore
+                        "startrow": int(box.startrow.get_text()),  # type: ignore
+                        "endrow": int(box.endrow.get_text()),  # type: ignore
                     }
                 ]
             else:
                 tables.update(
                     {
-                        int(box.tableid.get_text()): [
+                        int(box.tableid.get_text()): [  # type: ignore
                             {
                                 "bbox": new,
-                                "startcol": int(box.startcol.get_text()),
-                                "endcol": int(box.endcol.get_text()),
-                                "startrow": int(box.startrow.get_text()),
-                                "endrow": int(box.endrow.get_text()),
+                                "startcol": int(box.startcol.get_text()),  # type: ignore
+                                "endcol": int(box.endcol.get_text()),  # type: ignore
+                                "startrow": int(box.startrow.get_text()),  # type: ignore
+                                "endrow": int(box.endrow.get_text()),  # type: ignore
                             }
                         ]
                     }
                 )
 
     finaltables: List[Dict] = []
+    box: Dict = {}
     for t in tables.keys():
         columns: Dict[int, torch.Tensor] = {}
         rows: Dict[int, torch.Tensor] = {}
@@ -284,7 +285,7 @@ def processdata_wildtable_outer(
                         f"{tarfolder}/{xml.split('/')[-1].split('.')[-3]}_cell_{idx}.pt",
                     )
                     img = Image.open(impath)
-                    tableimg = img.crop((tuple(tablelist[idx].to(int).tolist())))
+                    tableimg = img.crop((tuple(tablelist[idx].to(int).tolist())))  # type: ignore
                     tableimg.save(
                         f"{tarfolder}/{xml.split('/')[-1].split('.')[-3]}_table_{idx}.jpg"
                     )

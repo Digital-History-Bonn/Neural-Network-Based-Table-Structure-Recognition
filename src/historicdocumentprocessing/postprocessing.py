@@ -23,7 +23,7 @@ from typing_extensions import List
 from src.historicdocumentprocessing.util.metricsutil import calcstats_iodt, calcstats_overlap, calcmetric_overlap, \
     calcstats_iou, calcmetric, get_dataframe
 from src.historicdocumentprocessing.tabletransformer_dataset import CustomDataset
-from src.historicdocumentprocessing.util.glosat_paper_postprocessing_method import (
+from src.historicdocumentprocessing.util.glosat_paper_postprocessing_method import (  # type: ignore
     reconstruct_table,
 )
 from src.historicdocumentprocessing.util.tablesutil import (
@@ -504,7 +504,7 @@ def postprocess_eval_tablesep(
         iou_thresholds = [0.5, 0.6, 0.7, 0.8, 0.9]
     if minsamples is None:
         minsamples = [2, 3]
-    epsprefactor = tuple([3.0, 1.5]) if not epsprefactorchange else epsprefactorchange
+    epsprefactor = (3.0, 1.5) if not epsprefactorchange else epsprefactorchange
     clusteredtables = clustertablesseperately(
         fullimagepredbox,
         epsprefactor=epsprefactor,
@@ -664,7 +664,7 @@ def postprocess(
     """
     if minsamples is None:
         minsamples = [2, 3]
-    epsprefactor = tuple([3.0, 1.5]) if not epsprefactorchange else epsprefactorchange
+    epsprefactor = (3.0, 1.5) if not epsprefactorchange else epsprefactorchange
     clusteredtables = clustertablesseperately(
         fullimagepredbox,
         epsprefactor=epsprefactor,
@@ -769,7 +769,7 @@ def postprocess_tabletransformer(
         "microsoft/table-transformer-structure-recognition"
     )
     modelpath = f"{Path(__file__).parent.absolute()}/../../checkpoints/tabletransformer/{modelname}"
-    if "aachen" in modelname:
+    if "aachen" in modelname:  # type: ignore
         model.load_state_dict(torch.load(modelpath, map_location="cuda:0"))
     else:
         model.load_state_dict(torch.load(modelpath))
@@ -789,7 +789,7 @@ def postprocess_tabletransformer(
             filtering = float(f.read())
         saveloc = f"{saveloc}_filtering_{filtering}{'_valid' if valid else ''}"
     dataset = CustomDataset(
-        targetloc,
+        targetloc,  # type: ignore
         "fullimage",
         transforms=None,
     )

@@ -57,7 +57,7 @@ class TableTransformer(pl.LightningModule):
         traindataset: CustomDataset,
         valdataset: Optional[CustomDataset] = None,
         datasetname: str = "BonnData",
-        savepath: Optional[str] = None,
+        savepath: str = "checkpoints/tabletransformer",
         loadmodelcheckpoint: Optional[str] = None,
     ):
         """Class to train TableTransformer models.
@@ -114,7 +114,7 @@ class TableTransformer(pl.LightningModule):
             )
         elif datasetname == "Tablesinthewild" and not valdataset:
             self.example_image, self.example_target, self.example_lable = (
-                valdataset.getimgtarget(0)
+                None, None, None  # type: ignore
             )
             (
                 self.train_example_image,
@@ -125,7 +125,7 @@ class TableTransformer(pl.LightningModule):
                     "mit_google_image_search-10918758-cdcd82db9ce0b61da60155c5c822b0be3884a2cf"
                 )
             )
-        else:
+        elif datasetname != "Tablesinthewild" and valdataset:
             self.example_image, self.example_target, self.example_lable = (
                 valdataset.getimgtarget(0)
             )
@@ -137,7 +137,7 @@ class TableTransformer(pl.LightningModule):
         self.example_image = self.example_image
         self.train_example_image = self.train_example_image
         self.savepath = savepath
-        self.val_losses = []
+        self.val_losses = []  # type: ignore
         self.mean_val_loss = None
 
     def forward(self, pixel_values, pixel_mask):
@@ -263,21 +263,22 @@ class TableTransformer(pl.LightningModule):
             colors=colors,
             labels=labels,
         )
-        self.writer.add_image(
-            "Train/example", result[:, ::2, ::2], global_step=self.global_step
-        )
+        if self.writer:
+            self.writer.add_image(
+                "Train/example", result[:, ::2, ::2], global_step=self.global_step
+            )
 
         # validexampleimg
         self.model.eval()
         encoding = move_data_to_device(
-            self.val_dataset.ImageProcessor(self.example_image, return_tensors="pt"),
+            self.val_dataset.ImageProcessor(self.example_image, return_tensors="pt"),  # type: ignore
             self.device,
         )
 
         with torch.no_grad():
             out = self.model(**encoding)
         width, height = self.example_image.size
-        pred = self.val_dataset.ImageProcessor.post_process_object_detection(
+        pred = self.val_dataset.ImageProcessor.post_process_object_detection(  # type: ignore
             out, target_sizes=[(height, width)]
         )[0]
         self.model.train()
@@ -297,9 +298,10 @@ class TableTransformer(pl.LightningModule):
             colors=colors,
             labels=labels,
         )
-        self.writer.add_image(
-            "Valid/example", result[:, ::2, ::2], global_step=self.global_step
-        )
+        if self.writer:
+            self.writer.add_image(
+                "Valid/example", result[:, ::2, ::2], global_step=self.global_step
+            )
 
     def configure_optimizers(self):
         """Method to configure the optimizer.
@@ -482,7 +484,7 @@ if __name__ == "__main__":
         )
     #    valid_dataloader = DataLoader(dataset=validdataset)
     else:
-        validdataset = None
+        validdataset = None  # type: ignore
     #    valid_dataloader = None
     # train_dataloader = DataLoader(dataset=traindataset)
     testdataset = CustomDataset(

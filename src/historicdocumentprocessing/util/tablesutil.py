@@ -55,9 +55,9 @@ def avrgeuc(boxes: torch.Tensor) -> float:
         average euc distance
     """
     count = 0
-    dist = 0
+    dist = 0.0
     for box1 in boxes:
-        singledist = 0
+        singledist = 0.0
         for box2 in boxes:
             if not torch.equal(box1, box2):
                 new = eucsimilarity(box1.numpy(), box2.numpy())
@@ -113,7 +113,7 @@ def clustertables(boxes: torch.Tensor, epsprefactor: float = 1 / 6) -> typing.Li
 
 def clustertablesseperately(
     boxes: torch.Tensor,
-    epsprefactor: Tuple[float, float] = tuple([3, 1.5]),
+    epsprefactor: Tuple[float, float] = (3.0, 1.5),
     includeoutlier: bool = True,
     minsamples: Optional[List[int]] = None,
 ) -> List[torch.Tensor]:
