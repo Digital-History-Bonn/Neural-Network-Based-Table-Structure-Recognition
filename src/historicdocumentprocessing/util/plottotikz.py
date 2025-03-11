@@ -1,3 +1,4 @@
+# type: ignore
 """script to create tikz plots from tensorboard from https://github.com/Digital-History-Bonn/HistorischeTabellenSemanticExtraction/blob/main/scripts/tensorboard2tikz.py .
 
 since tikzplotlib is not maintained anymore, this will only work with webcolors<=1.13

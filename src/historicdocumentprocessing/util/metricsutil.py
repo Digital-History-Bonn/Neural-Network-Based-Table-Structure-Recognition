@@ -23,7 +23,7 @@ from transformers import TableTransformerForObjectDetection
 
 from src.historicdocumentprocessing.util.tablesutil import reversetablerelativebboxes_outer, boxoverlap
 from src.historicdocumentprocessing.tabletransformer_dataset import CustomDataset
-from src.historicdocumentprocessing.util.plottotikz import save_plot_as_tikz
+from src.historicdocumentprocessing.util.plottotikz import save_plot_as_tikz  # type: ignore
 
 
 def findoptimalfilterpoint_outer(
