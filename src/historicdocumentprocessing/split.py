@@ -7,7 +7,7 @@ import random
 import shutil
 import warnings
 from pathlib import Path
-from typing import Optional, List
+from typing import Optional, List, Dict, Union
 
 import pandas as pd
 import torch
@@ -94,7 +94,7 @@ def reversewildtablesvalidsplit(
     validpath = glob.glob(f"{path}/valid/*")
     trainpath = f"{path}/train"
     dict = {"validation": [v.split("/")[-1] for v in validpath]}
-    with open(f"{path}/split1.json", "w") as file:
+    with open(f"{path}/split.json", "w") as file:
         json.dump(dict, file, indent=2)
     # print(len(validpath))
     for v in validpath:
@@ -230,13 +230,33 @@ def recreatetablesplit(
         shutil.copytree(src=imfolder[0], dst=saveloc, dirs_exist_ok=True)
 
 
+def savetablesplit(
+    datapath: str,  # f"{Path(__file__).parent.absolute()}/../../data/BonnData"
+    splitname: str = "split",
+):
+    """Save the split of bonn table dataset or glosat dataset to file.
+
+    Args:
+        datapath: path to dataset folder
+        splitname: name of split file
+
+    """
+    dict: Dict[str, Union[List[str], Dict[str, int]]] = {"len": {}}
+    for split in ("train", "test", "valid"):
+        folder = glob.glob(f"{datapath}/{split}/*")
+        dict.update({split: [f.split("/")[-1] for f in folder]})
+        dict["len"].update({split: len(folder)})  # type: ignore
+    with open(f"{datapath}/{splitname}.json", "w") as file:
+        json.dump(dict, file, indent=2)
+
+
 def get_args() -> argparse.Namespace:
     """Define args."""   # noqa: DAR201
     parser = argparse.ArgumentParser(description="split")
-    parser.add_argument('--operation', choices=['recreatesplit, validsplit, subclasssplit'])
+    parser.add_argument('--operation', choices=['recreatesplit, validsplit, subclasssplit', 'savesplit'])
 
     parser.add_argument('--datasetname', default="BonnData", choices=['BonnData', 'GloSat', 'Tablesinthewild'])
-    parser.add_argument('--splitfile', default='', help="filename of file with split file data")
+    parser.add_argument('--splitfile', default='split', help="filename of file with split file data")
 
     parser.add_argument('--tablerelative', action='store_true', default=False)
     parser.add_argument('--no-tablerelative', dest='tablerelative', action='store_false')
@@ -255,9 +275,11 @@ if __name__ == "__main__":
                                     xmlpath=f"{Path(__file__).parent.absolute()}/../../data/Tablesinthewild/rawdata/test/test-xml-revise/test-xml-revise",
                                     txtfolder=f"{Path(__file__).parent.absolute()}/../../data/Tablesinthewild/rawdata/test/sub_classes", tablerelative=args.tablerelative, rowcol=args.rowcol)
         else:
-            wildtablesvalidsplit(path=f"{Path(__file__).parent.absolute()}/../../data/Tablesinthewild/train", validfile=None if args.splitfile == '' else f"{Path(__file__).parent.absolute()}/../../data/Tablesinthewild/{args.splitfile}")
+            wildtablesvalidsplit(path=f"{Path(__file__).parent.absolute()}/../../data/Tablesinthewild/train", validfile=None if args.splitfile == '' else f"{Path(__file__).parent.absolute()}/../../data/Tablesinthewild/{args.splitfile}.json")
     else:
         if args.operation == 'validsplit':
             validsplit(path=f"{Path(__file__).parent.absolute()}/../../data/{args.datasetname}")
         elif args.operation == 'recreatesplit':
-            recreatetablesplit(datapath=f"{Path(__file__).parent.absolute()}/../../data/{args.datasetname}/preprocessed", csvpath=f"{Path(__file__).parent.absolute()}/../../data/{args.datasetname}/{args.splitfile}")
+            recreatetablesplit(datapath=f"{Path(__file__).parent.absolute()}/../../data/{args.datasetname}/preprocessed", csvpath=f"{Path(__file__).parent.absolute()}/../../data/{args.datasetname}/{args.splitfile}.csv")
+        elif args.operation == 'savesplit':
+            savetablesplit(datapath=f"{Path(__file__).parent.absolute()}/../../data/{args.datasetname}", splitname=args.splitfile)
