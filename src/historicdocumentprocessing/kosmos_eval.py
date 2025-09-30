@@ -1,18 +1,28 @@
 """Evaluation for Kosmos 2.5."""
+
 import argparse
 import glob
 import json
 import os
 from pathlib import Path
-from typing import Optional, List, Tuple
+from typing import List, Optional, Tuple
 
 import pandas
 import torch
 from tqdm import tqdm
 
-from src.historicdocumentprocessing.util.metricsutil import calcstats_iodt, calcstats_overlap, calcmetric_overlap, \
-    calcstats_iou, calcmetric, get_dataframe
-from src.historicdocumentprocessing.util.tablesutil import reversetablerelativebboxes_outer, extractboxes
+from src.historicdocumentprocessing.util.metricsutil import (
+    calcmetric,
+    calcmetric_overlap,
+    calcstats_iodt,
+    calcstats_iou,
+    calcstats_overlap,
+    get_dataframe,
+)
+from src.historicdocumentprocessing.util.tablesutil import (
+    extractboxes,
+    reversetablerelativebboxes_outer,
+)
 
 
 def calcmetrics_tables(
@@ -22,7 +32,7 @@ def calcmetrics_tables(
     saveloc: Optional[str] = None,
     tablerelative: bool = True,
     tableareaonly: bool = True,
-    datasetname: Optional[str] = None
+    datasetname: Optional[str] = None,
 ) -> Tuple[List[torch.Tensor], List[torch.Tensor], List[torch.Tensor]]:
     """Calculates metrics for all predictions and corresponding targets in a given location (pred Bboxes given as json files, targets as torch.Tensor).
 
@@ -429,18 +439,24 @@ def calcmetrics_tables(
 
 
 def get_args() -> argparse.Namespace:
-    """Define args."""   # noqa: DAR201
+    """Define args."""  # noqa: DAR201
     parser = argparse.ArgumentParser(description="kosmos_eval")
-    parser.add_argument('-t', '--testfolder', default="test", help="test data folder")
-    parser.add_argument('-p', '--predfolder', default='', help="prediction folder")
-    parser.add_argument('--datasetname', default="BonnData")
-    parser.add_argument('--iou_thresholds', nargs='*', type=float, default=[0.5, 0.6, 0.7, 0.8, 0.9])
+    parser.add_argument("-t", "--testfolder", default="test", help="test data folder")
+    parser.add_argument("-p", "--predfolder", default="", help="prediction folder")
+    parser.add_argument("--datasetname", default="BonnData")
+    parser.add_argument(
+        "--iou_thresholds", nargs="*", type=float, default=[0.5, 0.6, 0.7, 0.8, 0.9]
+    )
 
-    parser.add_argument('--tableareaonly', action='store_true', default=False)
-    parser.add_argument('--no-tableareaonly', dest='tableareaonly', action='store_false')
+    parser.add_argument("--tableareaonly", action="store_true", default=False)
+    parser.add_argument(
+        "--no-tableareaonly", dest="tableareaonly", action="store_false"
+    )
 
-    parser.add_argument('--tablerelative', action='store_true', default=False)
-    parser.add_argument('--no-tablerelative', dest='tablerelative', action='store_false')
+    parser.add_argument("--tablerelative", action="store_true", default=False)
+    parser.add_argument(
+        "--no-tablerelative", dest="tablerelative", action="store_false"
+    )
 
     return parser.parse_args()
 
@@ -451,7 +467,15 @@ if __name__ == "__main__":
     predpath = f"{Path(__file__).parent.absolute()}/../../results/kosmos25/{args.datasetname}{f'/{args.predfolder}' if args.predfolder else ''}"
     saveloc = f"{Path(__file__).parent.absolute()}/../../results/kosmos25/eval/fullimg/{args.datasetname}"
 
-    calcmetrics_tables(targetloc=targetpath, predloc=predpath, iou_thresholds=args.iou_thresholds, saveloc=saveloc, tablerelative=args.tablerelative, tableareaonly=args.tableareaonly, datasetname=args.datasetname)
+    calcmetrics_tables(
+        targetloc=targetpath,
+        predloc=predpath,
+        iou_thresholds=args.iou_thresholds,
+        saveloc=saveloc,
+        tablerelative=args.tablerelative,
+        tableareaonly=args.tableareaonly,
+        datasetname=args.datasetname,
+    )
 
     exit()
 

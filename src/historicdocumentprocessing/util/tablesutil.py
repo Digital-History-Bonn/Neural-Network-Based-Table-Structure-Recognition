@@ -1,8 +1,9 @@
 """Utility functions for tables."""
+
 import glob
 import math
 import typing
-from typing import Optional, List, Tuple
+from typing import List, Optional, Tuple
 
 import numpy as np
 import torch
@@ -10,7 +11,9 @@ from sklearn.cluster import DBSCAN
 from torchvision.ops.boxes import _box_inter_union
 
 
-def getcells(rows: torch.Tensor, cols: torch.Tensor, keepnonoverlap: bool = True) -> torch.Tensor:
+def getcells(
+    rows: torch.Tensor, cols: torch.Tensor, keepnonoverlap: bool = True
+) -> torch.Tensor:
     """Get cell bboxes by intersecting row and column bboxes (for tabletransformer).
 
     Args:
@@ -84,11 +87,26 @@ def eucsimilarity(x: torch.Tensor, y: torch.Tensor) -> float:
 
     """
     slice = int(x.shape[0] / 2)
-    res = math.sqrt(pow(np.linalg.norm(np.where((x[:slice] - y[slice:]) < 0, 0, (x[:slice] - y[slice:]))), 2) + pow(np.linalg.norm(np.where((y[:slice] - x[slice:]) < 0, 0, y[:slice] - x[slice:])), 2))
+    res = math.sqrt(
+        pow(
+            np.linalg.norm(
+                np.where((x[:slice] - y[slice:]) < 0, 0, (x[:slice] - y[slice:]))
+            ),
+            2,
+        )
+        + pow(  # noqa: W503
+            np.linalg.norm(
+                np.where((y[:slice] - x[slice:]) < 0, 0, y[:slice] - x[slice:])
+            ),
+            2,
+        )
+    )
     return res
 
 
-def clustertables(boxes: torch.Tensor, epsprefactor: float = 1 / 6) -> typing.List[torch.Tensor]:
+def clustertables(
+    boxes: torch.Tensor, epsprefactor: float = 1 / 6
+) -> typing.List[torch.Tensor]:
     """Clustering Tables by 2d euclidian distance.
 
     Args:
@@ -295,7 +313,11 @@ def boxoverlap(
         True if BBox lies in tablebox
 
     """
-    return bbox[0] >= (tablebox[0] - fuzzy) and bbox[1] >= (tablebox[1] - fuzzy) and bbox[2] <= (tablebox[2] + fuzzy) and bbox[3] <= (tablebox[3] + fuzzy)
+    return (bbox[0] >= (tablebox[0] - fuzzy)
+            and bbox[1] >= (tablebox[1] - fuzzy)  # noqa: W504, W503
+            and bbox[2] <= (tablebox[2] + fuzzy)  # noqa: W504, W503
+            and bbox[3] <= (tablebox[3] + fuzzy)  # noqa: W504, W503
+            )
 
 
 def extractboundingbox(bbox: dict) -> Tuple[int, int, int, int]:

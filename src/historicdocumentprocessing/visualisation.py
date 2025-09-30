@@ -1,9 +1,10 @@
 """Visualise predictions on image."""
+
 import argparse
 import glob
 import json
 from pathlib import Path
-from typing import Optional, List
+from typing import List, Optional
 
 import torch
 from lightning_fabric.utilities import move_data_to_device
@@ -17,8 +18,12 @@ from tqdm import tqdm
 from transformers import AutoImageProcessor, TableTransformerForObjectDetection
 
 from src.historicdocumentprocessing.postprocessing import postprocess
-from src.historicdocumentprocessing.util.tablesutil import getcells, remove_invalid_bbox, \
-    reversetablerelativebboxes_outer, extractboxes
+from src.historicdocumentprocessing.util.tablesutil import (
+    extractboxes,
+    getcells,
+    remove_invalid_bbox,
+    reversetablerelativebboxes_outer,
+)
 from src.historicdocumentprocessing.util.visualisationutil import (
     drawimg_varformat_inner,
 )
@@ -347,9 +352,7 @@ def drawimages_var(
             imgpred = j
         else:
             signifier = j.split("/")[-1]
-            imgpred = [
-                file for file in glob.glob(f"{j}/*") if "_table_" not in file
-            ][0]
+            imgpred = [file for file in glob.glob(f"{j}/*") if "_table_" not in file][0]
         img = glob.glob(f"{impath}/{signifier}/{signifier}.jpg")
         drawimg_varformat(
             impath=img[0],
@@ -369,16 +372,18 @@ def drawimages_var(
 
 
 def get_args() -> argparse.Namespace:
-    """Define args."""   # noqa: DAR201
+    """Define args."""  # noqa: DAR201
     parser = argparse.ArgumentParser(description="visualisation")
-    parser.add_argument('i', '--imname', default="test", help="name of image")
-    parser.add_argument('-p', '--predfolder', default='', help="prediction folder or folders")
-    parser.add_argument('--datasetname', default="BonnData")
-    parser.add_argument('--rcnnmodels', nargs='*', type=str, default=[])
-    parser.add_argument('--tabletransformermodels', nargs='*', type=str, default=[])
+    parser.add_argument("i", "--imname", default="test", help="name of image")
+    parser.add_argument(
+        "-p", "--predfolder", default="", help="prediction folder or folders"
+    )
+    parser.add_argument("--datasetname", default="BonnData")
+    parser.add_argument("--rcnnmodels", nargs="*", type=str, default=[])
+    parser.add_argument("--tabletransformermodels", nargs="*", type=str, default=[])
 
-    parser.add_argument('--valid', action='store_true', default=False)
-    parser.add_argument('--no-valid', dest='tableareaonly', action='store_false')
+    parser.add_argument("--valid", action="store_true", default=False)
+    parser.add_argument("--no-valid", dest="tableareaonly", action="store_false")
 
     return parser.parse_args()
 
@@ -386,7 +391,14 @@ def get_args() -> argparse.Namespace:
 if __name__ == "__main__":
     args = get_args()
     impath = f"{Path(__file__).parent.absolute()}/../../data/{args.datasetname}/{args.predfolder}/{args.imname}/{args.imname}.pt"
-    drawimg_allmodels(datasetname=args.datasetname, imgpath=impath, rcnnmodels=args.rcnnmodels, tabletransformermodels=args.tabletransformermodels, predfolder=args.predfolder, valid=args.valid)
+    drawimg_allmodels(
+        datasetname=args.datasetname,
+        imgpath=impath,
+        rcnnmodels=args.rcnnmodels,
+        tabletransformermodels=args.tabletransformermodels,
+        predfolder=args.predfolder,
+        valid=args.valid,
+    )
     exit()
 
     # drawimg_varformat(savepath=f"{Path(__file__).parent.absolute()}/../../images/rcnn/BonnTables/test",

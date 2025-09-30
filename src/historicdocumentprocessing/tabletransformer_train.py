@@ -28,7 +28,7 @@ SOFTWARE.
 
 import argparse
 import statistics
-from pathlib import Path
+from typing import Optional
 
 import lightning.pytorch as pl
 import torch
@@ -43,11 +43,11 @@ from torchvision.utils import draw_bounding_boxes
 from transformers import AutoModelForObjectDetection
 
 from src.historicdocumentprocessing.tabletransformer_dataset import CustomDataset
-from typing import Optional
 
 
 class TableTransformer(pl.LightningModule):
     """Class to train TableTransformer models."""
+
     def __init__(
         self,
         lr,
@@ -82,9 +82,7 @@ class TableTransformer(pl.LightningModule):
         # print(model.config.id2label)
         if loadmodelcheckpoint:
             self.model.load_state_dict(
-                torch.load(
-                    f"{Path(__file__).parent.absolute()}/../../checkpoints/tabletransformer/{loadmodelcheckpoint}.pt"
-                )
+                torch.load(f"./checkpoints/tabletransformer/{loadmodelcheckpoint}.pt")
             )
             self.model.train()
             print("loaded: ", loadmodelcheckpoint)
@@ -114,7 +112,9 @@ class TableTransformer(pl.LightningModule):
             )
         elif datasetname == "Tablesinthewild" and not valdataset:
             self.example_image, self.example_target, self.example_lable = (
-                None, None, None  # type: ignore
+                None,
+                None,
+                None,  # type: ignore
             )
             (
                 self.train_example_image,
@@ -134,8 +134,8 @@ class TableTransformer(pl.LightningModule):
                 self.train_example_target,
                 self.train_example_lable,
             ) = traindataset.getimgtarget(0)
-        self.example_image = self.example_image
-        self.train_example_image = self.train_example_image
+        # self.example_image = self.example_image
+        # self.train_example_image = self.train_example_image
         self.savepath = savepath
         self.val_losses = []  # type: ignore
         self.mean_val_loss = None
@@ -280,7 +280,9 @@ class TableTransformer(pl.LightningModule):
         width, height = self.example_image.size
         pred = self.val_dataset.ImageProcessor.post_process_object_detection(  # type: ignore
             out, target_sizes=[(height, width)]
-        )[0]
+        )[
+            0
+        ]
         self.model.train()
         boxes = {
             "ground truth": self.example_target,
@@ -370,7 +372,7 @@ class TableTransformer(pl.LightningModule):
 
 
 def get_args() -> argparse.Namespace:
-    """Defines arguments."""   # noqa: DAR201
+    """Defines arguments."""  # noqa: DAR201
     parser = argparse.ArgumentParser(description="tabletransformer_train")
 
     parser.add_argument(
@@ -393,7 +395,7 @@ def get_args() -> argparse.Namespace:
         "--dataset",
         "-d",
         type=str,
-        default="Tablesinthewild",
+        default="BonnData",
         help="which dataset should be used for training",
     )
 
@@ -458,9 +460,9 @@ if __name__ == "__main__":
     # if args.load:
     #     modelname = args.load.split("/")[-1]
     #     name = f"{name}_loaded_{modelname}"
-    train_log_dir = f"{Path(__file__).parent.absolute()}/../../logs/runs/"
+    train_log_dir = "./logs/runs/"
     traindataset = CustomDataset(
-        f"{Path(__file__).parent.absolute()}/../../data/{args.dataset}/train",
+        f"./data/{args.dataset}/train",
         args.objective,
     )
 
@@ -479,7 +481,7 @@ if __name__ == "__main__":
 
     if args.valid:
         validdataset = CustomDataset(
-            f"{Path(__file__).parent.absolute()}/../../data/{args.dataset}/valid",
+            f"./data/{args.dataset}/valid",
             args.objective,
         )
     #    valid_dataloader = DataLoader(dataset=validdataset)
@@ -488,15 +490,15 @@ if __name__ == "__main__":
     #    valid_dataloader = None
     # train_dataloader = DataLoader(dataset=traindataset)
     testdataset = CustomDataset(
-        f"{Path(__file__).parent.absolute()}/../../data/{args.dataset}/test",
+        f"./data/{args.dataset}/test",
         args.objective,
     )
 
-    print(f"{len(traindataset)=}")
-    print(f"{len(validdataset)=}")
+    print(f"Data-Set length: {len(traindataset)=}")
+    print(f"Validation-Set length: {len(validdataset)=}")
 
     checkpoint_callback = ModelCheckpoint(
-        dirpath=f"{Path(__file__).parent.absolute()}/../../checkpoints/tabletransformer/",
+        dirpath="./checkpoints/tabletransformer/",
         filename=f"{f'{name}_es' if args.early_stopping else f'{name}_end'}",
     )
     logger = loggers.TensorBoardLogger(
@@ -510,7 +512,7 @@ if __name__ == "__main__":
         valdataset=validdataset,
         testdataset=testdataset,
         datasetname=args.dataset,
-        savepath=f"{Path(__file__).parent.absolute()}/../../checkpoints/tabletransformer/{name}",
+        savepath=f"./checkpoints/tabletransformer/{name}",
         loadmodelcheckpoint=args.load,
     )
     if args.identicalname and args.load and args.valid and not args.early_stopping:
@@ -522,13 +524,11 @@ if __name__ == "__main__":
             num_nodes=args.num_nodes,
             callbacks=[checkpoint_callback],
         )
-        checkpoint = torch.load(
-            f"{Path(__file__).parent.absolute()}/../../checkpoints/tabletransformer/{args.load}.ckpt"
-        )
+        checkpoint = torch.load(f"./checkpoints/tabletransformer/{args.load}.ckpt")
         print("global_step", checkpoint["global_step"])
         trainer.fit(
             model,
-            ckpt_path=f"{Path(__file__).parent.absolute()}/../../checkpoints/tabletransformer/{args.load}.ckpt",
+            ckpt_path=f"./checkpoints/tabletransformer/{args.load}.ckpt",
         )
     elif args.valid and not args.early_stopping:
         trainer = Trainer(

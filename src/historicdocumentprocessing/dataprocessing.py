@@ -3,6 +3,7 @@
 Note key difference regarding <imname>.pt, which is bbox coordinates on full image here (instead of image saved as pytorch tensor)
 
 """
+
 import argparse
 import glob
 import os
@@ -105,7 +106,7 @@ def processdata_wildtable_tablerelative(
 
 def processdata_wildtable_rowcoll(
     datapath: str,
-) -> (List[Dict]):
+) -> List[Dict]:
     """Extract cell, row, col BBoxes from XML, to torch tensor (cell, row, col BBox coordinates relative to table, table coords relative to full image).
 
     Extraction method for row, col from https://github.com/Digital-History-Bonn/HistorischeTabellenSemanticExtraction/blob/main/src/TableExtraction/preprocess.py.
@@ -304,14 +305,20 @@ def processdata_wildtable_outer(
 
 
 def get_args() -> argparse.Namespace:
-    """Define args."""   # noqa: DAR201
+    """Define args."""  # noqa: DAR201
     parser = argparse.ArgumentParser(description="dataprocessing_wtw")
-    parser.add_argument('-p', '--path', default=f"{Path(__file__).parent.absolute()}/../../data/Tablesinthewild/rawdata")
-    parser.add_argument('--folder', default="train")
-    parser.add_argument('--tablerelative', action='store_true', default=False)
-    parser.add_argument('--no-tablerelative', dest='tablerelative', action='store_false')
-    parser.add_argument('--rowcol', action='store_true', default=False)
-    parser.add_argument('--no-rowcol', dest='rowcol', action='store_false')
+    parser.add_argument(
+        "-p",
+        "--path",
+        default=f"{Path(__file__).parent.absolute()}/../../data/Tablesinthewild/rawdata",
+    )
+    parser.add_argument("--folder", default="train")
+    parser.add_argument("--tablerelative", action="store_true", default=False)
+    parser.add_argument(
+        "--no-tablerelative", dest="tablerelative", action="store_false"
+    )
+    parser.add_argument("--rowcol", action="store_true", default=False)
+    parser.add_argument("--no-rowcol", dest="rowcol", action="store_false")
 
     return parser.parse_args()
 
@@ -319,4 +326,6 @@ def get_args() -> argparse.Namespace:
 if __name__ == "__main__":
     args = get_args()
     path = f"{args.path}/{args.folder}"
-    processdata_wildtable_outer(datapath=path, tablerelative=args.tablerelative, rowcol=args.rowcol)
+    processdata_wildtable_outer(
+        datapath=path, tablerelative=args.tablerelative, rowcol=args.rowcol
+    )

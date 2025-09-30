@@ -5,7 +5,7 @@ import os
 import typing
 import warnings
 from pathlib import Path
-from typing import Optional, List, Literal, Tuple, Dict
+from typing import Dict, List, Literal, Optional, Tuple
 
 import pandas as pd
 import torch
@@ -21,9 +21,14 @@ from torchvision.ops.boxes import _box_inter_union
 from tqdm import tqdm
 from transformers import TableTransformerForObjectDetection
 
-from src.historicdocumentprocessing.util.tablesutil import reversetablerelativebboxes_outer, boxoverlap
 from src.historicdocumentprocessing.tabletransformer_dataset import CustomDataset
-from src.historicdocumentprocessing.util.plottotikz import save_plot_as_tikz  # type: ignore
+from src.historicdocumentprocessing.util.plottotikz import (
+    save_plot_as_tikz,
+)  # type: ignore
+from src.historicdocumentprocessing.util.tablesutil import (
+    boxoverlap,
+    reversetablerelativebboxes_outer,
+)
 
 
 def findoptimalfilterpoint_outer(
@@ -307,7 +312,9 @@ def findoptimalfilterpoint(
         f.write(str(bestpred))
 
 
-def findoptimalfilterpoint_inner(totaliou: typing.List, totalscores: typing.List) -> Tuple[typing.Union[float, int], torch.Tensor, torch.Tensor, torch.Tensor]:
+def findoptimalfilterpoint_inner(
+    totaliou: typing.List, totalscores: typing.List
+) -> Tuple[typing.Union[float, int], torch.Tensor, torch.Tensor, torch.Tensor]:
     """Inner function to find the optimal filter point.
 
     Args:
@@ -327,7 +334,8 @@ def findoptimalfilterpoint_inner(totaliou: typing.List, totalscores: typing.List
     # print(totalscores)
     # print(totaliou)
     for idx, pred in enumerate(preds):
-        assert torch.equal(len(totaliou[totalscores >= pred]) - torch.sum(totaliou[totalscores >= pred] >= 0.5), torch.sum(totaliou[totalscores >= pred] < 0.5))
+        assert torch.equal(
+            len(totaliou[totalscores >= pred]) - torch.sum(totaliou[totalscores >= pred] >= 0.5), torch.sum(totaliou[totalscores >= pred] < 0.5),)
         # bestpred += pred * (torch.sum(totaliou[totalscores == pred] >= 0.5) / totaliou[totalscores == pred])
         sum_tp[idx] = torch.sum(totaliou[totalscores >= pred] >= 0.5)
         sum_fp[idx] = torch.sum(totaliou[totalscores >= pred] < 0.5)
@@ -453,7 +461,9 @@ def calcstats_iodt(
     return prediodt, targetiodt, tp, fp, fn
 
 
-def intersection_over_detection(predbox: torch.Tensor, targetbox: torch.Tensor) -> torch.Tensor:
+def intersection_over_detection(
+    predbox: torch.Tensor, targetbox: torch.Tensor
+) -> torch.Tensor:
     """Calculate the IoDT (Intersection over Detection Metric): Intersection of prediction and target over the total prediction area.
 
     Args:
@@ -475,7 +485,10 @@ def intersection_over_detection(predbox: torch.Tensor, targetbox: torch.Tensor) 
 
 
 def calcstats_overlap(
-    predbox: torch.Tensor, targetbox: torch.Tensor, imname: Optional[str] = None, fuzzy: int = 25
+    predbox: torch.Tensor,
+    targetbox: torch.Tensor,
+    imname: Optional[str] = None,
+    fuzzy: int = 25,
 ) -> Tuple[torch.Tensor, torch.Tensor, torch.Tensor]:
     """Calculates stats based on wether a prediciton box fully overlaps with a target box instead of IoU.
 
@@ -732,4 +745,8 @@ if __name__ == "__main__":
     #    "titw_severalcalls_2_e250_es.pt", "titw_severalcalls_2_e250_end.pt", "titw_call_aachen_e250_es.pt", "titw_call_aachen_e250_end.pt"],
     #                             modelfolder=f"{Path(__file__).parent.absolute()}/../../../checkpoints/tabletransformer",
     #                             valid=False, modeltype="tabletransformer")
-    findoptimalfilterpoint(modelpath=f"{Path(__file__).parent.absolute()}/../../../checkpoints/fasterrcnn/BonnDataFullImage1_BonnData_fullimage_e250_es.pt", datasetpath=f"{Path(__file__).parent.absolute()}/../../../data/BonnData/test", valid=True)
+    findoptimalfilterpoint(
+        modelpath=f"{Path(__file__).parent.absolute()}/../../../checkpoints/fasterrcnn/BonnDataFullImage1_BonnData_fullimage_e250_es.pt",
+        datasetpath=f"{Path(__file__).parent.absolute()}/../../../data/BonnData/test",
+        valid=True,
+    )

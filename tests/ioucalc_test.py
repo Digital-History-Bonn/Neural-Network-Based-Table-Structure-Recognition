@@ -1,4 +1,5 @@
 """Tests for IoU calculation."""
+
 from pathlib import Path
 
 import pandas
@@ -7,8 +8,14 @@ from bs4 import BeautifulSoup
 from torchvision.ops import box_iou
 
 from src.historicdocumentprocessing.dataprocessing import processdata_wildtable_inner
-from src.historicdocumentprocessing.util.metricsutil import calcmetric, get_dataframe, calcstats_iou
-from src.historicdocumentprocessing.util.tablesutil import reversetablerelativebboxes_outer
+from src.historicdocumentprocessing.util.metricsutil import (
+    calcmetric,
+    calcstats_iou,
+    get_dataframe,
+)
+from src.historicdocumentprocessing.util.tablesutil import (
+    reversetablerelativebboxes_outer,
+)
 
 
 def test_ioumetrics():

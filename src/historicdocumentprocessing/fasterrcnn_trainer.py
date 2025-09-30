@@ -9,7 +9,6 @@ from typing import Optional, Union
 
 import numpy as np
 import torch
-
 from torch.optim import AdamW, Optimizer
 from torch.utils.data import DataLoader
 from torch.utils.tensorboard import SummaryWriter  # type: ignore
@@ -20,7 +19,6 @@ from torchvision.models.detection import (
 )
 from torchvision.utils import draw_bounding_boxes
 from tqdm import tqdm
-
 
 from src.historicdocumentprocessing.fasterrcnn_dataset import CustomDataset
 
@@ -120,7 +118,9 @@ class Trainer:
             name: name of the model
         """
         self.model.load_state_dict(
-            torch.load(f"{Path(__file__).parent.absolute()}/../../checkpoints/{name}.pt")
+            torch.load(
+                f"{Path(__file__).parent.absolute()}/../../checkpoints/{name}.pt"
+            )
         )
 
     def train(self, epoch: int) -> None:
@@ -315,7 +315,9 @@ class Trainer:
 
 
 def get_model(
-    objective: str = "fullimage", load_model: Optional[str] = None, randominit: bool = False
+    objective: str = "fullimage",
+    load_model: Optional[str] = None,
+    randominit: bool = False,
 ) -> FasterRCNN:
     """Creates a FasterRCNN model for training.
 
@@ -352,7 +354,7 @@ def get_model(
 
 
 def get_args() -> argparse.Namespace:
-    """Defines arguments."""   # noqa: DAR201
+    """Defines arguments."""  # noqa: DAR201
     parser = argparse.ArgumentParser(description="fasterrcnn_training")
 
     parser.add_argument(
@@ -455,9 +457,7 @@ if __name__ == "__main__":
     )
     if args.identicalname:
         name = args.name
-    model = get_model(
-        args.objective, load_model=args.load, randominit=args.randominit
-    )
+    model = get_model(args.objective, load_model=args.load, randominit=args.randominit)
 
     transform = None
     if args.augmentations:

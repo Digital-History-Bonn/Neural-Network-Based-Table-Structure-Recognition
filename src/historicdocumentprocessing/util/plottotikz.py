@@ -3,12 +3,13 @@
 
 since tikzplotlib is not maintained anymore, this will only work with webcolors<=1.13
 """
-import matplotlib.figure
-import requests
-import tikzplotlib
 from csv import reader
 from pathlib import Path
 from typing import List
+
+import matplotlib.figure
+import requests
+import tikzplotlib
 from matplotlib import pyplot as plt
 
 

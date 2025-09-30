@@ -41,8 +41,10 @@ from torchvision.transforms.functional import pil_to_tensor
 from torchvision.utils import draw_bounding_boxes
 from transformers import AutoImageProcessor, BatchFeature
 
-from src.historicdocumentprocessing.util.tablesutil import reversetablerelativebboxes_inner, \
-    reversetablerelativebboxes_outer
+from src.historicdocumentprocessing.util.tablesutil import (
+    reversetablerelativebboxes_inner,
+    reversetablerelativebboxes_outer,
+)
 
 
 def reversetablerelativebboxes_outer_rowcoll(
@@ -62,7 +64,9 @@ def reversetablerelativebboxes_outer_rowcoll(
     newcoords = torch.zeros((0, 4))
     for table in glob.glob(f"{fpath}/*_{category}_*.pt"):
         n = int(table.split(".")[-2].split("_")[-1])
-        newcell = reversetablerelativebboxes_inner(tablebbox=tablebboxes[n], cellbboxes=torch.load(table))
+        newcell = reversetablerelativebboxes_inner(
+            tablebbox=tablebboxes[n], cellbboxes=torch.load(table)
+        )
         newcoords = torch.vstack((newcoords, newcell))
     return newcoords
 
@@ -85,6 +89,7 @@ class CustomDataset(Dataset):  # type: ignore
 
         """
         super().__init__()
+        self.path = path
         if objective == "fullimage":
             self.data = sorted(
                 list(glob.glob(f"{path}/*")), key=lambda x: str(x.split(os.sep)[-1])

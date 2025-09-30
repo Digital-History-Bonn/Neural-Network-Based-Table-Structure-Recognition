@@ -6,14 +6,15 @@ from pathlib import Path
 from typing import Dict, Optional, Tuple, Union
 
 import torch
+from PIL import Image
 from torch.nn import Module
 from torch.utils.data import Dataset
 from torchvision.io import read_image
 from torchvision.utils import draw_bounding_boxes
 
-from PIL import Image
-
-from src.historicdocumentprocessing.util.tablesutil import reversetablerelativebboxes_outer
+from src.historicdocumentprocessing.util.tablesutil import (
+    reversetablerelativebboxes_outer,
+)
 
 
 class CustomDataset(Dataset):  # type: ignore
@@ -142,7 +143,7 @@ if __name__ == "__main__":
     # )
 
     img, target = dataset[0]
-    print(target['boxes'])
+    print(target["boxes"])
     result = draw_bounding_boxes(image=(img * 255).to(torch.uint8), boxes=target["boxes"], colors=["red" for i in range(target["boxes"].shape[0])], labels=["Ground" for i in range(target["boxes"].shape[0])])  # type: ignore
     result = Image.fromarray(result.permute(1, 2, 0).numpy())
     result.save(f"{Path(__file__).parent.absolute()}/../../images/rcnn/test.jpg")

@@ -1,10 +1,11 @@
 """Postprocessing."""
+
 import argparse
 import glob
 import json
 import os
 from pathlib import Path
-from typing import Optional, Literal, Tuple
+from typing import Literal, Optional, Tuple
 
 import pandas
 import torch
@@ -14,23 +15,30 @@ from torchvision.models.detection import (
     FasterRCNN_ResNet50_FPN_Weights,
     fasterrcnn_resnet50_fpn,
 )
-
 from tqdm import tqdm
 from transformers import AutoModelForObjectDetection
 from typing_extensions import List
 
-
-from src.historicdocumentprocessing.util.metricsutil import calcstats_iodt, calcstats_overlap, calcmetric_overlap, \
-    calcstats_iou, calcmetric, get_dataframe
 from src.historicdocumentprocessing.tabletransformer_dataset import CustomDataset
-from src.historicdocumentprocessing.util.glosat_paper_postprocessing_method import (  # type: ignore
+from src.historicdocumentprocessing.util.glosat_paper_postprocessing_method import (
     reconstruct_table,
+)  # type: ignore
+from src.historicdocumentprocessing.util.metricsutil import (
+    calcmetric,
+    calcmetric_overlap,
+    calcstats_iodt,
+    calcstats_iou,
+    calcstats_overlap,
+    get_dataframe,
 )
 from src.historicdocumentprocessing.util.tablesutil import (
+    boxoverlap,
     clustertablesseperately,
+    extractboxes,
     getcells,
     getsurroundingtable,
-    remove_invalid_bbox, reversetablerelativebboxes_outer, boxoverlap, extractboxes,
+    remove_invalid_bbox,
+    reversetablerelativebboxes_outer,
 )
 
 
@@ -265,8 +273,12 @@ def postprocess_rcnn_sep(
 
 
 def postprocess_kosmos_sep(
-    targetloc: Optional[str] = None,  # f"{Path(__file__).parent.absolute()}/../../data/BonnData/test"
-    predloc: Optional[str] = None,  # f"{Path(__file__).parent.absolute()}/../../results/kosmos25/BonnData/Tabellen/test"
+    targetloc: Optional[
+        str
+    ] = None,  # f"{Path(__file__).parent.absolute()}/../../data/BonnData/test"
+    predloc: Optional[
+        str
+    ] = None,  # f"{Path(__file__).parent.absolute()}/../../results/kosmos25/BonnData/Tabellen/test"
     datasetname: str = "BonnData",
     iou_thresholds: Optional[List[float]] = None,  # [0.5, 0.6, 0.7, 0.8, 0.9]
     epsprefactorchange=tuple([3.0, 1.5]),
@@ -713,7 +725,9 @@ def postprocess_rcnn(
 
     """
     saveloc = f"{Path(__file__).parent.absolute()}/../../results/fasterrcnn/postprocessed/fullimg/{datasetname}"
-    modelpath = f"{Path(__file__).parent.absolute()}/../../checkpoints/fasterrcnn/{modelname}"
+    modelpath = (
+        f"{Path(__file__).parent.absolute()}/../../checkpoints/fasterrcnn/{modelname}"
+    )
     model = fasterrcnn_resnet50_fpn(
         weights=FasterRCNN_ResNet50_FPN_Weights.DEFAULT,
         **{"box_detections_per_img": 200},
@@ -1168,27 +1182,38 @@ def postprocess_eval(
 
 
 def get_args() -> argparse.Namespace:
-    """Define args."""   # noqa: DAR201
+    """Define args."""  # noqa: DAR201
     parser = argparse.ArgumentParser(description="postprocess")
-    parser.add_argument('-f', '--folder', default="test", help="test data folder")
-    parser.add_argument('-p', '--predfolder', default='', help="prediction folder (kosmos25)")
-    parser.add_argument('-m', '--modeltype', choices=['fasterrcnn', 'kosmos25', 'tabletransformer'], default='kosmos25')
-    parser.add_argument('--modelname')
-    parser.add_argument('--datasetname', default="BonnData")
+    parser.add_argument("-f", "--folder", default="test", help="test data folder")
+    parser.add_argument(
+        "-p", "--predfolder", default="", help="prediction folder (kosmos25)"
+    )
+    parser.add_argument(
+        "-m",
+        "--modeltype",
+        choices=["fasterrcnn", "kosmos25", "tabletransformer"],
+        default="kosmos25",
+    )
+    parser.add_argument("--modelname")
+    parser.add_argument("--datasetname", default="BonnData")
 
-    parser.add_argument('--tablerelative', action='store_true', default=False)
-    parser.add_argument('--no-tablerelative', dest='tablerelative', action='store_false')
+    parser.add_argument("--tablerelative", action="store_true", default=False)
+    parser.add_argument(
+        "--no-tablerelative", dest="tablerelative", action="store_false"
+    )
 
-    parser.add_argument('--filter', action='store_true', default=False)
-    parser.add_argument('--no-filter', dest='filter', action='store_false')
+    parser.add_argument("--filter", action="store_true", default=False)
+    parser.add_argument("--no-filter", dest="filter", action="store_false")
 
-    parser.add_argument('--valid_filter', action='store_true', default=False)
-    parser.add_argument('--no-valid_filter', dest='valid_filter', action='store_false')
+    parser.add_argument("--valid_filter", action="store_true", default=False)
+    parser.add_argument("--no-valid_filter", dest="valid_filter", action="store_false")
 
-    parser.add_argument('--eval', action='store_true', default=False)
-    parser.add_argument('--no-eval', dest='eval', action='store_false')
+    parser.add_argument("--eval", action="store_true", default=False)
+    parser.add_argument("--no-eval", dest="eval", action="store_false")
 
-    parser.add_argument('--iou_thresholds', nargs='*', type=float, default=[0.5, 0.6, 0.7, 0.8, 0.9])
+    parser.add_argument(
+        "--iou_thresholds", nargs="*", type=float, default=[0.5, 0.6, 0.7, 0.8, 0.9]
+    )
 
     return parser.parse_args()
 
@@ -1197,16 +1222,41 @@ if __name__ == "__main__":
     args = get_args()
     dpath = f"{Path(__file__).parent.absolute()}/../../data/{args.datasetname}/{args.folder}"
     if not args.eval:
-        if args.modeltype == 'fasterrcnn':
-            postprocess_rcnn(modelname=args.modelname, targetloc=dpath, datasetname=args.datasetname, filter=args.filter, valid=args.valid_filter)
-        elif args.modeltype == 'tabletransformer':
-            postprocess_tabletransformer(modelname=args.modelname, targetloc=dpath, datasetname=args.datasetname, filter=args.filter, valid=args.valid_filter)
-        elif args.modeltype == 'kosmos25':
+        if args.modeltype == "fasterrcnn":
+            postprocess_rcnn(
+                modelname=args.modelname,
+                targetloc=dpath,
+                datasetname=args.datasetname,
+                filter=args.filter,
+                valid=args.valid_filter,
+            )
+        elif args.modeltype == "tabletransformer":
+            postprocess_tabletransformer(
+                modelname=args.modelname,
+                targetloc=dpath,
+                datasetname=args.datasetname,
+                filter=args.filter,
+                valid=args.valid_filter,
+            )
+        elif args.modeltype == "kosmos25":
             predpath = f"{Path(__file__).parent.absolute()}/../../results/kosmos25/{args.datasetname}{f'/{args.predfolder}' if args.predfolder else ''}"
-            postprocess_kosmos(targetloc=dpath, predloc=predpath, datasetname=args.datasetname)
+            postprocess_kosmos(
+                targetloc=dpath, predloc=predpath, datasetname=args.datasetname
+            )
     else:
-        postprocess_eval(datasetname=args.datasetname, modeltype=args.modeltype, modelname=args.modelname if args.modeltype in ['fasterrcnn', 'tabletransformer'] else None, tablerelative=args.tablerelative, iou_thresholds=args.iou_thresholds,
-                         filter=args.filter, valid=args.valid_filter)
+        postprocess_eval(
+            datasetname=args.datasetname,
+            modeltype=args.modeltype,
+            modelname=(
+                args.modelname
+                if args.modeltype in ["fasterrcnn", "tabletransformer"]
+                else None
+            ),
+            tablerelative=args.tablerelative,
+            iou_thresholds=args.iou_thresholds,
+            filter=args.filter,
+            valid=args.valid_filter,
+        )
     exit()
     # postprocess_tabletransformer(modelname="tabletransformer_v0_new_BonnDataFullImage_tabletransformer_estest_BonnData_fullimage_e250_valid_es.pt", targetloc= f"{Path(__file__).parent.absolute()}/../../data/BonnData/test",
     #                             datasetname="BonnData")

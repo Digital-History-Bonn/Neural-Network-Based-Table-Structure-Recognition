@@ -1,22 +1,27 @@
 """Evaluation for Tabletransformer."""
+
 import argparse
 import glob
 import os
 from pathlib import Path
-from typing import Optional, List
+from typing import List, Optional
 
 import pandas
 import torch
 from lightning.fabric.utilities import move_data_to_device
 from tqdm import tqdm
-from transformers import (
-    TableTransformerForObjectDetection,
-)
+from transformers import TableTransformerForObjectDetection
 
 from src.historicdocumentprocessing.fasterrcnn_eval import tableareabboxes
-from src.historicdocumentprocessing.util.metricsutil import calcstats_iodt, calcstats_overlap, calcmetric_overlap, \
-    calcstats_iou, calcmetric, get_dataframe
 from src.historicdocumentprocessing.tabletransformer_dataset import CustomDataset
+from src.historicdocumentprocessing.util.metricsutil import (
+    calcmetric,
+    calcmetric_overlap,
+    calcstats_iodt,
+    calcstats_iou,
+    calcstats_overlap,
+    get_dataframe,
+)
 from src.historicdocumentprocessing.util.tablesutil import getcells
 
 
@@ -398,29 +403,33 @@ def inference(
 
 
 def get_args() -> argparse.Namespace:
-    """Define args."""   # noqa: DAR201
+    """Define args."""  # noqa: DAR201
     parser = argparse.ArgumentParser(description="tabletransformer_eval")
-    parser.add_argument('-f', '--folder', default="test", help="test data folder")
-    parser.add_argument('-m', '--modelname')
-    parser.add_argument('--datasetname', default="BonnData")
+    parser.add_argument("-f", "--folder", default="test", help="test data folder")
+    parser.add_argument("-m", "--modelname")
+    parser.add_argument("--datasetname", default="BonnData")
 
-    parser.add_argument('--celleval', action='store_true', default=False)
-    parser.add_argument('--no-celleval', dest='tablerelative', action='store_false')
+    parser.add_argument("--celleval", action="store_true", default=False)
+    parser.add_argument("--no-celleval", dest="tablerelative", action="store_false")
 
-    parser.add_argument('--tableareaonly', action='store_true', default=False)
-    parser.add_argument('--no-tableareaonly', dest='tableareaonly', action='store_false')
+    parser.add_argument("--tableareaonly", action="store_true", default=False)
+    parser.add_argument(
+        "--no-tableareaonly", dest="tableareaonly", action="store_false"
+    )
 
-    parser.add_argument('--filter', action='store_true', default=False)
-    parser.add_argument('--no-filter', dest='filter', action='store_false')
+    parser.add_argument("--filter", action="store_true", default=False)
+    parser.add_argument("--no-filter", dest="filter", action="store_false")
 
-    parser.add_argument('--valid_filter', action='store_true', default=False)
-    parser.add_argument('--no-valid_filter', dest='valid_filter', action='store_false')
+    parser.add_argument("--valid_filter", action="store_true", default=False)
+    parser.add_argument("--no-valid_filter", dest="valid_filter", action="store_false")
 
-    parser.add_argument('--per_category', action='store_true', default=False)
-    parser.add_argument('--no-per_category', dest='per_category', action='store_false')
-    parser.add_argument('--catfolder', default="testsubclasses")
+    parser.add_argument("--per_category", action="store_true", default=False)
+    parser.add_argument("--no-per_category", dest="per_category", action="store_false")
+    parser.add_argument("--catfolder", default="testsubclasses")
 
-    parser.add_argument('--iou_thresholds', nargs='*', type=float, default=[0.5, 0.6, 0.7, 0.8, 0.9])
+    parser.add_argument(
+        "--iou_thresholds", nargs="*", type=float, default=[0.5, 0.6, 0.7, 0.8, 0.9]
+    )
 
     return parser.parse_args()
 
@@ -432,9 +441,26 @@ if __name__ == "__main__":
 
     if args.per_category:
         for cat in glob.glob(
-                f"{Path(__file__).parent.absolute()}/../../data/{args.datasetname}/{args.catfolder}/*"
+            f"{Path(__file__).parent.absolute()}/../../data/{args.datasetname}/{args.catfolder}/*"
         ):
             print(cat)
-            inference(modelpath=mpath, targetloc=dpath, tableareaonly=args.tableareaonly, filtering=args.filter, valid=args.valid_filter, celleval=args.celleval, iou_thresholds=args.iou_thresholds)
+            inference(
+                modelpath=mpath,
+                targetloc=dpath,
+                tableareaonly=args.tableareaonly,
+                filtering=args.filter,
+                valid=args.valid_filter,
+                celleval=args.celleval,
+                iou_thresholds=args.iou_thresholds,
+            )
     else:
-        inference(modelpath=mpath, targetloc=dpath, iou_thresholds=args.iou_thresholds, tableareaonly=args.tableareaonly, filtering=args.filter, valid=args.valid_filter, datasetname=args.datasetname, celleval=args.celleval)
+        inference(
+            modelpath=mpath,
+            targetloc=dpath,
+            iou_thresholds=args.iou_thresholds,
+            tableareaonly=args.tableareaonly,
+            filtering=args.filter,
+            valid=args.valid_filter,
+            datasetname=args.datasetname,
+            celleval=args.celleval,
+        )
