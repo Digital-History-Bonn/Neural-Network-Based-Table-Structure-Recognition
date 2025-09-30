@@ -2,7 +2,6 @@
 
 import nox
 
-
 nox.options.sessions = ["lint", "typing", "format"]
 
 
@@ -19,7 +18,7 @@ def run_test(session):
     session.run("pytest")
 
 
-@nox.session(name="limited-test", python='3.8')
+@nox.session(name="limited-test", python="3.8")
 def run_limited_test(session):
     """Run ioucalc test.
 
@@ -46,7 +45,7 @@ def run_limited_test(session):
     session.run("pytest", *test_files)
 
 
-@nox.session(name="small-limited-test", python='3.8')
+@nox.session(name="small-limited-test", python="3.8")
 def run_small_test(session):
     """Run ioucalc test.
 

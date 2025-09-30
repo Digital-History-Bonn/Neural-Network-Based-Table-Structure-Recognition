@@ -1,5 +1,5 @@
 # Neural Network Based Table Structure Recognition
-This is the code for my BA.
+Code for neural network based table structure recognition, based on Annika Thelen's Bachelor Thesis.
 
 # Used Datasets
 GloSAT:https://github.com/stuartemiddleton/glosat_table_dataset/tree/main
@@ -17,6 +17,89 @@ Faster R-CNN: https://pytorch.org/vision/stable/models/generated/torchvision.mod
 
 # Dependencies
 Please see https://github.com/Digital-History-Bonn/HistorischeTabellenSemanticExtraction/tree/main to preprocess GloSAT and BonnData Datasets
+
+
+
+# Get started
+The dataset currently can not be downloaded by a script. You need to clone https://gitlab.uni-bonn.de/digital-history/tabellenlayout/immediat-tables by hand. It needs to have the following structure, with _annotations_ containing all the Transkribus annotation -xml-files and _images_ containing all
+the images as .jpg-files.
+
+```
+.
++-- data
+|   +--BonnData
+|   |  +--annoations
+|   |  |  +--.xml-files
+|   |  |        ...
+|   |
+|   |  +--images
+|      |  +--.jpg-files
+|      |        ...
+```
+
+### GloSAT dataset
+The GloSAT dataset can be downloaded using the `download.py` script: 
+```python
+    python -m src.historicdocumentprocessing.download
+```
+
+
+## Preprocess the data
+For preprocessing the data the `preprocess.py` can be used. It creates a new folder in data/BonnData
+or data/GloSAT called preprocessed with all the preprocessed data. Use `--BonnData` or `--GloSAT` to
+preprocess the specific dataset.
+
+```python
+    python -m src.historicdocumentprocessing.preprocess --BonnData
+```
+```python
+    python -m src.historicdocumentprocessing.preprocess --GloSAT
+```
+
+## Create Training, Validation and Test split
+To create a split on the data the `split.py` can be used:
+
+```python
+    python -m src.historicdocumentprocessing.split --BonnData
+```
+```python
+    python -m src.historicdocumentprocessing.split --GloSAT
+```
+
+## Train a model
+To train a model the `trainer.py` script can be used:
+```python
+    python -m src.historicdocumentprocessing.tabletransformer_train
+```
+Here the following parameter can be used:
+
+| parameter           | functionality                                                  |
+|---------------------|----------------------------------------------------------------|
+| --name, -n          | name of the model in savefiles and logging                     |
+| --epochs, -e        | Number of epochs to train                                      |
+| --dataset, -d       | which dataset should be used for training (GloSAT or BonnData) |
+| --objective, -o     | objective of the model ('table', 'cell', 'row' or 'col')       |
+| --augmentations, -a | Use augmentations while training                               |
+
+
+## Evaluate a model
+To evaluate a model the `evaluation.py` script can be used:
+```python
+    python -m src.TableExtraction.evaluation
+```
+
+Here the following parameter can be used:
+
+| parameter           | functionality                                                  |
+|---------------------|----------------------------------------------------------------|
+| --dataset, -d       | which dataset should be used for training (GloSAT or BonnData) |
+| --objective, -o     | objective of the model ('table', 'cell', 'row' or 'col')       |
+| --model, -m         | name of the model to load and evaluate                         |
+
+
+
+
+
 
 # Used Code
 Included Post-Processing from https://github.com/stuartemiddleton/glosat_table_dataset/blob/main/dla/src/table_structure_analysis.py
