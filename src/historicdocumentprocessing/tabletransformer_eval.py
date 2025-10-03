@@ -7,6 +7,7 @@ from pathlib import Path
 from typing import List, Optional
 
 import pandas
+import numpy as np
 import torch
 from lightning.fabric.utilities import move_data_to_device
 from tqdm import tqdm
@@ -74,18 +75,18 @@ def inference(
         return
     if filtering:
         with open(
-            f"{Path(__file__).parent.absolute()}/../../results/tabletransformer/bestfilterthresholds{'_valid' if valid else ''}/{modelname}.txt",
+            f"./results/tabletransformer/bestfilterthresholds{'_valid' if valid else ''}/{modelname}.txt",
             "r",
         ) as f:
             filterthreshold = float(f.read())
-    saveloc = f"{Path(__file__).parent.absolute()}/../../results/tabletransformer/testevalfinal1/fullimg/{datasetname}/{modelname}/no_filtering_iou_{'_'.join([str(iou_thresholds[0]), str(iou_thresholds[-1])])}"
-    # boxsaveloc = f"{Path(__file__).parent.absolute()}/../../results/fasterrcnn/{datasetname}/{modelname}"
+    saveloc = f"./results/tabletransformer/testevalfinal1/fullimg/{datasetname}/{modelname}/no_filtering_iou_{'_'.join([str(iou_thresholds[0]), str(iou_thresholds[-1])])}"
+    # boxsaveloc = f"./results/fasterrcnn/{datasetname}/{modelname}"
     if tableareaonly and not filtering:
-        saveloc = f"{Path(__file__).parent.absolute()}/../../results/tabletransformer/testevalfinal1/fullimg/{datasetname}/{modelname}/tableareaonly/no_filtering_iou_{'_'.join([str(iou_thresholds[0]), str(iou_thresholds[-1])])}"
+        saveloc = f"./results/tabletransformer/testevalfinal1/fullimg/{datasetname}/{modelname}/tableareaonly/no_filtering_iou_{'_'.join([str(iou_thresholds[0]), str(iou_thresholds[-1])])}"
     elif filtering and not tableareaonly:
-        saveloc = f"{Path(__file__).parent.absolute()}/../../results/tabletransformer/testevalfinal1/fullimg/{datasetname}/{modelname}/filtering_{filterthreshold}{'_novalid' if not valid else ''}_iou{'_'.join([str(iou_thresholds[0]), str(iou_thresholds[-1])])}"
+        saveloc = f"./results/tabletransformer/testevalfinal1/fullimg/{datasetname}/{modelname}/filtering_{filterthreshold}{'_novalid' if not valid else ''}_iou{'_'.join([str(iou_thresholds[0]), str(iou_thresholds[-1])])}"
     elif filtering and tableareaonly:
-        saveloc = f"{Path(__file__).parent.absolute()}/../../results/tabletransformer/testevalfinal1/fullimg/{datasetname}/{modelname}/tableareaonly/filtering_{filterthreshold}{'_novalid' if not valid else ''}_iou{'_'.join([str(iou_thresholds[0]), str(iou_thresholds[-1])])}"
+        saveloc = f"./results/tabletransformer/testevalfinal1/fullimg/{datasetname}/{modelname}/tableareaonly/filtering_{filterthreshold}{'_novalid' if not valid else ''}_iou{'_'.join([str(iou_thresholds[0]), str(iou_thresholds[-1])])}"
     saveloc = f"{saveloc}{'/cells' if celleval else ''}"
     os.makedirs(saveloc, exist_ok=True)
 
@@ -400,7 +401,15 @@ def inference(
     fullimagedf.to_csv(f"{saveloc}/fullimageiou.csv")
     iodtdf.to_csv(f"{saveloc}/fullimageiodt.csv")
     conclusiondf.to_csv(f"{saveloc}/overview.csv")
+    print(f"overlapdf - precision: {np.mean(overlapdf['prec'])}")
+    print(f"overlapdf - recall: {np.mean(overlapdf['recall'])}")
+    print(f"fullimagedf - precision@0.5: {np.mean(fullimagedf['prec@0.5'])}")
+    print(f"fullimagedf - recall@0.5: {np.mean(fullimagedf['recall@0.5'])}")
+    print(f"iodtdf - precision@0.5: {np.mean(iodtdf['prec@0.5'])}")
+    print(f"iodtdf - recall@0.5: {np.mean(iodtdf['recall@0.5'])}")
 
+    print('conclusion')
+    print(conclusiondf)
 
 def get_args() -> argparse.Namespace:
     """Define args."""  # noqa: DAR201
@@ -436,12 +445,12 @@ def get_args() -> argparse.Namespace:
 
 if __name__ == "__main__":
     args = get_args()
-    dpath = f"{Path(__file__).parent.absolute()}/../../data/{args.datasetname}/{args.folder}"
-    mpath = f"{Path(__file__).parent.absolute()}/../../checkpoints/tabletransformer/{args.modelname}"
+    dpath = f"./data/{args.datasetname}/{args.folder}"
+    mpath = f"./checkpoints/tabletransformer/{args.modelname}"
 
     if args.per_category:
         for cat in glob.glob(
-            f"{Path(__file__).parent.absolute()}/../../data/{args.datasetname}/{args.catfolder}/*"
+            f"./data/{args.datasetname}/{args.catfolder}/*"
         ):
             print(cat)
             inference(

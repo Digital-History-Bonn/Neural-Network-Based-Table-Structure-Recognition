@@ -26,8 +26,8 @@ from src.historicdocumentprocessing.util.tablesutil import (
 
 
 def calcmetrics_tables(
-    targetloc: str,  # f"{Path(__file__).parent.absolute()}/../../data/BonnData/test"
-    predloc: str,  # f"{Path(__file__).parent.absolute()}/../../results/kosmos25/BonnData/Tabellen/test"
+    targetloc: str,  # f"./data/BonnData/test"
+    predloc: str,  # f"./results/kosmos25/BonnData/Tabellen/test"
     iou_thresholds: Optional[List[float]] = None,
     saveloc: Optional[str] = None,
     tablerelative: bool = True,
@@ -52,7 +52,7 @@ def calcmetrics_tables(
     if iou_thresholds is None:
         iou_thresholds = [0.5, 0.6, 0.7, 0.8, 0.9]
     if saveloc is None:
-        saveloc = f"{Path(__file__).parent.absolute()}/../../results/kosmos25/eval/fullimg/{datasetname}"
+        saveloc = f"./results/kosmos25/eval/fullimg/{datasetname}"
     if tableareaonly:
         saveloc = f"{saveloc}/tableareaonly"
     saveloc = (
@@ -435,6 +435,10 @@ def calcmetrics_tables(
     tabledf.to_csv(f"{saveloc}/tableiou.csv")
     iodtdf.to_csv(f"{saveloc}/fullimageiodt.csv")
     conclusiondf.to_csv(f"{saveloc}/overview.csv")
+
+    print("conclusion")
+    print(conclusiondf)
+
     return fullioulist, fullf1list, fullwf1list
 
 
@@ -463,9 +467,9 @@ def get_args() -> argparse.Namespace:
 
 if __name__ == "__main__":
     args = get_args()
-    targetpath = f"{Path(__file__).parent.absolute()}/../../data/{args.datasetname}/{args.folder}"
-    predpath = f"{Path(__file__).parent.absolute()}/../../results/kosmos25/{args.datasetname}{f'/{args.predfolder}' if args.predfolder else ''}"
-    saveloc = f"{Path(__file__).parent.absolute()}/../../results/kosmos25/eval/fullimg/{args.datasetname}"
+    targetpath = "./{args.datasetname}/{args.folder}"
+    predpath = "./results/kosmos25/{args.datasetname}{f'/{args.predfolder}' if args.predfolder else ''}"
+    saveloc = "{/results/kosmos25/eval/fullimg/{args.datasetname}"
 
     calcmetrics_tables(
         targetloc=targetpath,
@@ -480,136 +484,136 @@ if __name__ == "__main__":
     exit()
 
     calcmetrics_tables(
-        targetloc=f"{Path(__file__).parent.absolute()}/../../data/Tablesinthewild/test",
-        predloc=f"{Path(__file__).parent.absolute()}/../../results/kosmos25/Tablesinthewild/complete",
+        targetloc=f"./data/Tablesinthewild/test",
+        predloc=f"./results/kosmos25/Tablesinthewild/complete",
         iou_thresholds=[0.5, 0.6, 0.7, 0.8, 0.9],
-        saveloc=f"{Path(__file__).parent.absolute()}/../../results/kosmos25/testevalfinal2/fullimg"
+        saveloc=f"./results/kosmos25/testevalfinal2/fullimg"
         f"/Tablesinthewild/allsubsets/tableavail/tablerelative/tableareaonly",
     )
     calcmetrics_tables(
-        targetloc=f"{Path(__file__).parent.absolute()}/../../data/Tablesinthewild/test",
-        predloc=f"{Path(__file__).parent.absolute()}/../../results/kosmos25/Tablesinthewild/complete",
+        targetloc=f"./data/Tablesinthewild/test",
+        predloc=f"./results/kosmos25/Tablesinthewild/complete",
         iou_thresholds=[0.5, 0.6, 0.7, 0.8, 0.9],
-        saveloc=f"{Path(__file__).parent.absolute()}/../../results/kosmos25/testevalfinal2/fullimg"
+        saveloc=f"./results/kosmos25/testevalfinal2/fullimg"
         f"/Tablesinthewild/allsubsets/tableavail/tablerelative/nottableareaonly",
         tableareaonly=False,
     )
     """
     calcmetrics_tables(
-        targetloc=f"{Path(__file__).parent.absolute()}/../../data/Tablesinthewild/preprocessed/simple",
-        predloc=f"{Path(__file__).parent.absolute()}/../../results/kosmos25/Tablesinthewild/simple",
+        targetloc=f"./data/Tablesinthewild/preprocessed/simple",
+        predloc=f"./results/kosmos25/Tablesinthewild/simple",
         iou_thresholds=[0.5, 0.6, 0.7, 0.8, 0.9],
-        saveloc=f"{Path(__file__).parent.absolute()}/../../results/kosmos25/testevalchange/fullimg"
+        saveloc=f"./results/kosmos25/testevalchange/fullimg"
         f"/Tablesinthewild/simple/tableavail",
     )
     calcmetrics_tables(
-        targetloc=f"{Path(__file__).parent.absolute()}/../../data/Tablesinthewild/preprocessed/curved",
-        predloc=f"{Path(__file__).parent.absolute()}/../../results/kosmos25/Tablesinthewild/curved",
+        targetloc=f"./data/Tablesinthewild/preprocessed/curved",
+        predloc=f"./results/kosmos25/Tablesinthewild/curved",
         iou_thresholds=[0.5, 0.6, 0.7, 0.8, 0.9],
-        saveloc=f"{Path(__file__).parent.absolute()}/../../results/kosmos25/testevalchange/fullimg"
+        saveloc=f"./results/kosmos25/testevalchange/fullimg"
         f"/Tablesinthewild/curved/tableavail",
     )
     calcmetrics_tables(
-        targetloc=f"{Path(__file__).parent.absolute()}/../../data/Tablesinthewild/preprocessed/occblu",
-        predloc=f"{Path(__file__).parent.absolute()}/../../results/kosmos25/Tablesinthewild/occblu",
+        targetloc=f"./data/Tablesinthewild/preprocessed/occblu",
+        predloc=f"./results/kosmos25/Tablesinthewild/occblu",
         iou_thresholds=[0.5, 0.6, 0.7, 0.8, 0.9],
-        saveloc=f"{Path(__file__).parent.absolute()}/../../results/kosmos25/testevalchange/fullimg"
+        saveloc=f"./results/kosmos25/testevalchange/fullimg"
         f"/Tablesinthewild/occblu/tableavail",
     )
     calcmetrics_tables(
-        targetloc=f"{Path(__file__).parent.absolute()}/../../data/Tablesinthewild/preprocessed/overlaid",
-        predloc=f"{Path(__file__).parent.absolute()}/../../results/kosmos25/Tablesinthewild/overlaid",
+        targetloc=f"./data/Tablesinthewild/preprocessed/overlaid",
+        predloc=f"./results/kosmos25/Tablesinthewild/overlaid",
         iou_thresholds=[0.5, 0.6, 0.7, 0.8, 0.9],
-        saveloc=f"{Path(__file__).parent.absolute()}/../../results/kosmos25/testevalchange/fullimg"
+        saveloc=f"./results/kosmos25/testevalchange/fullimg"
         f"/Tablesinthewild/overlaid/tableavail",
     )
     calcmetrics_tables(
-        targetloc=f"{Path(__file__).parent.absolute()}/../../data/Tablesinthewild/preprocessed/Inclined",
-        predloc=f"{Path(__file__).parent.absolute()}/../../results/kosmos25/Tablesinthewild/Inclined1",
+        targetloc=f"./data/Tablesinthewild/preprocessed/Inclined",
+        predloc=f"./results/kosmos25/Tablesinthewild/Inclined1",
         iou_thresholds=[0.5, 0.6, 0.7, 0.8, 0.9],
-        saveloc=f"{Path(__file__).parent.absolute()}/../../results/kosmos25/testevalchange/fullimg"
+        saveloc=f"./results/kosmos25/testevalchange/fullimg"
         f"/Tablesinthewild/Inclined/tableavail",
     )
     calcmetrics_tables(
-        targetloc=f"{Path(__file__).parent.absolute()}/../../data/Tablesinthewild/preprocessed/extremeratio",
-        predloc=f"{Path(__file__).parent.absolute()}/../../results/kosmos25/Tablesinthewild/extremeratio1",
+        targetloc=f"./data/Tablesinthewild/preprocessed/extremeratio",
+        predloc=f"./results/kosmos25/Tablesinthewild/extremeratio1",
         iou_thresholds=[0.5, 0.6, 0.7, 0.8, 0.9],
-        saveloc=f"{Path(__file__).parent.absolute()}/../../results/kosmos25/testevalchange/fullimg"
+        saveloc=f"./results/kosmos25/testevalchange/fullimg"
         f"/Tablesinthewild/extremeratio/tableavail",
     )
     calcmetrics_tables(
-        targetloc=f"{Path(__file__).parent.absolute()}/../../data/Tablesinthewild/preprocessed/muticolorandgrid",
-        predloc=f"{Path(__file__).parent.absolute()}/../../results/kosmos25/Tablesinthewild/muticolorandgrid1",
+        targetloc=f"./data/Tablesinthewild/preprocessed/muticolorandgrid",
+        predloc=f"./results/kosmos25/Tablesinthewild/muticolorandgrid1",
         iou_thresholds=[0.5, 0.6, 0.7, 0.8, 0.9],
-        saveloc=f"{Path(__file__).parent.absolute()}/../../results/kosmos25/testevalchange/fullimg"
+        saveloc=f"./results/kosmos25/testevalchange/fullimg"
         f"/Tablesinthewild/muticolorandgrid/tableavail",
     )
     # print(calcmetrics_jsoninput())
     calcmetrics_tables(
-        saveloc=f"{Path(__file__).parent.absolute()}/../../results/kosmos25/testevalchange/fullimg/BonnData"
+        saveloc=f"./results/kosmos25/testevalchange/fullimg/BonnData"
     )
     calcmetrics_tables(
-        targetloc=f"{Path(__file__).parent.absolute()}/../../data/GloSat/test",
-        predloc=f"{Path(__file__).parent.absolute()}/../../results/kosmos25/GloSat/test1",
+        targetloc=f"./data/GloSat/test",
+        predloc=f"./results/kosmos25/GloSat/test1",
         iou_thresholds=[0.5, 0.6, 0.7, 0.8, 0.9],
-        saveloc=f"{Path(__file__).parent.absolute()}/../../results/kosmos25/testevalchange/fullimg/GloSat",
+        saveloc=f"./results/kosmos25/testevalchange/fullimg/GloSat",
     )
     calcmetrics_tables(
-        targetloc=f"{Path(__file__).parent.absolute()}/../../data/Tablesinthewild/preprocessed/simple",
-        predloc=f"{Path(__file__).parent.absolute()}/../../results/kosmos25/Tablesinthewild/simple",
+        targetloc=f"./data/Tablesinthewild/preprocessed/simple",
+        predloc=f"./results/kosmos25/Tablesinthewild/simple",
         iou_thresholds=[0.5, 0.6, 0.7, 0.8, 0.9],
-        saveloc=f"{Path(__file__).parent.absolute()}/../../results/kosmos25/testevalchange/fullimg"
+        saveloc=f"./results/kosmos25/testevalchange/fullimg"
         f"/Tablesinthewild/simple",
         tablerelative=False,
     )
     calcmetrics_tables(
-        targetloc=f"{Path(__file__).parent.absolute()}/../../data/Tablesinthewild/preprocessed/curved",
-        predloc=f"{Path(__file__).parent.absolute()}/../../results/kosmos25/Tablesinthewild/curved",
+        targetloc=f"./data/Tablesinthewild/preprocessed/curved",
+        predloc=f"./results/kosmos25/Tablesinthewild/curved",
         iou_thresholds=[0.5, 0.6, 0.7, 0.8, 0.9],
-        saveloc=f"{Path(__file__).parent.absolute()}/../../results/kosmos25/testevalchange/fullimg"
+        saveloc=f"./results/kosmos25/testevalchange/fullimg"
         f"/Tablesinthewild/curved",
         tablerelative=False,
     )
     calcmetrics_tables(
-        targetloc=f"{Path(__file__).parent.absolute()}/../../data/Tablesinthewild/preprocessed/occblu",
-        predloc=f"{Path(__file__).parent.absolute()}/../../results/kosmos25/Tablesinthewild/occblu",
+        targetloc=f"./data/Tablesinthewild/preprocessed/occblu",
+        predloc=f"./results/kosmos25/Tablesinthewild/occblu",
         iou_thresholds=[0.5, 0.6, 0.7, 0.8, 0.9],
-        saveloc=f"{Path(__file__).parent.absolute()}/../../results/kosmos25/testevalchange/fullimg"
+        saveloc=f"./results/kosmos25/testevalchange/fullimg"
         f"/Tablesinthewild/occblu",
         tablerelative=False,
     )
     calcmetrics_tables(
-        targetloc=f"{Path(__file__).parent.absolute()}/../../data/Tablesinthewild/preprocessed/overlaid",
-        predloc=f"{Path(__file__).parent.absolute()}/../../results/kosmos25/Tablesinthewild/overlaid",
+        targetloc=f"./data/Tablesinthewild/preprocessed/overlaid",
+        predloc=f"./results/kosmos25/Tablesinthewild/overlaid",
         iou_thresholds=[0.5, 0.6, 0.7, 0.8, 0.9],
-        saveloc=f"{Path(__file__).parent.absolute()}/../../results/kosmos25/testevalchange/fullimg"
+        saveloc=f"./results/kosmos25/testevalchange/fullimg"
         f"/Tablesinthewild/overlaid",
         tablerelative=False,
     )
     calcmetrics_tables(
-        targetloc=f"{Path(__file__).parent.absolute()}/../../data/Tablesinthewild/preprocessed/Inclined",
-        predloc=f"{Path(__file__).parent.absolute()}/../../results/kosmos25/Tablesinthewild/Inclined1",
+        targetloc=f"./data/Tablesinthewild/preprocessed/Inclined",
+        predloc=f"./results/kosmos25/Tablesinthewild/Inclined1",
         iou_thresholds=[0.5, 0.6, 0.7, 0.8, 0.9],
-        saveloc=f"{Path(__file__).parent.absolute()}/../../results/kosmos25/testevalchange/fullimg"
+        saveloc=f"./results/kosmos25/testevalchange/fullimg"
         f"/Tablesinthewild/Inclined",
         tablerelative=False,
     )
     calcmetrics_tables(
-        targetloc=f"{Path(__file__).parent.absolute()}/../../data/Tablesinthewild/preprocessed/extremeratio",
-        predloc=f"{Path(__file__).parent.absolute()}/../../results/kosmos25/Tablesinthewild/extremeratio1",
+        targetloc=f"./data/Tablesinthewild/preprocessed/extremeratio",
+        predloc=f"./results/kosmos25/Tablesinthewild/extremeratio1",
         iou_thresholds=[0.5, 0.6, 0.7, 0.8, 0.9],
-        saveloc=f"{Path(__file__).parent.absolute()}/../../results/kosmos25/testevalchange/fullimg"
+        saveloc=f"./results/kosmos25/testevalchange/fullimg"
         f"/Tablesinthewild/extremeratio",
         tablerelative=False,
     )
     calcmetrics_tables(
-        targetloc=f"{Path(__file__).parent.absolute()}/../../data/Tablesinthewild/preprocessed/muticolorandgrid",
-        predloc=f"{Path(__file__).parent.absolute()}/../../results/kosmos25/Tablesinthewild/muticolorandgrid1",
+        targetloc=f"./data/Tablesinthewild/preprocessed/muticolorandgrid",
+        predloc=f"./results/kosmos25/Tablesinthewild/muticolorandgrid1",
         iou_thresholds=[0.5, 0.6, 0.7, 0.8, 0.9],
-        saveloc=f"{Path(__file__).parent.absolute()}/../../results/kosmos25/testevalchange/fullimg"
+        saveloc=f"./results/kosmos25/testevalchange/fullimg"
         f"/Tablesinthewild/muticolorandgrid",
         tablerelative=False,
     )
     """
-    # print(reversetablerelativebboxes_outer(f"{Path(__file__).parent.absolute()}/../../data/BonnData/Tabellen/preprocessed/I_HA_Rep_89_Nr_16160_0090"))
+    # print(reversetablerelativebboxes_outer(f"./data/BonnData/Tabellen/preprocessed/I_HA_Rep_89_Nr_16160_0090"))
     pass

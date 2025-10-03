@@ -39,7 +39,7 @@ the images as .jpg-files.
 
 ### GloSAT dataset
 The GloSAT dataset can be downloaded using the `download.py` script: 
-```python
+``` bash
     python -m src.historicdocumentprocessing.download
 ```
 
@@ -49,55 +49,46 @@ For preprocessing the data the `preprocess.py` can be used. It creates a new fol
 or data/GloSAT called preprocessed with all the preprocessed data. Use `--BonnData` or `--GloSAT` to
 preprocess the specific dataset.
 
-```python
+``` bash
     python -m src.historicdocumentprocessing.preprocess --BonnData
 ```
-```python
+``` bash
     python -m src.historicdocumentprocessing.preprocess --GloSAT
 ```
 
 ## Create Training, Validation and Test split
 To create a split on the data the `split.py` can be used:
 
-```python
+``` bash
     python -m src.historicdocumentprocessing.split --BonnData
 ```
-```python
+``` bash
     python -m src.historicdocumentprocessing.split --GloSAT
 ```
 
 ## Train a model
-To train a model the `trainer.py` script can be used:
-```python
+To train a model the `trainer.py` script can be used i.e.
+``` bash
     python -m src.historicdocumentprocessing.tabletransformer_train
 ```
-Here the following parameter can be used:
-
-| parameter           | functionality                                                  |
-|---------------------|----------------------------------------------------------------|
-| --name, -n          | name of the model in savefiles and logging                     |
-| --epochs, -e        | Number of epochs to train                                      |
-| --dataset, -d       | which dataset should be used for training (GloSAT or BonnData) |
-| --objective, -o     | objective of the model ('table', 'cell', 'row' or 'col')       |
-| --augmentations, -a | Use augmentations while training                               |
-
-
-## Evaluate a model
-To evaluate a model the `evaluation.py` script can be used:
-```python
-    python -m src.TableExtraction.evaluation
+or
+``` bash
+    python -m src.historicdocumentprocessing.fasterrcnn_trainer --name 'reproduction' --dataset BonnData
 ```
 
-Here the following parameter can be used:
-
-| parameter           | functionality                                                  |
-|---------------------|----------------------------------------------------------------|
-| --dataset, -d       | which dataset should be used for training (GloSAT or BonnData) |
-| --objective, -o     | objective of the model ('table', 'cell', 'row' or 'col')       |
-| --model, -m         | name of the model to load and evaluate                         |
-
-
-
+## Evaluate a model
+To evaluate a model the evaluation scripts can be used i.e
+``` bash
+    python -m src.historicdocumentprocessing.tabletransformer_eval --modelname tabletransformer_v0_new_model_BonnData_fullimage_e250_valid_end.pt
+```
+or 
+``` bash
+    python -m src.historicdocumentprocessing.kosmos_eval --datasetname BonnData
+```
+or 
+``` bash
+    python -m src.historicdocumentprocessing.fasterrcnn_eval --modelname rcnn_reproduction_BonnData_fullimage_e250_end.pt --tablerelative
+```
 
 
 

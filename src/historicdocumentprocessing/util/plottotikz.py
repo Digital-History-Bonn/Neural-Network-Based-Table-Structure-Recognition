@@ -9,7 +9,7 @@ from typing import List
 
 import matplotlib.figure
 import requests
-import tikzplotlib
+import matplot2tikz as tikzplotlib
 from matplotlib import pyplot as plt
 
 

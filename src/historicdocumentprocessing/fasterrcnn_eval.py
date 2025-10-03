@@ -50,8 +50,8 @@ def tableareabboxes(bboxes: torch.Tensor, tablepath: str) -> torch.Tensor:
 
 
 def inference_fullimg(
-    targetloc: str,  # f"{Path(__file__).parent.absolute()}/../../data/Tablesinthewild/test"
-    modelpath: str,  # f"{Path(__file__).parent.absolute()}/../../checkpoints/fasterrcnn/test4_Tablesinthewild_fullimage_e50_end.pt"
+    targetloc: str,  # f"./data/Tablesinthewild/test"
+    modelpath: str,  # f"./checkpoints/fasterrcnn/test4_Tablesinthewild_fullimage_e50_end.pt"
     datasetname: str = "Tablesinthewild",
     iou_thresholds: Optional[List[float]] = None,  # [0.5, 0.6, 0.7, 0.8, 0.9]
     filter: bool = True,
@@ -89,20 +89,20 @@ def inference_fullimg(
         print("Cuda not available")
         return
     modelname = modelpath.split(os.sep)[-1]
-    saveloc = f"{Path(__file__).parent.absolute()}/../../results/fasterrcnn/eval/fullimg/{datasetname}/{modelname}/iou_{'_'.join([str(iou_thresholds[0]), str(iou_thresholds[-1])])}"
-    # boxsaveloc = f"{Path(__file__).parent.absolute()}/../../results/fasterrcnn/{datasetname}/{modelname}"
+    saveloc = f"./results/fasterrcnn/eval/fullimg/{datasetname}/{modelname}/iou_{'_'.join([str(iou_thresholds[0]), str(iou_thresholds[-1])])}"
+    # boxsaveloc = f"./results/fasterrcnn/{datasetname}/{modelname}"
     if filter:
         with open(
-            f"{Path(__file__).parent.absolute()}/../../results/fasterrcnn/bestfilterthresholds{'_valid' if valid else ''}/{modelname}.txt",
+            f"./results/fasterrcnn/bestfilterthresholds{'_valid' if valid else ''}/{modelname}.txt",
             "r",
         ) as f:
             filtering = float(f.read())
     if tableareaonly and not filter:
-        saveloc = f"{Path(__file__).parent.absolute()}/../../results/fasterrcnn/eval/fullimg/{datasetname}/{modelname}/tableareaonly/iou_{'_'.join([str(iou_thresholds[0]), str(iou_thresholds[-1])])}"
+        saveloc = f"./results/fasterrcnn/eval/fullimg/{datasetname}/{modelname}/tableareaonly/iou_{'_'.join([str(iou_thresholds[0]), str(iou_thresholds[-1])])}"
     elif filter and not tableareaonly:
-        saveloc = f"{Path(__file__).parent.absolute()}/../../results/fasterrcnn/eval/fullimg/{datasetname}/{modelname}/filtering_{filtering}{'_valid' if valid else ''}_iou{'_'.join([str(iou_thresholds[0]), str(iou_thresholds[-1])])}"
+        saveloc = f"./results/fasterrcnn/eval/fullimg/{datasetname}/{modelname}/filtering_{filtering}{'_valid' if valid else ''}_iou{'_'.join([str(iou_thresholds[0]), str(iou_thresholds[-1])])}"
     elif filter and tableareaonly:
-        saveloc = f"{Path(__file__).parent.absolute()}/../../results/fasterrcnn/eval/fullimg/{datasetname}/{modelname}/tableareaonly/filtering_{filtering}{'_valid' if valid else ''}_iou{'_'.join([str(iou_thresholds[0]), str(iou_thresholds[-1])])}"
+        saveloc = f"./results/fasterrcnn/eval/fullimg/{datasetname}/{modelname}/tableareaonly/filtering_{filtering}{'_valid' if valid else ''}_iou{'_'.join([str(iou_thresholds[0]), str(iou_thresholds[-1])])}"
     os.makedirs(saveloc, exist_ok=True)
 
     # *** initializing variables ***
@@ -393,10 +393,13 @@ def inference_fullimg(
     iodtdf.to_csv(f"{saveloc}/fullimageiodt.csv")
     conclusiondf.to_csv(f"{saveloc}/overview.csv")
 
+    print('conclusion')
+    print(conclusiondf)
+
 
 def inference_tablecutout(
-    datapath: str,  # f"{Path(__file__).parent.absolute()}/../../data/BonnData/test"
-    modelpath: str,  # f"{Path(__file__).parent.absolute()}/../../checkpoints/fasterrcnn/run3_BonnData_cell_aug_loadrun_GloSAT_cell_aug_e250_es_e250_es.pt",
+    datapath: str,  # f"./data/BonnData/test"
+    modelpath: str,  # f"./checkpoints/fasterrcnn/run3_BonnData_cell_aug_loadrun_GloSAT_cell_aug_e250_es_e250_es.pt",
     datasetname: str = "BonnData",
     iou_thresholds: Optional[List[float]] = None,  # [0.5, 0.6, 0.7, 0.8, 0.9]
     filtering=False,
@@ -429,10 +432,10 @@ def inference_tablecutout(
         return
     model.eval()
     modelname = modelpath.split(os.sep)[-1]
-    saveloc = f"{Path(__file__).parent.absolute()}/../../results/fasterrcnn/eval/tableareacutout/{datasetname}/{modelname}"
-    boxsaveloc = f"{Path(__file__).parent.absolute()}/../../results/fasterrcnn/tableareacutout/{datasetname}/{modelname}"
+    saveloc = f"./results/fasterrcnn/eval/tableareacutout/{datasetname}/{modelname}"
+    boxsaveloc = f"./results/fasterrcnn/tableareacutout/{datasetname}/{modelname}"
     if filtering:
-        saveloc = f"{Path(__file__).parent.absolute()}/../../results/fasterrcnn/eval/tableareacutout/{datasetname}/{modelname}/filtering"
+        saveloc = f"./results/fasterrcnn/eval/tableareacutout/{datasetname}/{modelname}/filtering"
     os.makedirs(saveloc, exist_ok=True)
     if saveboxes:
         os.makedirs(boxsaveloc, exist_ok=True)
@@ -617,7 +620,9 @@ def inference_tablecutout(
     ioudf.to_csv(f"{saveloc}/iou.csv")
     iodtdf.to_csv(f"{saveloc}/iodt.csv")
     conclusiondf.to_csv(f"{saveloc}/overview.csv")
-    print("done")
+
+    print('conclusion')
+    print(conclusiondf)
 
 
 def get_args() -> argparse.Namespace:
@@ -659,8 +664,8 @@ def get_args() -> argparse.Namespace:
 
 if __name__ == "__main__":
     args = get_args()
-    dpath = f"{Path(__file__).parent.absolute()}/../../data/{args.datasetname}/{args.folder}"
-    mpath = f"{Path(__file__).parent.absolute()}/../../checkpoints/fasterrcnn/{args.modelname}"
+    dpath = f"./data/{args.datasetname}/{args.folder}"
+    mpath = f"./checkpoints/fasterrcnn/{args.modelname}"
     if args.tablecutout:
         inference_tablecutout(
             datapath=dpath,
@@ -672,7 +677,7 @@ if __name__ == "__main__":
     else:
         if args.per_category:
             for cat in glob.glob(
-                f"{Path(__file__).parent.absolute()}/../../data/{args.datasetname}/{args.catfolder}/*"
+                f"./data/{args.datasetname}/{args.catfolder}/*"
             ):
                 print(cat)
                 inference_fullimg(
@@ -696,3 +701,4 @@ if __name__ == "__main__":
                 tableareaonly=args.tableareaonly,
                 valid=args.valid_filter,
             )
+    pass
