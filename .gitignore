@@ -14,3 +14,4 @@ venv.bak/
 
 # Ignore data directory
 data/
+results/
