@@ -3,7 +3,6 @@
 import argparse
 import glob
 import os
-from pathlib import Path
 from typing import List, Optional
 
 import pandas
@@ -410,6 +409,7 @@ def inference(
 
     print('conclusion')
     print(conclusiondf)
+
 
 def get_args() -> argparse.Namespace:
     """Define args."""  # noqa: DAR201

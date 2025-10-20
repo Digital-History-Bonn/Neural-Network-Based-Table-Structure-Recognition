@@ -4,7 +4,6 @@ import argparse
 import glob
 import json
 import os
-from pathlib import Path
 from typing import List, Optional, Tuple
 
 import pandas
@@ -484,18 +483,18 @@ if __name__ == "__main__":
     exit()
 
     calcmetrics_tables(
-        targetloc=f"./data/Tablesinthewild/test",
-        predloc=f"./results/kosmos25/Tablesinthewild/complete",
+        targetloc="./data/Tablesinthewild/test",
+        predloc="./results/kosmos25/Tablesinthewild/complete",
         iou_thresholds=[0.5, 0.6, 0.7, 0.8, 0.9],
-        saveloc=f"./results/kosmos25/testevalfinal2/fullimg"
-        f"/Tablesinthewild/allsubsets/tableavail/tablerelative/tableareaonly",
+        saveloc="./results/kosmos25/testevalfinal2/fullimg"
+        + "/Tablesinthewild/allsubsets/tableavail/tablerelative/tableareaonly",
     )
     calcmetrics_tables(
-        targetloc=f"./data/Tablesinthewild/test",
-        predloc=f"./results/kosmos25/Tablesinthewild/complete",
+        targetloc="./data/Tablesinthewild/test",
+        predloc="./results/kosmos25/Tablesinthewild/complete",
         iou_thresholds=[0.5, 0.6, 0.7, 0.8, 0.9],
-        saveloc=f"./results/kosmos25/testevalfinal2/fullimg"
-        f"/Tablesinthewild/allsubsets/tableavail/tablerelative/nottableareaonly",
+        saveloc="./results/kosmos25/testevalfinal2/fullimg"
+        + "/Tablesinthewild/allsubsets/tableavail/tablerelative/nottableareaonly",
         tableareaonly=False,
     )
     """

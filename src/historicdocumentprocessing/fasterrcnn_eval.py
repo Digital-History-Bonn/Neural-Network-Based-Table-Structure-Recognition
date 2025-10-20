@@ -3,7 +3,6 @@
 import argparse
 import glob
 import os
-from pathlib import Path
 from typing import List, Optional
 
 import pandas
@@ -701,4 +700,3 @@ if __name__ == "__main__":
                 tableareaonly=args.tableareaonly,
                 valid=args.valid_filter,
             )
-    pass
