@@ -53,8 +53,8 @@ def extract_annotation(
             textregions.append(text)
 
     for table in soup.find_all("TableRegion"):
-        tablecoords = table.find("Coords")["points"] # type: ignore
-        if tablecoords.find("NaN") != -1: # type: ignore
+        tablecoords = table.find("Coords")["points"]  # type: ignore
+        if tablecoords.find("NaN") != -1:  # type: ignore
             continue
 
         t = {
@@ -123,7 +123,7 @@ def extract_annotation(
                 if int(cell["row"]) in rows.keys():  # type: ignore
                     rows[int(cell["row"])].extend(points.tolist())  # type: ignore
                 else:
-                    rows[int(cell["row"])] = points.tolist() # type: ignore
+                    rows[int(cell["row"])] = points.tolist()  # type: ignore
 
                 # when cell over multiple rows create a join operation
                 if int(cell["rowSpan"]) > 1:  # type: ignore
