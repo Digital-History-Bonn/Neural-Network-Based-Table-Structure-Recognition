@@ -64,7 +64,11 @@ def wildtablesvalidsplit(
     if not validfile:
         random.shuffle(trainlist)
         train = trainlist[: round(len(trainlist) * ratio[0])]
-        valid = trainlist[round(len(trainlist) * ratio[0]):round(len(trainlist) * (ratio[1] + ratio[0]))]
+        valid = trainlist[
+            round(len(trainlist) * ratio[0]) : round(
+                len(trainlist) * (ratio[1] + ratio[0])
+            )
+        ]
         assert len(train) + len(valid) == len(trainlist)
     else:
         imnames = pd.read_json(validfile)["validation"]
@@ -155,7 +159,11 @@ def subclasssplitwildtables(
                         "empty bbox, image not added to preprocessed test data"
                     )
 
-                if (rowcol and processedpt.numel() and (read_image(im) / 255).shape[0] == 3):
+                if (
+                    rowcol
+                    and processedpt.numel()
+                    and (read_image(im) / 255).shape[0] == 3
+                ):
                     tables = processdata_wildtable_rowcoll(xml)
                     tablelist = []
                     for n, _table in enumerate(tables):

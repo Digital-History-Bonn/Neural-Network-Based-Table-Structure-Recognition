@@ -7,9 +7,9 @@ from csv import reader
 from pathlib import Path
 from typing import List
 
+import matplot2tikz as tikzplotlib
 import matplotlib.figure
 import requests
-import matplot2tikz as tikzplotlib
 from matplotlib import pyplot as plt
 
 

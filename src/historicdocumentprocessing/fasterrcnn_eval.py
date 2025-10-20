@@ -392,7 +392,7 @@ def inference_fullimg(
     iodtdf.to_csv(f"{saveloc}/fullimageiodt.csv")
     conclusiondf.to_csv(f"{saveloc}/overview.csv")
 
-    print('conclusion')
+    print("conclusion")
     print(conclusiondf)
 
 
@@ -620,7 +620,7 @@ def inference_tablecutout(
     iodtdf.to_csv(f"{saveloc}/iodt.csv")
     conclusiondf.to_csv(f"{saveloc}/overview.csv")
 
-    print('conclusion')
+    print("conclusion")
     print(conclusiondf)
 
 
@@ -675,9 +675,7 @@ if __name__ == "__main__":
         )
     else:
         if args.per_category:
-            for cat in glob.glob(
-                f"./data/{args.datasetname}/{args.catfolder}/*"
-            ):
+            for cat in glob.glob(f"./data/{args.datasetname}/{args.catfolder}/*"):
                 print(cat)
                 inference_fullimg(
                     targetloc=cat,

@@ -390,7 +390,9 @@ def get_args() -> argparse.Namespace:
 
 if __name__ == "__main__":
     args = get_args()
-    impath = f"./data/{args.datasetname}/{args.predfolder}/{args.imname}/{args.imname}.pt"
+    impath = (
+        f"./data/{args.datasetname}/{args.predfolder}/{args.imname}/{args.imname}.pt"
+    )
     drawimg_allmodels(
         datasetname=args.datasetname,
         imgpath=impath,

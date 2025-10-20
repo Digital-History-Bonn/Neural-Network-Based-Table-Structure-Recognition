@@ -313,11 +313,12 @@ def boxoverlap(
         True if BBox lies in tablebox
 
     """
-    return (bbox[0] >= (tablebox[0] - fuzzy)
-            and bbox[1] >= (tablebox[1] - fuzzy)  # noqa: W504, W503
-            and bbox[2] <= (tablebox[2] + fuzzy)  # noqa: W504, W503
-            and bbox[3] <= (tablebox[3] + fuzzy)  # noqa: W504, W503
-            )
+    return (
+        bbox[0] >= (tablebox[0] - fuzzy)
+        and bbox[1] >= (tablebox[1] - fuzzy)  # noqa: W504, W503
+        and bbox[2] <= (tablebox[2] + fuzzy)  # noqa: W504, W503
+        and bbox[3] <= (tablebox[3] + fuzzy)  # noqa: W504, W503
+    )
 
 
 def extractboundingbox(bbox: dict) -> Tuple[int, int, int, int]:

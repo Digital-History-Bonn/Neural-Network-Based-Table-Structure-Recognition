@@ -66,7 +66,11 @@ def findoptimalfilterpoint_outer(
                     datasetpath=f"{Path(__file__).parent.absolute()}/../../../data/BonnData",
                     valid=valid,
                 )
-        elif ("GloSat" in modelpath and "BonnData" not in modelpath and "run" not in modelpath):
+        elif (
+            "GloSat" in modelpath
+            and "BonnData" not in modelpath
+            and "run" not in modelpath
+        ):
             if modeltype == "fasterrcnn":
                 findoptimalfilterpoint(
                     modelpath,
@@ -335,7 +339,10 @@ def findoptimalfilterpoint_inner(
     # print(totaliou)
     for idx, pred in enumerate(preds):
         assert torch.equal(
-            len(totaliou[totalscores >= pred]) - torch.sum(totaliou[totalscores >= pred] >= 0.5), torch.sum(totaliou[totalscores >= pred] < 0.5),)
+            len(totaliou[totalscores >= pred])
+            - torch.sum(totaliou[totalscores >= pred] >= 0.5),
+            torch.sum(totaliou[totalscores >= pred] < 0.5),
+        )
         # bestpred += pred * (torch.sum(totaliou[totalscores == pred] >= 0.5) / totaliou[totalscores == pred])
         sum_tp[idx] = torch.sum(totaliou[totalscores >= pred] >= 0.5)
         sum_fp[idx] = torch.sum(totaliou[totalscores >= pred] < 0.5)

@@ -45,10 +45,10 @@ def extract_annotation(
 
     # Find all TextLine elements and extract the Baseline points
     for textline in soup.find_all("TextRegion"):
-        textcoords = textline.find("Coords")["points"]
-        if textcoords.find("NaN") == -1:
+        textcoords = textline.find("Coords")["points"]  # type: ignore
+        if textcoords.find("NaN") == -1:  # type: ignore
             text = {
-                "coords": get_bbox(convert_coords(textline.find("Coords")["points"]))
+                "coords": get_bbox(convert_coords(textline.find("Coords")["points"]))  # type: ignore
             }
             textregions.append(text)
 
@@ -77,7 +77,11 @@ def extract_annotation(
             maxcol = max(maxcol, int(cell["col"]))
         firstcell = table.find("TableCell")
 
-        if (cell.get("rowSpan") is not None and int(firstcell["colSpan"]) == maxcol + 1 and int(firstcell["row"]) == 0):
+        if (
+            cell.get("rowSpan") is not None
+            and int(firstcell["colSpan"]) == maxcol + 1
+            and int(firstcell["row"]) == 0
+        ):
             coord1 = t["coords"]
             coord2 = get_bbox(convert_coords(firstcell.find("Coords")["points"]))
             t["coords"] = (coord1[0], coord2[3], coord1[2], coord1[3])

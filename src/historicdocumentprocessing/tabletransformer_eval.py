@@ -5,8 +5,8 @@ import glob
 import os
 from typing import List, Optional
 
-import pandas
 import numpy as np
+import pandas
 import torch
 from lightning.fabric.utilities import move_data_to_device
 from tqdm import tqdm
@@ -407,7 +407,7 @@ def inference(
     print(f"iodtdf - precision@0.5: {np.mean(iodtdf['prec@0.5'])}")
     print(f"iodtdf - recall@0.5: {np.mean(iodtdf['recall@0.5'])}")
 
-    print('conclusion')
+    print("conclusion")
     print(conclusiondf)
 
 
@@ -449,9 +449,7 @@ if __name__ == "__main__":
     mpath = f"./checkpoints/tabletransformer/{args.modelname}"
 
     if args.per_category:
-        for cat in glob.glob(
-            f"./data/{args.datasetname}/{args.catfolder}/*"
-        ):
+        for cat in glob.glob(f"./data/{args.datasetname}/{args.catfolder}/*"):
             print(cat)
             inference(
                 modelpath=mpath,
