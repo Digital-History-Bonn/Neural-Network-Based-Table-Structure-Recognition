@@ -1,4 +1,4 @@
 [flake8]
-ignore = B028, BLK100, N400, W503
+ignore = B028, BLK100, N400, W503, DAR201
 max-line-length = 350
 docstring-convention = google

@@ -296,7 +296,7 @@ def main(
 
 def get_args() -> argparse.Namespace:
     """Defines arguments.
-    
+
     Returns:
         parsed arguments.
     """

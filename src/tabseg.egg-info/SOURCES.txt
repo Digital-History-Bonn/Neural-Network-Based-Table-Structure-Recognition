@@ -1,0 +1,8 @@
+README.md
+setup.cfg
+setup.py
+src/tabseg.egg-info/PKG-INFO
+src/tabseg.egg-info/SOURCES.txt
+src/tabseg.egg-info/dependency_links.txt
+src/tabseg.egg-info/requires.txt
+src/tabseg.egg-info/top_level.txt
