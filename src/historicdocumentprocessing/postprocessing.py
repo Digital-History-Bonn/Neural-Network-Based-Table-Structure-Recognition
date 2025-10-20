@@ -20,9 +20,9 @@ from transformers import AutoModelForObjectDetection
 from typing_extensions import List
 
 from src.historicdocumentprocessing.tabletransformer_dataset import CustomDataset
-from src.historicdocumentprocessing.util.glosat_paper_postprocessing_method import (
+from src.historicdocumentprocessing.util.glosat_paper_postprocessing_method import (   # type: ignore
     reconstruct_table,
-)  # type: ignore
+)
 from src.historicdocumentprocessing.util.metricsutil import (
     calcmetric,
     calcmetric_overlap,
