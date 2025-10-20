@@ -295,7 +295,11 @@ def main(
 
 
 def get_args() -> argparse.Namespace:
-    """Defines arguments."""
+    """Defines arguments.
+    
+    Returns:
+        parsed arguments.
+    """
     parser = argparse.ArgumentParser(description="preprocess")
     parser.add_argument("--BonnData", action=argparse.BooleanOptionalAction)
     parser.set_defaults(BonnData=False)
