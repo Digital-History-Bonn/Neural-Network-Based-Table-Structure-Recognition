@@ -112,8 +112,8 @@ class TableTransformer(pl.LightningModule):
             )
         elif datasetname == "Tablesinthewild" and not valdataset:
             self.example_image, self.example_target, self.example_lable = (
-                None,
-                None,
+                None,  # type: ignore
+                None,  # type: ignore
                 None,  # type: ignore
             )
             (

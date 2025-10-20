@@ -53,12 +53,12 @@ def extract_annotation(
             textregions.append(text)
 
     for table in soup.find_all("TableRegion"):
-        tablecoords = table.find("Coords")["points"]
-        if tablecoords.find("NaN") != -1:
+        tablecoords = table.find("Coords")["points"] # type: ignore
+        if tablecoords.find("NaN") != -1: # type: ignore
             continue
 
         t = {
-            "coords": get_bbox(convert_coords(tablecoords)),
+            "coords": get_bbox(convert_coords(tablecoords)),  # type: ignore
             "cells": [],
             "columns": [],
             "rows": [],
@@ -74,16 +74,16 @@ def extract_annotation(
         row_joins = []  # list of join operations for rows
 
         for cell in table.find_all("TableCell"):
-            maxcol = max(maxcol, int(cell["col"]))
+            maxcol = max(maxcol, int(cell["col"]))  # type: ignore
         firstcell = table.find("TableCell")
 
         if (
             cell.get("rowSpan") is not None
-            and int(firstcell["colSpan"]) == maxcol + 1
-            and int(firstcell["row"]) == 0
+            and int(firstcell["colSpan"]) == maxcol + 1  # type: ignore
+            and int(firstcell["row"]) == 0  # type: ignore
         ):
             coord1 = t["coords"]
-            coord2 = get_bbox(convert_coords(firstcell.find("Coords")["points"]))
+            coord2 = get_bbox(convert_coords(firstcell.find("Coords")["points"]))  # type: ignore
             t["coords"] = (coord1[0], coord2[3], coord1[2], coord1[3])
 
         if table_relative:
@@ -94,11 +94,11 @@ def extract_annotation(
         # iterate over cells in table
         for cell in table.find_all("TableCell"):
             # get points and corners of cell
-            points = convert_coords(cell.find("Coords")["points"])
+            points = convert_coords(cell.find("Coords")["points"])  # type: ignore
 
             # uses corner points of cell if mode is 'corners'
             corners = (
-                [int(x) for x in cell.find("CornerPts").text.split_dataset()]
+                [int(x) for x in cell.find("CornerPts").text.split_dataset()]  # type: ignore
                 if mode == "corners"
                 else None
             )
@@ -112,7 +112,7 @@ def extract_annotation(
 
             # check if Cell is a header for table
             no_header_cell = cell.get("rowSpan") is not None and not (
-                int(cell["colSpan"]) == maxcol + 1 and int(cell["row"]) == 0
+                int(cell["colSpan"]) == maxcol + 1 and int(cell["row"]) == 0  # type: ignore
             )
 
             if not x_flat and not y_flat and no_header_cell:
@@ -120,32 +120,32 @@ def extract_annotation(
 
                 # calc rows
                 # add row number to dict
-                if int(cell["row"]) in rows.keys():
-                    rows[int(cell["row"])].extend(points.tolist())
+                if int(cell["row"]) in rows.keys():  # type: ignore
+                    rows[int(cell["row"])].extend(points.tolist())  # type: ignore
                 else:
-                    rows[int(cell["row"])] = points.tolist()
+                    rows[int(cell["row"])] = points.tolist() # type: ignore
 
                 # when cell over multiple rows create a join operation
-                if int(cell["rowSpan"]) > 1:
+                if int(cell["rowSpan"]) > 1:  # type: ignore
                     row_joins.extend(
                         [
-                            (int(cell["row"]), int(cell["row"]) + s)
-                            for s in range(1, int(cell["rowSpan"]))
+                            (int(cell["row"]), int(cell["row"]) + s)  # type: ignore
+                            for s in range(1, int(cell["rowSpan"]))  # type: ignore
                         ]
                     )
 
                 # add col number to dict
-                if int(cell["col"]) in columns.keys():
-                    columns[int(cell["col"])].extend(points.tolist())
+                if int(cell["col"]) in columns.keys():  # type: ignore
+                    columns[int(cell["col"])].extend(points.tolist())  # type: ignore
                 else:
-                    columns[int(cell["col"])] = points.tolist()
+                    columns[int(cell["col"])] = points.tolist()  # type: ignore
 
                 # when cell over multiple columns create a join operation
-                if int(cell["colSpan"]) > 1:
+                if int(cell["colSpan"]) > 1:  # type: ignore
                     col_joins.extend(
                         [
-                            (int(cell["col"]), int(cell["col"]) + s)
-                            for s in range(1, int(cell["colSpan"]))
+                            (int(cell["col"]), int(cell["col"]) + s)  # type: ignore
+                            for s in range(1, int(cell["colSpan"]))  # type: ignore
                         ]
                     )
 
@@ -171,7 +171,7 @@ def extract_annotation(
             for lst in col_set.subsets()
         ]
         t["columns"] = [
-            get_bbox(np.array(col), tablebbox=coord) for col in cols_list
+            get_bbox(np.array(col), tablebbox=coord) for col in cols_list  # type: ignore
         ]  # type: ignore
 
         if t["columns"] and t["rows"]:
@@ -222,7 +222,7 @@ def preprocess(
         tablelist.append(coord)
 
         # crop table from image
-        tableimg = img.crop((coord))
+        tableimg = img.crop((coord))  # type: ignore
 
         # save image of table
         torch.save(

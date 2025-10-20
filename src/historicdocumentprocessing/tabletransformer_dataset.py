@@ -315,7 +315,7 @@ class CustomDataset(Dataset):  # type: ignore
             img = Image.open(f"{self.data[index]}/{imgnum}.jpg").convert("RGB")
             labels = []
             pass
-        return img, target, labels
+        return img, target, labels  # type: ignore
 
     def getfolder(self, index):
         """Return folder associated with index.

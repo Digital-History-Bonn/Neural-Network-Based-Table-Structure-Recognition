@@ -65,7 +65,7 @@ def wildtablesvalidsplit(
         random.shuffle(trainlist)
         train = trainlist[: round(len(trainlist) * ratio[0])]
         valid = trainlist[
-            round(len(trainlist) * ratio[0]) : round(
+            round(len(trainlist) * ratio[0]):round(
                 len(trainlist) * (ratio[1] + ratio[0])
             )
         ]

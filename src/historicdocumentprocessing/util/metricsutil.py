@@ -22,7 +22,7 @@ from tqdm import tqdm
 from transformers import TableTransformerForObjectDetection
 
 from src.historicdocumentprocessing.tabletransformer_dataset import CustomDataset
-from src.historicdocumentprocessing.util.plottotikz import (
+from src.historicdocumentprocessing.util.plottotikz import (  # type: ignore
     save_plot_as_tikz,
 )  # type: ignore
 from src.historicdocumentprocessing.util.tablesutil import (
